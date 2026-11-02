@@ -6,6 +6,8 @@ import type { TrailMap } from '../lib/trailmap';
 import type { Activity, TrackPoint } from '../lib/types';
 import { TrailOverlay } from './TrailOverlay';
 import { useTheme, useStyles, type Palette, speedColor } from '../theme';
+import { mapsAvailable } from '../lib/mapsAvailable';
+import { MapPlaceholder } from './MapPlaceholder';
 
 interface Props {
   /** Cleaned track (indices must match `activities`). */
@@ -79,6 +81,7 @@ export function RouteMap({ points, speeds, activities, cursor, focus, style, tra
   const c = cursor != null ? points[cursor] : null;
   const first = points[0];
 
+  if (!mapsAvailable) return <MapPlaceholder height={280} style={style} />;
   return (
     <View style={[styles.wrap, style]}>
       <MapView

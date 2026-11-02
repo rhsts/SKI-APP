@@ -68,6 +68,36 @@ If the app doesn't open (for example while testing in Expo Go), tap **Copy invit
 
 To host the page somewhere else, change `INVITE_PAGE_URL` in `src/config.ts`.
 
+## Install the app (Android)
+
+Every push builds an installable APK on GitHub Actions and attaches it to a **Release**.
+
+1. On your phone, open **https://github.com/rhsts/SKI-APP/releases** and tap the newest release.
+2. Tap `ski-tracker-<n>.apk` to download it. When asked, allow your browser to **install unknown apps**,
+   then tap **Install**.
+3. On first launch, allow location **"All the time"** (for tracking with the screen off and start reminders)
+   and notifications.
+
+New builds install over the old one and keep your data. To build manually: **Actions → Build Android APK →
+Run workflow**.
+
+### Google Maps key (needed for maps in the installed app)
+
+The installed Android app uses Google Maps, which needs a free API key. Without one, maps show a placeholder
+and everything else still works.
+
+1. Go to **console.cloud.google.com** → create a project (any name).
+2. **APIs & Services → Library** → search **Maps SDK for Android** → **Enable**.
+3. **APIs & Services → Credentials → Create credentials → API key**. Copy the key.
+4. Recommended: edit the key → **Application restrictions: Android apps** → add package `com.rhsts.skiapp`
+   (fingerprint optional) → **API restrictions: Maps SDK for Android** → Save.
+5. In GitHub: repo **Settings → Secrets and variables → Actions → New repository secret**, name
+   `GOOGLE_MAPS_API_KEY`, paste the key → **Add secret**.
+6. **Actions → Build Android APK → Run workflow**, then install the new release.
+
+The build is signed with the standard React Native debug key: fine for installing on your own phones, but the
+Play Store would need a real signing key.
+
 ## Try it on your phone (Android, no build needed)
 
 1. Install **Expo Go** from the Play Store.

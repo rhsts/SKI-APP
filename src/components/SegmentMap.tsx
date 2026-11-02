@@ -3,6 +3,8 @@ import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from
 import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { PathPoint } from '../lib/segments';
 import { useTheme, useStyles, type Palette } from '../theme';
+import { mapsAvailable } from '../lib/mapsAvailable';
+import { MapPlaceholder } from './MapPlaceholder';
 
 interface Props {
   path: PathPoint[];
@@ -30,6 +32,7 @@ export function SegmentMap({ path, gateRadius = 30, context, style, markers }: P
     ref.current?.fitToCoordinates(all, { edgePadding: { top: 50, right: 50, bottom: 50, left: 50 }, animated: false });
   };
 
+  if (!mapsAvailable) return <MapPlaceholder height={260} style={style} />;
   if (!first) return <View style={[styles.wrap, style]} />;
 
   return (

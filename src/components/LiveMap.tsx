@@ -5,6 +5,8 @@ import type { TrailMap } from '../lib/trailmap';
 import type { TrackPoint } from '../lib/types';
 import { useStyles, useTheme, type Palette } from '../theme';
 import { TrailOverlay } from './TrailOverlay';
+import { mapsAvailable } from '../lib/mapsAvailable';
+import { MapPlaceholder } from './MapPlaceholder';
 
 /** Where you are now, today's track, and the resort's pistes and lifts. */
 export function LiveMap({ points, trail, center }: { points: TrackPoint[]; trail: TrailMap | null; center: { lat: number; lon: number } }) {
@@ -14,6 +16,7 @@ export function LiveMap({ points, trail, center }: { points: TrackPoint[]; trail
     const step = Math.max(1, Math.floor(points.length / 800));
     return points.filter((_, i) => i % step === 0 || i === points.length - 1).map((p) => ({ latitude: p.lat, longitude: p.lon }));
   }, [points]);
+  if (!mapsAvailable) return <MapPlaceholder height={320} />;
   return (
     <View style={styles.wrap}>
       <MapView

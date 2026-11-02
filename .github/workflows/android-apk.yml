@@ -1,0 +1,82 @@
+name: Build Android APK
+
+# Builds an installable APK and attaches it to a GitHub Release.
+# Needs (optional) repository secret GOOGLE_MAPS_API_KEY for maps.
+on:
+  push:
+    branches: [main, claude/elegant-mendel-38c8p6]
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write # to create the release
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      BUILD_NUMBER: ${{ github.run_number }}
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and tests
+        run: |
+          npx tsc --noEmit
+          npx jest --ci
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: android
+        # arm64 only: every phone from the last ~8 years, and a much smaller download.
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Collect APK
+        id: apk
+        run: |
+          OUT=ski-tracker-${BUILD_NUMBER}.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "$OUT"
+          ls -lh "$OUT"
+          echo "file=$OUT" >> "$GITHUB_OUTPUT"
+          if [ -n "$GOOGLE_MAPS_API_KEY" ]; then echo "maps=✅ Maps enabled" >> "$GITHUB_OUTPUT"; else echo "maps=⚠️ Built without a Google Maps key: maps show a placeholder. Add the GOOGLE_MAPS_API_KEY secret and run the workflow again." >> "$GITHUB_OUTPUT"; fi
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Ski Tracker 1.0.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: ${{ steps.apk.outputs.file }}
+          body: |
+            **Install on Android:** tap `${{ steps.apk.outputs.file }}` below → allow your browser to "install unknown apps" → Install.
+            Updates install over the previous version and keep your data.
+
+            ${{ steps.apk.outputs.maps }}
+
+            Built from ${{ github.sha }}.
