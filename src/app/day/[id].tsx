@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -13,6 +12,7 @@ import type { Attempt, Segment } from '../../lib/segments';
 import {
   fmtAlt, fmtDate, fmtDist, fmtDuration, fmtRaceTime, fmtSpeed, fmtTimeOfDay,
 } from '../../lib/format';
+import { activityAt } from '../../lib/scrub';
 import { cleanTrack, computeStats, smoothedAltitudes, smoothedSpeeds } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
@@ -53,12 +53,14 @@ export default function DayScreen() {
   const day = useMemo(() => {
     if (!raw) return null;
     const pts = cleanTrack(raw);
-    return { pts, speeds: smoothedSpeeds(pts), alts: smoothedAltitudes(pts), stats: computeStats(raw) };
+    return { pts, times: pts.map((p) => p.t), speeds: smoothedSpeeds(pts), alts: smoothedAltitudes(pts), stats: computeStats(raw) };
   }, [raw]);
 
   // Replay: advance the cursor through time.
   const cursorRef = useRef(cursor);
-  cursorRef.current = cursor;
+  useEffect(() => {
+    cursorRef.current = cursor;
+  }, [cursor]);
   useEffect(() => {
     if (!playing || !day) return;
     const timer = setInterval(() => {
@@ -67,6 +69,7 @@ export default function DayScreen() {
       if (i >= pts.length - 1) { setPlaying(false); return; }
       const target = pts[i].t + (REPLAY_RATE * 1000) / 20;
       while (i < pts.length - 1 && pts[i].t < target) i++;
+      cursorRef.current = i;
       setCursor(i);
     }, 50);
     return () => clearInterval(timer);
@@ -74,12 +77,21 @@ export default function DayScreen() {
 
   if (!session || !day) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
 
-  const { pts, speeds, alts, stats } = day;
+  const { pts, times, speeds, alts, stats } = day;
   const timeline = stats.activities;
   let runNo = 0, liftNo = 0;
   const numbers = timeline.map((a) => (a.kind === 'run' ? ++runNo : a.kind === 'lift' ? ++liftNo : 0));
   const cur = cursor != null ? pts[cursor] : null;
-  const curActivity = cursor != null ? timeline.find((a) => cursor >= a.startIndex && cursor <= a.endIndex) : null;
+  const curActivity = cursor != null ? activityAt(timeline, cursor) : null;
+  // Speed is only shown on runs; a lift's speed isn't interesting.
+  const readout = cur
+    ? [
+        fmtTimeOfDay(cur.t),
+        curActivity?.kind === 'run' ? fmtSpeed(speeds[cursor!], units) : null,
+        fmtAlt(cur.alt, units),
+        curActivity?.kind === 'run' ? 'Run' : curActivity?.kind === 'lift' ? 'On lift' : null,
+      ].filter(Boolean).join(' · ')
+    : 'Press play, or drag on the graph';
 
   const remove = () =>
     Alert.alert('Delete this day?', 'This can’t be undone.', [
@@ -137,24 +149,19 @@ export default function DayScreen() {
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={s.label}>Replay</Text>
-            <Text style={s.body}>
-              {cur
-                ? `${fmtTimeOfDay(cur.t)} · ${fmtSpeed(speeds[cursor!], units)} · ${fmtAlt(cur.alt, units)}${curActivity && curActivity.kind !== 'other' ? ` · ${curActivity.kind === 'run' ? 'Run' : 'Lift'}` : ''}`
-                : 'Press play or drag to relive your day'}
-            </Text>
+            <Text style={s.body}>{readout}</Text>
           </View>
         </View>
-        <Slider
-          minimumValue={0}
-          maximumValue={Math.max(1, pts.length - 1)}
-          step={1}
-          value={cursor ?? 0}
-          onValueChange={(v) => { setPlaying(false); setCursor(Math.round(v)); }}
-          minimumTrackTintColor={colors.accent}
-          maximumTrackTintColor={colors.faint}
-          thumbTintColor={colors.accent}
+        <ElevationChart
+          times={times}
+          alts={alts}
+          speeds={speeds}
+          activities={timeline}
+          cursor={cursor}
+          units={units}
+          onScrubStart={() => setPlaying(false)}
+          onScrub={setCursor}
         />
-        <ElevationChart times={pts.map((p) => p.t)} alts={alts} activities={timeline} cursor={cursor} units={units} />
         <SpeedLegend />
       </View>
 
@@ -206,6 +213,20 @@ export default function DayScreen() {
         ),
       )}
     </ScrollView>
+  );
+}
+
+/** Shown instead of closing the app if something on this screen throws. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View style={[s.screen, { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }]}>
+      <Ionicons name="alert-circle-outline" size={44} color={colors.danger} />
+      <Text style={[s.h2, { textAlign: 'center' }]}>Something went wrong showing this day</Text>
+      <Text style={[s.muted, { textAlign: 'center' }]}>{error.message}</Text>
+      <Pressable onPress={retry} style={styles.play}>
+        <Ionicons name="refresh" size={22} color="#fff" />
+      </Pressable>
+    </View>
   );
 }
 

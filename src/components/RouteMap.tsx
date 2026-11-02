@@ -21,7 +21,11 @@ interface Line {
   kind: Activity['kind'];
   coords: { latitude: number; longitude: number }[];
   colors?: string[];
+  /** Same length as `colors`, all one faded colour, for when another run is focused. */
+  dimColors?: string[];
 }
+
+const DIM_RUN = 'rgba(11,107,203,0.25)';
 
 /** Your day on a terrain map: runs coloured by speed, lifts dashed. */
 export function RouteMap({ points, speeds, activities, cursor, focus, style }: Props) {
@@ -39,7 +43,10 @@ export function RouteMap({ points, speeds, activities, cursor, focus, style }: P
       const keep = slice.length > 400 ? simplify(slice, 3) : slice.map((_, i) => i);
       const coords = keep.map((i) => ({ latitude: slice[i].lat, longitude: slice[i].lon }));
       const line: Line = { key: `${k}-${a.kind}`, kind: a.kind, coords };
-      if (a.kind === 'run') line.colors = keep.map((i) => speedColor(speeds[a.startIndex + i] ?? 0));
+      if (a.kind === 'run') {
+        line.colors = keep.map((i) => speedColor(speeds[a.startIndex + i] ?? 0));
+        line.dimColors = keep.map(() => DIM_RUN);
+      }
       return line;
     });
   }, [points, speeds, activities]);
@@ -80,11 +87,14 @@ export function RouteMap({ points, speeds, activities, cursor, focus, style }: P
           if (l.coords.length < 2) return null;
           if (l.kind === 'run') {
             return (
+              // Android crashes if strokeColors is ever set to undefined/null after being an
+              // array (MapPolyline.setStrokeColors calls .size() on it), so dimmed runs get an
+              // array of the faded colour, and the key changes so the line is rebuilt cleanly.
               <Polyline
-                key={l.key}
+                key={`${l.key}-${dim ? 'dim' : 'on'}`}
                 coordinates={l.coords}
-                strokeColors={dim ? undefined : l.colors}
-                strokeColor={dim ? 'rgba(11,107,203,0.25)' : colors.run}
+                strokeColors={dim ? l.dimColors : l.colors}
+                strokeColor={dim ? DIM_RUN : colors.run}
                 strokeWidth={dim ? 3 : 5}
                 zIndex={2}
               />

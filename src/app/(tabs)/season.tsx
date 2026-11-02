@@ -13,8 +13,14 @@ export default function SeasonScreen() {
   const { units } = useSettings();
   const [days, setDays] = useState<SessionRow[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
+  const [currentKey, setCurrentKey] = useState<string | null>(null);
 
-  useFocusEffect(useCallback(() => { listSessions().then(setDays).catch(() => setDays([])); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      setCurrentKey(seasonOf(Date.now()).key);
+      listSessions().then(setDays).catch(() => setDays([]));
+    }, []),
+  );
 
   const summaries: DaySummary[] = useMemo(
     () => days.filter((d) => d.stats).map((d) => ({ id: d.id, startedAt: d.startedAt, place: d.place, stats: d.stats! })),
@@ -22,9 +28,8 @@ export default function SeasonScreen() {
   );
   const keys = useMemo(() => {
     const k = seasonKeys(summaries);
-    const now = seasonOf(Date.now()).key;
-    return k.includes(now) ? k : [now, ...k];
-  }, [summaries]);
+    return !currentKey || k.includes(currentKey) ? k : [currentKey, ...k];
+  }, [summaries, currentKey]);
   const key = picked && keys.includes(picked) ? picked : keys[0];
   const season = useMemo(() => summariseSeason(key, summaries), [key, summaries]);
   const r = season.records;

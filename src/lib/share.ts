@@ -155,7 +155,6 @@ const ID_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 
 function cleanName(v: unknown, fallback: string): string {
   if (typeof v !== 'string') return fallback;
-  // eslint-disable-next-line no-control-regex
   const s = v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 30);
   return s || fallback;
 }

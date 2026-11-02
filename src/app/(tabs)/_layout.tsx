@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ColorValue } from 'react-native';
-import Tabs from 'expo-router/tabs';
+import { Tabs } from 'expo-router/tabs';
 import { colors } from '../../theme';
 import { useTracker } from '../../tracking/tracker';
 
