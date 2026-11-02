@@ -14,6 +14,7 @@ import { ghostTimeAt, leaderboard, pickTarget, Racer } from '../lib/segments';
 import { getSettings } from '../settings';
 import { compareSplits, SECTION_NAMES } from '../lib/ghost';
 import { batteryHoursLeft } from '../lib/power';
+import type { Sport } from '../lib/sport';
 import { readPressure, startBarometer, stopBarometer } from './barometer';
 import { lookupPistes } from '../days/pistes';
 import { lookupPlace } from './place';
@@ -389,11 +390,11 @@ export function dismissFinish() {
 
 // ---------- actions ----------
 
-export async function startDay(simulate: boolean): Promise<void> {
+export async function startDay(simulate: boolean, sport: Sport = 'ski'): Promise<void> {
   if (state.status !== 'idle') return;
   set({ error: null });
   const startedAt = Date.now();
-  const sessionId = await createSession(startedAt, simulate);
+  const sessionId = await createSession(startedAt, simulate, sport);
   const active: ActiveSession = { sessionId, startedAt, paused: false, source: simulate ? 'sim' : 'gps' };
   await saveActive(active);
   set({ ...initial, status: 'recording', active });

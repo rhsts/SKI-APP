@@ -107,3 +107,26 @@ describe('computeStats on a simulated day', () => {
     expect(s.distance).toBeGreaterThan(0);
   });
 });
+
+describe('lift lines and ski touring', () => {
+  it('measures time in the lift line, but not the lunch break', () => {
+    const sim = simulateDay();
+    const s = computeStats(sim.points);
+    const lifts = s.activities.filter((a) => a.kind === 'lift');
+    // Queues are 60–120 s in the simulator (plus slowing to a stop at the bottom);
+    // the lift after the 25-minute lunch is a break, not a queue.
+    expect(lifts[0].wait).toBeGreaterThanOrEqual(55);
+    expect(lifts[2].wait).toBe(0);
+    expect(s.liftWaitTime).toBeGreaterThan(3 * 55);
+    expect(s.liftWaitTime).toBeLessThan(3 * 200);
+  });
+
+  it('recognises climbing on skins as touring, not a lift', () => {
+    const sim = simulateDay({ touring: true, runs: 2 });
+    const s = computeStats(sim.points);
+    expect(s.liftCount).toBe(0);
+    expect(s.activities.filter((a) => a.kind === 'tour')).toHaveLength(2);
+    expect(s.tourVertical).toBeGreaterThan(2 * 550);
+    expect(s.runCount).toBe(2);
+  });
+});

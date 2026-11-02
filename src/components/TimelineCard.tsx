@@ -13,24 +13,28 @@ interface Props {
   onPress?: () => void;
   /** Shown on runs: turn this run into a challenge. */
   onChallenge?: () => void;
-  /** The piste this run was on, from OpenStreetMap. */
+  /** The piste this run was on (or, for a lift, the lift's name), from OpenStreetMap. */
   piste?: PisteMatch | null;
+  /** Runs: open the run detail screen. */
+  onDetails?: () => void;
 }
 
 /** One entry in the day's timeline: a run or a lift ride. */
-export function TimelineCard({ activity: a, number, units, selected, onPress, onChallenge, piste }: Props) {
+export function TimelineCard({ activity: a, number, units, selected, onPress, onChallenge, piste, onDetails }: Props) {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const isRun = a.kind === 'run';
-  const tint = isRun ? colors.run : colors.lift;
+  const isTour = a.kind === 'tour';
+  const tint = isRun ? colors.run : isTour ? colors.good : colors.lift;
+  const title = isRun ? `Run ${number}` : isTour ? `Climb ${number}` : `Lift ${number}`;
   return (
     <Pressable onPress={onPress} style={[s.card, styles.card, selected && { borderColor: tint }]}>
       <View style={[styles.icon, { backgroundColor: isRun ? colors.accentSoft : colors.liftSoft }]}>
-        <Ionicons name={isRun ? 'trending-down' : 'arrow-up'} size={20} color={tint} />
+        <Ionicons name={isRun ? 'trending-down' : isTour ? 'walk' : 'arrow-up'} size={20} color={tint} />
       </View>
       <View style={{ flex: 1, gap: 4 }}>
         <View style={styles.row}>
-          <Text style={s.h2}>{isRun ? `Run ${number}` : `Lift ${number}`}</Text>
+          <Text style={s.h2}>{title}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Text style={s.muted}>{fmtTimeOfDay(a.startTime)} · {fmtDuration(a.duration)}</Text>
             {isRun && onChallenge ? (
@@ -38,8 +42,16 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
                 <Ionicons name="flag-outline" size={20} color={colors.accent} />
               </Pressable>
             ) : null}
+            {isRun && onDetails ? (
+              <Pressable onPress={onDetails} hitSlop={10} accessibilityLabel={`Details of run ${number}`}>
+                <Ionicons name="stats-chart-outline" size={19} color={colors.accent} />
+              </Pressable>
+            ) : null}
           </View>
         </View>
+        {!isRun && !isTour && piste?.name ? (
+          <Text style={[s.body, { fontWeight: '700' }]} numberOfLines={1}>{piste.name}</Text>
+        ) : null}
         {isRun && piste ? (
           <View style={styles.pisteRow}>
             <View style={[styles.dot, { backgroundColor: difficultyColor(piste.difficulty) }]} />
@@ -56,11 +68,18 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
             <Metric label="Vertical" value={fmtAlt(a.verticalDown, units)} />
             <Metric label="Dist" value={fmtDist(a.distance, units)} />
           </View>
+        ) : isTour ? (
+          <View style={styles.row}>
+            <Metric label="Climbed" value={fmtAlt(a.verticalUp, units)} />
+            <Metric label="Dist" value={fmtDist(a.distance, units)} />
+            <Metric label="Rate" value={`${fmtAlt((a.verticalUp / Math.max(1, a.duration)) * 3600, units)}/h`} />
+          </View>
         ) : (
           <View style={styles.row}>
             <Metric label="Up" value={fmtAlt(a.verticalUp, units)} />
             <Metric label="Dist" value={fmtDist(a.distance, units)} />
             <Metric label="Speed" value={fmtSpeed(a.avgSpeed, units)} />
+            {a.wait != null && a.wait > 0 ? <Metric label="Lift line" value={fmtDuration(a.wait)} /> : null}
           </View>
         )}
       </View>

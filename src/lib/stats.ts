@@ -17,6 +17,10 @@ export const CONFIG = {
   liftMaxSpeed: 8, // m/s average along the lift
   liftMinStraightness: 0.6, // straight-line / path distance
   runMinAvgSpeed: 2, // m/s: slower descents are walking
+  tourMinClimb: 40, // m: a climb under your own power must gain at least this
+  tourMaxAvgSpeed: 2.5, // m/s: skinning/hiking pace
+  queueMaxSeconds: 20 * 60, // longer stops before a lift are breaks, not lift lines
+  queueMaxSpread: 150, // m: you stay put in a lift line
   maxGapForMoving: 30, // s: longer gaps (tunnel, signal lost) don't count as moving
 };
 
@@ -238,14 +242,37 @@ export function segmentActivities(
         climb / leg.duration >= CONFIG.liftMinClimbRate &&
         leg.avgSpeed <= CONFIG.liftMaxSpeed &&
         straightness >= CONFIG.liftMinStraightness;
+      // A slow, steady climb that isn't a lift: ski touring / hiking up.
+      const isTour =
+        !isLift &&
+        climb >= CONFIG.tourMinClimb &&
+        leg.avgSpeed <= CONFIG.tourMaxAvgSpeed &&
+        climb / Math.max(1, leg.duration) < CONFIG.liftMinClimbRate;
       push('other', start, s);
-      push(isLift ? 'lift' : 'other', s, e);
+      push(isLift ? 'lift' : isTour ? 'tour' : 'other', s, e);
       push('other', e, end);
     } else {
       push('other', start, end);
     }
   }
-  return out;
+  return markLiftLines(out, pts);
+}
+
+/**
+ * The stop right before a lift ride is the lift line, if you stayed put and it
+ * wasn't long enough to be a break.
+ */
+function markLiftLines(acts: Activity[], pts: TrackPoint[]): Activity[] {
+  return acts.map((a, i) => {
+    if (a.kind !== 'lift' || i === 0) return a;
+    const prev = acts[i - 1];
+    if (prev.kind !== 'other' || prev.duration > CONFIG.queueMaxSeconds) return { ...a, wait: 0 };
+    // Only the part of the stop near the lift's bottom station counts.
+    const bottom = pts[a.startIndex];
+    let k = prev.endIndex;
+    while (k > prev.startIndex && distance(pts[k], bottom) <= CONFIG.queueMaxSpread) k--;
+    return { ...a, wait: Math.max(0, (pts[prev.endIndex].t - pts[k].t) / 1000) };
+  });
 }
 
 /** Everything the app shows about a day, computed from raw GPS fixes. */
@@ -285,6 +312,7 @@ export function computeStats(rawPoints: TrackPoint[]): DayStats {
   const activities = segmentActivities(pts, cum, spd, alts);
   const runs = activities.filter((x) => x.kind === 'run');
   const lifts = activities.filter((x) => x.kind === 'lift');
+  const tours = activities.filter((x) => x.kind === 'tour');
   const skiTime = runs.reduce((s, r) => s + r.duration, 0);
   const skiDistance = runs.reduce((s, r) => s + r.distance, 0);
 
@@ -293,6 +321,9 @@ export function computeStats(rawPoints: TrackPoint[]): DayStats {
     movingTime: moving,
     skiTime,
     liftTime: lifts.reduce((s, r) => s + r.duration, 0),
+    liftWaitTime: lifts.reduce((s, r) => s + (r.wait ?? 0), 0),
+    tourTime: tours.reduce((s, r) => s + r.duration, 0),
+    tourVertical: tours.reduce((s, r) => s + r.verticalUp, 0),
     distance: cum[n - 1],
     skiDistance,
     topSpeed: top,

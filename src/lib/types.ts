@@ -10,7 +10,8 @@ export interface TrackPoint {
   pres?: number | null;
 }
 
-export type ActivityKind = 'run' | 'lift' | 'other';
+/** run = skiing down, lift = riding up, tour = climbing under your own power (skinning/hiking), other = breaks. */
+export type ActivityKind = 'run' | 'lift' | 'tour' | 'other';
 
 export interface Activity {
   kind: ActivityKind;
@@ -25,6 +26,8 @@ export interface Activity {
   verticalUp: number; // m
   topSpeed: number; // m/s
   avgSpeed: number; // m/s
+  /** Lifts only: seconds spent in the lift line before boarding. */
+  wait?: number;
 }
 
 export interface DayStats {
@@ -32,6 +35,11 @@ export interface DayStats {
   movingTime: number; // s, while moving > 1 m/s
   skiTime: number; // s, sum of runs
   liftTime: number; // s, sum of lifts
+  /** s spent waiting in lift lines (absent on days saved by older versions). */
+  liftWaitTime?: number;
+  /** Ski touring: time and height climbed under your own power. */
+  tourTime?: number;
+  tourVertical?: number;
   distance: number; // m, everything
   skiDistance: number; // m, runs only
   topSpeed: number; // m/s

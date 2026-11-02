@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { DEFAULT_GOALS, type Goals } from '../lib/goals';
+import { isSport, type Sport } from '../lib/sport';
 import type { PisteMatch } from '../lib/pistes';
 import type { Attempt, PathPoint, Segment } from '../lib/segments';
 import type { DayStats, TrackPoint, Units } from '../lib/types';
@@ -10,7 +11,7 @@ import type { DayStats, TrackPoint, Units } from '../lib/types';
  * killed app never loses a day.
  */
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
@@ -33,6 +34,7 @@ function migrate(d: SQLite.SQLiteDatabase) {
   }
   if (version < 3) d.execSync('ALTER TABLE points ADD COLUMN pres REAL');
   if (version < 4) d.execSync('ALTER TABLE sessions ADD COLUMN pistes_json TEXT');
+  if (version < 5) d.execSync("ALTER TABLE sessions ADD COLUMN sport TEXT NOT NULL DEFAULT 'ski'");
   d.execSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -107,9 +109,11 @@ export interface Settings {
   /** Buzz on a new top speed and at the end of each run. */
   vibrate: boolean;
   goals: Goals;
+  /** Sport picked for the next day you record. */
+  sport: Sport;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski' };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');
@@ -135,6 +139,7 @@ export interface SessionRow {
   place: string | null;
   stats: DayStats | null;
   isDemo: boolean;
+  sport: Sport;
   /** Piste name per run (keyed by run start time); null = not looked up yet. */
   pistes: Record<string, PisteMatch> | null;
 }
@@ -147,6 +152,7 @@ interface RawSession {
   stats_json: string | null;
   is_demo: number;
   pistes_json: string | null;
+  sport: string | null;
 }
 
 function toSession(r: RawSession): SessionRow {
@@ -162,16 +168,20 @@ function toSession(r: RawSession): SessionRow {
   } catch {
     pistes = null;
   }
-  return { id: r.id, startedAt: r.started_at, endedAt: r.ended_at, place: r.place, stats, isDemo: !!r.is_demo, pistes };
+  return { id: r.id, startedAt: r.started_at, endedAt: r.ended_at, place: r.place, stats, isDemo: !!r.is_demo, pistes, sport: isSport(r.sport) ? r.sport : 'ski' };
 }
 
-export async function createSession(startedAt: number, isDemo = false): Promise<string> {
+export async function createSession(startedAt: number, isDemo = false, sport: Sport = 'ski'): Promise<string> {
   const id = newId();
   await getDb().runAsync(
-    'INSERT INTO sessions (id, started_at, is_demo) VALUES (?, ?, ?)',
-    id, startedAt, isDemo ? 1 : 0,
+    'INSERT INTO sessions (id, started_at, is_demo, sport) VALUES (?, ?, ?, ?)',
+    id, startedAt, isDemo ? 1 : 0, sport,
   );
   return id;
+}
+
+export async function setSessionSport(id: string, sport: Sport) {
+  await getDb().runAsync('UPDATE sessions SET sport = ? WHERE id = ?', sport, id);
 }
 
 export async function finishSession(id: string, endedAt: number, stats: DayStats, place: string | null) {
@@ -187,11 +197,11 @@ export async function setSessionPistes(id: string, pistes: Record<string, PisteM
 
 /** Inserts a finished day with a known id (restoring a backup). Returns false if it already exists. */
 export async function insertSessionRaw(s: {
-  id: string; startedAt: number; endedAt: number | null; place: string | null; isDemo: boolean; stats: DayStats;
+  id: string; startedAt: number; endedAt: number | null; place: string | null; isDemo: boolean; stats: DayStats; sport?: Sport;
 }): Promise<boolean> {
   const r = await getDb().runAsync(
-    'INSERT OR IGNORE INTO sessions (id, started_at, ended_at, place, stats_json, is_demo) VALUES (?, ?, ?, ?, ?, ?)',
-    s.id, s.startedAt, s.endedAt ?? s.startedAt, s.place, JSON.stringify(s.stats), s.isDemo ? 1 : 0,
+    'INSERT OR IGNORE INTO sessions (id, started_at, ended_at, place, stats_json, is_demo, sport) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    s.id, s.startedAt, s.endedAt ?? s.startedAt, s.place, JSON.stringify(s.stats), s.isDemo ? 1 : 0, s.sport ?? 'ski',
   );
   return r.changes > 0;
 }

@@ -18,6 +18,8 @@ export interface SimOptions {
   noDoppler?: boolean;
   /** Add barometer readings (true altitude + weather drift + sensor noise). */
   barometer?: boolean;
+  /** Ski touring: climb on skins along a zig-zag skin track instead of taking the lift. */
+  touring?: boolean;
   /** GPS altitude noise amplitude in metres (default 3). */
   gpsAltNoise?: number;
   /** Indices of fixes to replace with a wild GPS jump. */
@@ -106,11 +108,22 @@ export function simulateDay(opts: SimOptions = {}): SimDay {
   const usedTops: number[] = [];
 
   for (let r = 0; r < runCount; r++) {
-    // Queue at the base, then ride the chairlift straight up.
-    wait(60 + Math.round(rnd() * 60), 0, 0, BASE_ALT);
-    for (let s = 0; s < liftLen; s += LIFT_SPEED) {
-      const u = s / liftLen;
-      emit(top[0] * u, top[1] * u, BASE_ALT + (TOP_ALT - BASE_ALT) * u, LIFT_SPEED);
+    if (opts.touring) {
+      // Skin up a zig-zag track west of the piste: ~0.9 m/s, ~0.2 m/s of climb.
+      wait(120, 0, 0, BASE_ALT);
+      const climbSeconds = Math.round((TOP_ALT - BASE_ALT) / 0.2);
+      for (let k = 0; k < climbSeconds; k++) {
+        const u = k / climbSeconds;
+        const zig = 60 * Math.sin(u * Math.PI * 24);
+        emit(-150 + zig + top[0] * u, top[1] * u, BASE_ALT + (TOP_ALT - BASE_ALT) * u, 0.9);
+      }
+    } else {
+      // Queue at the base, then ride the chairlift straight up.
+      wait(60 + Math.round(rnd() * 60), 0, 0, BASE_ALT);
+      for (let s = 0; s < liftLen; s += LIFT_SPEED) {
+        const u = s / liftLen;
+        emit(top[0] * u, top[1] * u, BASE_ALT + (TOP_ALT - BASE_ALT) * u, LIFT_SPEED);
+      }
     }
     wait(30 + Math.round(rnd() * 30), top[0], top[1], TOP_ALT);
 

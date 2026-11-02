@@ -8,6 +8,7 @@ import {
 } from '../db';
 import { buildBackup, packPoints, parseBackup, unpackPoints } from '../lib/backup';
 import { fileNameFor, toGpx } from '../lib/gpx';
+import { isSport } from '../lib/sport';
 import { computeStats } from '../lib/stats';
 
 /** Writes text to a temp file and opens the share sheet (save to Drive, send, open in another app…). */
@@ -34,7 +35,7 @@ export async function createBackup(): Promise<{ days: number }> {
   const days = [];
   for (const s of sessions) {
     days.push({
-      id: s.id, startedAt: s.startedAt, endedAt: s.endedAt, place: s.place, isDemo: s.isDemo,
+      id: s.id, startedAt: s.startedAt, endedAt: s.endedAt, place: s.place, isDemo: s.isDemo, sport: s.sport,
       points: packPoints(await getPoints(s.id)),
     });
   }
@@ -61,6 +62,7 @@ export async function restoreBackup(): Promise<{ days: number; challenges: numbe
     if (points.length < 2) continue;
     const added = await insertSessionRaw({
       id: d.id, startedAt: d.startedAt, endedAt: d.endedAt, place: d.place, isDemo: d.isDemo, stats: computeStats(points),
+      sport: isSport(d.sport) ? d.sport : 'ski',
     });
     if (added) {
       await insertPoints(d.id, points);

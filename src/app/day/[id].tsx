@@ -10,6 +10,10 @@ import { BreakRow, TimelineCard } from '../../components/TimelineCard';
 import { exportGpx } from '../../days/files';
 import { lookupPistes } from '../../days/pistes';
 import { suggestChallenges } from '../../lib/suggest';
+import { difficultyBreakdown } from '../../lib/breakdown';
+import { DifficultyBar } from '../../components/DifficultyBar';
+import { SportPicker } from '../../components/SportPicker';
+import { setSessionSport } from '../../db';
 import { deleteSession, kvGet, kvSet, getPoints, getSession, listSegments, listSessionAttempts, renameSession, type SessionRow } from '../../db';
 import type { Attempt, Segment } from '../../lib/segments';
 import {
@@ -97,8 +101,9 @@ export default function DayScreen() {
   const suggestion = segments && !hideSuggest ? suggestChallenges(pts, stats.activities, segments)[0] ?? null : null;
   const suggestedRunNo = suggestion ? stats.activities.slice(0, suggestion.activityIndex + 1).filter((a) => a.kind === 'run').length : 0;
   const timeline = stats.activities;
-  let runNo = 0, liftNo = 0;
-  const numbers = timeline.map((a) => (a.kind === 'run' ? ++runNo : a.kind === 'lift' ? ++liftNo : 0));
+  let runNo = 0, liftNo = 0, tourNo = 0;
+  const numbers = timeline.map((a) => (a.kind === 'run' ? ++runNo : a.kind === 'lift' ? ++liftNo : a.kind === 'tour' ? ++tourNo : 0));
+  const shares = session.pistes && Object.keys(session.pistes).length ? difficultyBreakdown([{ activities: timeline, pistes: session.pistes }]) : [];
   const cur = cursor != null ? pts[cursor] : null;
   const curActivity = cursor != null ? activityAt(timeline, cursor) : null;
   // Speed is only shown on runs; a lift's speed isn't interesting.
@@ -166,6 +171,13 @@ export default function DayScreen() {
       <Text style={s.muted}>
         {fmtTimeOfDay(session.startedAt)} – {fmtTimeOfDay(session.endedAt ?? session.startedAt)} · {fmtDuration(stats.duration)} on the mountain
       </Text>
+      <SportPicker
+        value={session.sport}
+        onChange={(sp) => {
+          setSession({ ...session, sport: sp });
+          setSessionSport(session.id, sp);
+        }}
+      />
 
       <RouteMap points={pts} speeds={speeds} activities={timeline} cursor={cursor} focus={focus} />
 
@@ -204,11 +216,17 @@ export default function DayScreen() {
         <StatTile label="Vertical ↓" value={fmtAlt(stats.verticalDown, units)} sub={`↑ ${fmtAlt(stats.verticalUp, units)}`} />
         <StatTile label="Runs" value={String(stats.runCount)} sub={`Longest ${fmtDist(stats.longestRun, units)}`} />
         <StatTile label="Ski time" value={fmtDuration(stats.skiTime)} sub={`Lifts ${fmtDuration(stats.liftTime)}`} />
+        <StatTile label="Lift lines" value={fmtDuration(stats.liftWaitTime ?? 0)} sub={stats.liftCount ? `≈ ${fmtDuration((stats.liftWaitTime ?? 0) / stats.liftCount)} per lift` : undefined} />
+        {(stats.tourVertical ?? 0) > 0 ? (
+          <StatTile label="Climbed on skins" value={fmtAlt(stats.tourVertical ?? 0, units)} sub={fmtDuration(stats.tourTime ?? 0)} />
+        ) : null}
         <StatTile label="Distance skied" value={fmtDist(stats.skiDistance, units)} sub={`Total ${fmtDist(stats.distance, units)}`} />
         <StatTile label="Avg ski speed" value={fmtSpeed(stats.avgSkiSpeed, units)} />
         <StatTile label="Peak altitude" value={fmtAlt(stats.maxAlt, units)} />
         <StatTile label="Lowest point" value={fmtAlt(stats.minAlt, units)} />
       </StatGrid>
+
+      <DifficultyBar shares={shares} units={units} />
 
       {suggestion ? (
         <View style={[s.card, styles.suggest]}>

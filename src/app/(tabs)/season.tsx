@@ -2,13 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { DifficultyBar } from '../../components/DifficultyBar';
 import { StatGrid, StatTile } from '../../components/StatTile';
+import { difficultyBreakdown } from '../../lib/breakdown';
+import { SPORTS } from '../../lib/sport';
 import { listAttempts, listSessions, type SessionRow } from '../../db';
 import { computeBadges, goalProgress, type Badge, type GoalProgress, type Goals } from '../../lib/goals';
 import type { Attempt } from '../../lib/segments';
 import { fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed, speedValue } from '../../lib/format';
 import type { Units } from '../../lib/types';
-import { seasonKeys, seasonOf, summariseSeason, type DaySummary, type SeasonRecord } from '../../lib/season';
+import { ALL_TIME, seasonKeys, seasonOf, summariseSeason, type DaySummary, type SeasonRecord } from '../../lib/season';
 import { updateSettings, useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
 
@@ -33,16 +36,24 @@ export default function SeasonScreen() {
   );
 
   const summaries: DaySummary[] = useMemo(
-    () => days.filter((d) => d.stats).map((d) => ({ id: d.id, startedAt: d.startedAt, place: d.place, stats: d.stats! })),
+    () => days.filter((d) => d.stats).map((d) => ({ id: d.id, startedAt: d.startedAt, place: d.place, stats: d.stats!, sport: d.sport })),
     [days],
   );
   const keys = useMemo(() => {
     const k = seasonKeys(summaries);
-    return !currentKey || k.includes(currentKey) ? k : [currentKey, ...k];
+    const withCurrent = !currentKey || k.includes(currentKey) ? k : [currentKey, ...k];
+    return [...withCurrent, ALL_TIME];
   }, [summaries, currentKey]);
   const key = picked && keys.includes(picked) ? picked : keys[0];
   const season = useMemo(() => summariseSeason(key, summaries), [key, summaries]);
   const r = season.records;
+  const allTime = key === ALL_TIME;
+  const shares = useMemo(
+    () => difficultyBreakdown(
+      days.filter((d) => d.stats && (allTime || seasonOf(d.startedAt).key === key)).map((d) => ({ activities: d.stats!.activities, pistes: d.pistes })),
+    ),
+    [days, key, allTime],
+  );
   const progress = useMemo(() => (now ? goalProgress(summaries, goals, now) : []), [summaries, goals, now]);
   const badges = useMemo(() => computeBadges(summaries, attempts, playerId), [summaries, attempts, playerId]);
   const earned = badges.filter((b) => b.earnedAt != null).length;
@@ -52,18 +63,24 @@ export default function SeasonScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
         {keys.map((k) => (
           <Pressable key={k} onPress={() => setPicked(k)} style={[styles.pill, k === key && styles.pillOn]}>
-            <Text style={[styles.pillText, k === key && { color: colors.onAccent }]}>Season {k}</Text>
+            <Text style={[styles.pillText, k === key && { color: colors.onAccent }]}>{k === ALL_TIME ? 'All time' : `Season ${k}`}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
       <View style={[s.card, styles.hero]}>
-        <Text style={s.label}>Vertical this season</Text>
+        <Text style={s.label}>{allTime ? 'Vertical, all time' : 'Vertical this season'}</Text>
         <Text style={styles.big}>{fmtAlt(season.verticalDown, units)}</Text>
         <Text style={s.muted}>
           {season.days} {season.days === 1 ? 'day' : 'days'}
+          {allTime && season.seasons.size ? ` · ${season.seasons.size} ${season.seasons.size === 1 ? 'season' : 'seasons'}` : ''}
           {season.places.length ? ` · ${season.places.slice(0, 3).join(', ')}${season.places.length > 3 ? '…' : ''}` : ''}
         </Text>
+        {Object.keys(season.sports).length > 1 || (Object.keys(season.sports)[0] ?? 'ski') !== 'ski' ? (
+          <Text style={s.muted}>
+            {SPORTS.filter((sp) => season.sports[sp.id]).map((sp) => `${sp.emoji} ${season.sports[sp.id]}`).join('   ')}
+          </Text>
+        ) : null}
       </View>
 
       <StatGrid>
@@ -71,7 +88,11 @@ export default function SeasonScreen() {
         <StatTile label="Runs" value={String(season.runs)} />
         <StatTile label="Distance skied" value={fmtDist(season.skiDistance, units)} />
         <StatTile label="Time skiing" value={fmtDuration(season.skiTime)} />
+        <StatTile label="In lift lines" value={fmtDuration(season.liftWaitTime)} />
+        {season.tourVertical > 0 ? <StatTile label="Climbed on skins" value={fmtAlt(season.tourVertical, units)} /> : null}
       </StatGrid>
+
+      <DifficultyBar shares={shares} units={units} title={allTime ? 'Pistes, all time' : 'Pistes this season'} />
 
       <Text style={[s.h2, { marginTop: 8 }]}>Goals</Text>
       {progress.map((g) => (
@@ -93,7 +114,7 @@ export default function SeasonScreen() {
         {badges.map((b) => <BadgeTile key={b.id} b={b} />)}
       </View>
 
-      <Text style={[s.h2, { marginTop: 8 }]}>Personal records</Text>
+      <Text style={[s.h2, { marginTop: 8 }]}>{allTime ? 'All-time records' : 'Personal records'}</Text>
       <RecordRow icon="speedometer" label="Fastest speed" rec={r.topSpeed} fmt={(v) => fmtSpeed(v, units)} />
       <RecordRow icon="resize" label="Longest run" rec={r.longestRun} fmt={(v) => fmtDist(v, units)} />
       <RecordRow icon="trending-down" label="Most vertical in a day" rec={r.mostVertical} fmt={(v) => fmtAlt(v, units)} />

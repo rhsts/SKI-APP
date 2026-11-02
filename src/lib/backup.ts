@@ -16,6 +16,7 @@ export interface BackupDay {
   endedAt: number | null;
   place: string | null;
   isDemo: boolean;
+  sport?: string;
   /** [t, lat, lon, alt, acc, spd, pres] */
   points: (number | null)[][];
 }
@@ -74,6 +75,7 @@ export function parseBackup(text: string): Backup {
       endedAt: typeof d.endedAt === 'number' ? d.endedAt : null,
       place: str(d.place, 80),
       isDemo: !!d.isDemo,
+      sport: str(d.sport, 20) ?? undefined,
       points: Array.isArray(d.points) ? d.points : [],
     });
   }

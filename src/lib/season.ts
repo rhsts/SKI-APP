@@ -6,7 +6,11 @@ export interface DaySummary {
   startedAt: number;
   place: string | null;
   stats: DayStats;
+  sport?: string;
 }
+
+/** Pseudo season key for lifetime totals. */
+export const ALL_TIME = 'all';
 
 /** A ski season runs 1 July → 30 June and is named after both years, e.g. "2025/26". */
 export function seasonOf(ms: number): { key: string; start: number; end: number } {
@@ -34,6 +38,12 @@ export interface SeasonSummary {
   skiTime: number;
   runs: number;
   places: string[];
+  liftWaitTime: number;
+  tourVertical: number;
+  /** Days per sport. */
+  sports: Record<string, number>;
+  /** Seasons covered (filled for ALL_TIME). */
+  seasons: Set<string>;
   records: {
     topSpeed: SeasonRecord | null;
     longestRun: SeasonRecord | null;
@@ -52,16 +62,22 @@ function better(cur: SeasonRecord | null, value: number, day: DaySummary): Seaso
 export function summariseSeason(key: string, days: DaySummary[]): SeasonSummary {
   const out: SeasonSummary = {
     key, days: 0, verticalDown: 0, distance: 0, skiDistance: 0, skiTime: 0, runs: 0, places: [],
+    liftWaitTime: 0, tourVertical: 0, sports: {}, seasons: new Set(),
     records: { topSpeed: null, longestRun: null, mostVertical: null, mostRuns: null, longestDay: null },
   };
   // Several recordings on the same calendar day count as one ski day.
   const calendarDays = new Set<string>();
   for (const day of days) {
-    if (seasonOf(day.startedAt).key !== key) continue;
+    if (key !== ALL_TIME && seasonOf(day.startedAt).key !== key) continue;
     const d = new Date(day.startedAt);
     calendarDays.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
     const s = day.stats;
     out.verticalDown += s.verticalDown;
+    out.liftWaitTime += s.liftWaitTime ?? 0;
+    out.tourVertical += s.tourVertical ?? 0;
+    const sport = day.sport ?? 'ski';
+    out.sports[sport] = (out.sports[sport] ?? 0) + 1;
+    if (key === ALL_TIME) out.seasons.add(seasonOf(day.startedAt).key);
     out.distance += s.distance;
     out.skiDistance += s.skiDistance;
     out.skiTime += s.skiTime;

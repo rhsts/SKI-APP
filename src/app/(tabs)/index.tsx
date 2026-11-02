@@ -6,7 +6,8 @@ import { StatGrid, StatTile } from '../../components/StatTile';
 import { badgesEarnedBy } from '../../days/badges';
 import { fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
 import { liveStatus } from '../../lib/stats';
-import { useSettings } from '../../settings';
+import { updateSettings, useSettings } from '../../settings';
+import { SportPicker } from '../../components/SportPicker';
 import { useTheme, useStyles, type Palette } from '../../theme';
 import { dismissFinish, dismissLastRun, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish, type RunSummary } from '../../tracking/tracker';
 
@@ -21,7 +22,7 @@ export default function RecordScreen() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const t = useTracker();
-  const { units, simulate } = useSettings();
+  const { units, simulate, sport } = useSettings();
   const [busy, setBusy] = useState(false);
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -122,7 +123,7 @@ export default function RecordScreen() {
           <StatTile label="Top speed" value={fmtSpeed(st?.topSpeed ?? 0, units)} />
           <StatTile label="Vertical ↓" value={fmtAlt(st?.verticalDown ?? 0, units)} />
           <StatTile label="Runs" value={String(st?.runCount ?? 0)} sub={`${st?.liftCount ?? 0} lifts`} />
-          <StatTile label="Ski time" value={fmtDuration(st?.skiTime ?? 0)} sub={`Lifts ${fmtDuration(st?.liftTime ?? 0)}`} />
+          <StatTile label="Ski time" value={fmtDuration(st?.skiTime ?? 0)} sub={`Lifts ${fmtDuration(st?.liftTime ?? 0)} · line ${fmtDuration(st?.liftWaitTime ?? 0)}`} />
           <StatTile label="Distance" value={fmtDist(st?.distance ?? 0, units)} sub={`Skied ${fmtDist(st?.skiDistance ?? 0, units)}`} />
           <StatTile label="Altitude" value={fmtAlt(t.points.length ? t.points[t.points.length - 1].alt : null, units)} sub={st?.maxAlt != null ? `Max ${fmtAlt(st.maxAlt, units)}` : undefined} />
         </StatGrid>
@@ -146,11 +147,14 @@ export default function RecordScreen() {
       ) : null}
       {t.error ? <Text style={[s.body, { color: colors.danger, textAlign: 'center' }]}>{t.error}</Text> : null}
 
+      {t.status === 'idle' && !busy ? (
+        <SportPicker value={sport} onChange={(sp) => updateSettings({ sport: sp })} />
+      ) : null}
       <View style={styles.buttons}>
         {busy ? (
           <ActivityIndicator color={colors.accent} size="large" />
         ) : t.status === 'idle' ? (
-          <Button label="Start day" icon="play" color={colors.accent} big onPress={() => run(() => startDay(simulate))} />
+          <Button label="Start day" icon="play" color={colors.accent} big onPress={() => run(() => startDay(simulate, sport))} />
         ) : (
           <>
             {t.status === 'recording' ? (

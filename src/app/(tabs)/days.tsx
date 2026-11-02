@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { listSessions, type SessionRow } from '../../db';
 import { fmtAlt, fmtDate, fmtDuration, fmtSpeed } from '../../lib/format';
+import { sportInfo } from '../../lib/sport';
 import { useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
 import { addDemoDay } from '../../tracking/demo';
@@ -89,7 +90,7 @@ export default function DaysScreen() {
               <Ionicons name={picked.includes(item.id) ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={colors.accent} />
             ) : null}
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={s.h2} numberOfLines={1}>{item.place ?? 'Ski day'}</Text>
+              <Text style={s.h2} numberOfLines={1}>{sportInfo(item.sport).emoji} {item.place ?? 'Ski day'}</Text>
               <Text style={s.muted}>{fmtDate(item.startedAt)}{item.isDemo ? ' · demo' : ''}</Text>
               {st ? (
                 <View style={styles.metrics}>
