@@ -3,11 +3,11 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatGrid, StatTile } from '../../components/StatTile';
-import { fmtAlt, fmtClock, fmtDist, fmtDuration, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
+import { fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
 import { liveStatus } from '../../lib/stats';
 import { useSettings } from '../../settings';
 import { colors, s } from '../../theme';
-import { pauseDay, resumeDay, startDay, stopDay, useTracker } from '../../tracking/tracker';
+import { dismissFinish, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish } from '../../tracking/tracker';
 
 const STATUS_LABEL = {
   skiing: { text: 'Skiing', icon: 'trending-down', color: colors.run },
@@ -59,6 +59,9 @@ export default function RecordScreen() {
           </Text>
         </View>
       ) : null}
+
+      {t.finish ? <FinishCard f={t.finish} /> : null}
+      {t.race && t.status === 'recording' ? <RaceCard r={t.race} /> : null}
 
       <View style={[s.card, styles.hero]}>
         <View style={styles.chipRow}>
@@ -131,6 +134,67 @@ export default function RecordScreen() {
   );
 }
 
+/** Live challenge: elapsed time, progress, and gap to the ghost you're chasing. */
+function RaceCard({ r }: { r: LiveRace }) {
+  const ahead = r.delta != null && r.delta < 0;
+  const deltaColor = r.delta == null ? colors.muted : ahead ? colors.good : colors.danger;
+  return (
+    <View style={[s.card, styles.race]}>
+      <View style={styles.raceHead}>
+        <Ionicons name="flag" size={16} color="#fff" />
+        <Text style={styles.raceTitle} numberOfLines={1}>{r.name}</Text>
+      </View>
+      <View style={styles.raceRow}>
+        <Text style={styles.raceTime}>{fmtRaceTime(r.elapsed)}</Text>
+        {r.delta != null ? (
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[styles.raceDelta, { color: deltaColor }]}>{fmtDelta(r.delta)}</Text>
+            <Text style={styles.raceSub}>vs {r.rivalIsMe ? 'your best' : r.rivalName}</Text>
+          </View>
+        ) : (
+          <Text style={styles.raceSub}>First time: set the time to beat!</Text>
+        )}
+      </View>
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${Math.round(r.progress * 100)}%` }]} />
+      </View>
+    </View>
+  );
+}
+
+/** What to say when you cross the finish line. */
+function finishMessage(f: RaceFinish): string {
+  const gap = f.rivalGap != null ? Math.abs(f.rivalGap).toFixed(1) : '';
+  if (f.rivalName && f.rivalGap != null) {
+    if (f.rivalIsMe) return f.rivalGap < 0 ? `New personal best, ${gap}s faster! 🔥` : `${fmtDelta(f.rivalGap)} off your best. Go again!`;
+    if (f.rivalGap < 0) return `You beat ${f.rivalName} by ${gap}s${f.rank === 1 ? ' and took the lead! 🏆' : '!'}`;
+    return `${fmtDelta(f.rivalGap)} behind ${f.rivalName}${f.isPersonalBest && f.previousBest != null ? ', but a new personal best!' : '. Go again!'}`;
+  }
+  if (f.previousBest == null) return 'Your first time! Now challenge a friend to beat it.';
+  return f.isPersonalBest ? `New personal best! (was ${fmtRaceTime(f.previousBest)})` : 'Go again!';
+}
+
+function FinishCard({ f }: { f: RaceFinish }) {
+  const headline = f.of > 1 ? `${fmtRaceTime(f.time)}  ·  #${f.rank} of ${f.of}` : fmtRaceTime(f.time);
+  const line = finishMessage(f);
+  return (
+    <View style={[s.card, styles.finish]}>
+      <Text style={{ fontSize: 28 }}>🏁</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={s.label}>{f.name}</Text>
+        <Text style={styles.finishTime}>{headline}</Text>
+        <Text style={s.body}>{line}</Text>
+        <Pressable onPress={() => router.push(`/segment/${f.segmentId}`)}>
+          <Text style={{ color: colors.accent, fontWeight: '700', marginTop: 4 }}>See leaderboard ›</Text>
+        </Pressable>
+      </View>
+      <Pressable onPress={dismissFinish} hitSlop={10} accessibilityLabel="Dismiss">
+        <Ionicons name="close" size={20} color={colors.muted} />
+      </Pressable>
+    </View>
+  );
+}
+
 function Chip({ text, icon, color }: { text: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }) {
   return (
     <View style={[styles.chip, { borderColor: color }]}>
@@ -164,6 +228,17 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, fontWeight: '700' },
   speed: { fontSize: 96, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'], lineHeight: 104 },
   speedUnit: { fontSize: 18, fontWeight: '700', color: colors.muted, marginTop: -6, marginBottom: 6 },
+  race: { backgroundColor: colors.text, gap: 8 },
+  raceHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  raceTitle: { color: '#fff', fontWeight: '800', fontSize: 15, flex: 1 },
+  raceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  raceTime: { color: '#fff', fontSize: 40, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  raceDelta: { fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  raceSub: { color: '#B9C4D2', fontSize: 13, fontWeight: '600' },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
+  progressFill: { height: 6, backgroundColor: colors.good },
+  finish: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderLeftWidth: 4, borderLeftColor: colors.good },
+  finishTime: { fontSize: 26, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
   buttons: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 4 },
   button: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 14 },
   bigButton: { paddingVertical: 20 },

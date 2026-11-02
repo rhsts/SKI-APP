@@ -1,3 +1,4 @@
+import { matchSession } from '../challenges/service';
 import { createSession, finishSession, insertPoints } from '../db';
 import { simulateDay } from '../lib/sim';
 import { computeStats } from '../lib/stats';
@@ -15,5 +16,6 @@ export async function addDemoDay(daysAgo = 1): Promise<string> {
   await insertPoints(id, sim.points);
   const stats = computeStats(sim.points);
   await finishSession(id, sim.points[sim.points.length - 1].t, stats, 'Demo Mountain');
+  await matchSession(id, sim.points);
   return id;
 }

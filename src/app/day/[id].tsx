@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ElevationChart } from '../../components/ElevationChart';
 import { RouteMap } from '../../components/RouteMap';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { BreakRow, TimelineCard } from '../../components/TimelineCard';
-import { deleteSession, getPoints, getSession, renameSession, type SessionRow } from '../../db';
+import { deleteSession, getPoints, getSession, listSegments, listSessionAttempts, renameSession, type SessionRow } from '../../db';
+import type { Attempt, Segment } from '../../lib/segments';
 import {
-  fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed, fmtTimeOfDay,
+  fmtAlt, fmtDate, fmtDist, fmtDuration, fmtRaceTime, fmtSpeed, fmtTimeOfDay,
 } from '../../lib/format';
 import { cleanTrack, computeStats, smoothedAltitudes, smoothedSpeeds } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
@@ -29,12 +30,24 @@ export default function DayScreen() {
   const [playing, setPlaying] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
+  const [timed, setTimed] = useState<{ attempt: Attempt; segment: Segment }[]>([]);
 
   useEffect(() => {
     if (!id) return;
     getSession(id).then((ses) => { setSession(ses); setName(ses?.place ?? ''); });
     getPoints(id).then(setRaw);
   }, [id]);
+
+  // Challenge times set on this day (refreshed when coming back from creating one).
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return;
+      Promise.all([listSessionAttempts(id), listSegments()]).then(([atts, segs]) => {
+        const byId = new Map(segs.map((x) => [x.id, x]));
+        setTimed(atts.filter((a) => byId.has(a.segmentId)).map((a) => ({ attempt: a, segment: byId.get(a.segmentId)! })));
+      });
+    }, [id]),
+  );
 
   // Recompute from raw points so indices always match the cleaned track.
   const day = useMemo(() => {
@@ -156,7 +169,21 @@ export default function DayScreen() {
         <StatTile label="Lowest point" value={fmtAlt(stats.minAlt, units)} />
       </StatGrid>
 
+      {timed.length ? (
+        <View style={[s.card, { gap: 8 }]}>
+          <Text style={s.label}>Challenge times</Text>
+          {timed.map(({ attempt, segment }) => (
+            <Pressable key={attempt.id} onPress={() => router.push(`/segment/${segment.id}`)} style={styles.timedRow}>
+              <Text style={[s.body, { flex: 1 }]} numberOfLines={1}>🏁 {segment.name}</Text>
+              <Text style={s.muted}>{fmtTimeOfDay(attempt.at)}</Text>
+              <Text style={[s.body, { fontWeight: '800', minWidth: 64, textAlign: 'right' }]}>{fmtRaceTime(attempt.time)}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       <Text style={[s.h2, { marginTop: 8 }]}>Timeline</Text>
+      <Text style={s.muted}>Tap 🏳 on a run to turn it into a challenge for your friends.</Text>
       {timeline.length === 0 ? <Text style={s.muted}>No runs or lifts detected.</Text> : null}
       {timeline.map((a, i) =>
         a.kind === 'other' ? (
@@ -168,6 +195,7 @@ export default function DayScreen() {
             number={numbers[i]}
             units={units}
             selected={focus === i}
+            onChallenge={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(i) } })}
             onPress={() => {
               const next = focus === i ? null : i;
               setFocus(next);
@@ -202,5 +230,6 @@ const styles = StyleSheet.create({
   replayRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
+  timedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   swatch: { width: 18, height: 6, borderRadius: 3 },
 });

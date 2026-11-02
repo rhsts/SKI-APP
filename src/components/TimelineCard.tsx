@@ -10,10 +10,12 @@ interface Props {
   units: Units;
   selected?: boolean;
   onPress?: () => void;
+  /** Shown on runs: turn this run into a challenge. */
+  onChallenge?: () => void;
 }
 
 /** One entry in the day's timeline: a run or a lift ride. */
-export function TimelineCard({ activity: a, number, units, selected, onPress }: Props) {
+export function TimelineCard({ activity: a, number, units, selected, onPress, onChallenge }: Props) {
   const isRun = a.kind === 'run';
   const tint = isRun ? colors.run : colors.lift;
   return (
@@ -24,7 +26,14 @@ export function TimelineCard({ activity: a, number, units, selected, onPress }: 
       <View style={{ flex: 1, gap: 4 }}>
         <View style={styles.row}>
           <Text style={s.h2}>{isRun ? `Run ${number}` : `Lift ${number}`}</Text>
-          <Text style={s.muted}>{fmtTimeOfDay(a.startTime)} · {fmtDuration(a.duration)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={s.muted}>{fmtTimeOfDay(a.startTime)} · {fmtDuration(a.duration)}</Text>
+            {isRun && onChallenge ? (
+              <Pressable onPress={onChallenge} hitSlop={10} accessibilityLabel={`Make run ${number} a challenge`}>
+                <Ionicons name="flag-outline" size={20} color={colors.accent} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
         {isRun ? (
           <View style={styles.row}>

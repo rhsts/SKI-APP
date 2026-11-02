@@ -1,4 +1,4 @@
-import { fmtAlt, fmtClock, fmtDist, fmtDuration, fmtSpeed } from '../src/lib/format';
+import { fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtSpeed } from '../src/lib/format';
 import { seasonKeys, seasonOf, summariseSeason, type DaySummary } from '../src/lib/season';
 import { computeStats } from '../src/lib/stats';
 import { simulateDay } from '../src/lib/sim';
@@ -54,5 +54,10 @@ describe('format', () => {
     expect(fmtDuration(95)).toBe('1m 35s');
     expect(fmtClock(3723)).toBe('1:02:03');
     expect(fmtClock(83)).toBe('1:23');
+    expect(fmtRaceTime(48.24)).toBe('48.2s');
+    expect(fmtRaceTime(83.36)).toBe('1:23.4');
+    expect(fmtRaceTime(3723.4)).toBe('1:02:03.4');
+    expect(fmtDelta(1.26)).toBe('+1.3s');
+    expect(fmtDelta(-0.8)).toBe('−0.8s');
   });
 });

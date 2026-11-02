@@ -53,6 +53,20 @@ export function fmtClock(seconds: number): string {
   return `${h > 0 ? `${h}:` : ''}${mm}:${String(r).padStart(2, '0')}`;
 }
 
+/** Race times: 48.2s, 1:23.4, 1:02:03.4 */
+export function fmtRaceTime(seconds: number): string {
+  const tenths = Math.round(seconds * 10);
+  const s = Math.floor(tenths / 10), d = tenths % 10;
+  if (s < 60) return `${s}.${d}s`;
+  return `${fmtClock(s)}.${d}`;
+}
+
+/** Gap to a rival: +1.3s / −0.8s */
+export function fmtDelta(seconds: number): string {
+  const v = Math.abs(seconds).toFixed(1);
+  return seconds > 0.05 ? `+${v}s` : seconds < -0.05 ? `−${v}s` : '±0.0s';
+}
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

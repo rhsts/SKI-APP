@@ -33,6 +33,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen name="days" options={{ title: 'Days', tabBarIcon: icon('calendar-outline') }} />
+      <Tabs.Screen name="challenges" options={{ title: 'Challenges', tabBarIcon: icon('flag-outline') }} />
       <Tabs.Screen name="season" options={{ title: 'Season', tabBarIcon: icon('trophy-outline') }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: icon('person-circle-outline') }} />
     </Tabs>

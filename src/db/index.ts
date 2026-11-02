@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import type { Attempt, PathPoint, Segment } from '../lib/segments';
 import type { DayStats, TrackPoint, Units } from '../lib/types';
 
 /**
@@ -7,7 +8,7 @@ import type { DayStats, TrackPoint, Units } from '../lib/types';
  * killed app never loses a day.
  */
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
@@ -21,6 +22,17 @@ function migrate(d: SQLite.SQLiteDatabase) {
   const row = d.getFirstSync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
   if (version >= SCHEMA_VERSION) return;
+  if (version < 1) migrateV1(d);
+  if (version < 2) {
+    d.execSync(`
+      ALTER TABLE attempts ADD COLUMN player_id TEXT NOT NULL DEFAULT '';
+      CREATE INDEX IF NOT EXISTS attempts_session ON attempts(session_id);
+    `);
+  }
+  d.execSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
+function migrateV1(d: SQLite.SQLiteDatabase) {
   d.execSync(`
     PRAGMA journal_mode = WAL;
     CREATE TABLE IF NOT EXISTS sessions (
@@ -62,7 +74,6 @@ function migrate(d: SQLite.SQLiteDatabase) {
       ghost_json TEXT
     );
     CREATE INDEX IF NOT EXISTS attempts_segment ON attempts(segment_id, time);
-    PRAGMA user_version = ${SCHEMA_VERSION};
   `);
 }
 
@@ -83,12 +94,14 @@ export async function kvSet(key: string, value: string | null): Promise<void> {
 }
 
 export interface Settings {
+  /** Random id that identifies you on shared leaderboards. */
+  playerId: string;
   name: string;
   units: Units;
   simulate: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { name: '', units: 'metric', simulate: false };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');
@@ -188,6 +201,7 @@ export async function deleteDemoData() {
   const d = getDb();
   await d.withTransactionAsync(async () => {
     await d.runAsync('DELETE FROM points WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
+    await d.runAsync('DELETE FROM attempts WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
     await d.runAsync('DELETE FROM sessions WHERE is_demo = 1');
   });
 }
@@ -215,4 +229,120 @@ export async function getPoints(sessionId: string, afterT = -1): Promise<TrackPo
     'SELECT t, lat, lon, alt, acc, spd FROM points WHERE session_id = ? AND t > ? ORDER BY t',
     sessionId, afterT,
   );
+}
+
+// ---------- challenges ----------
+
+interface RawSegment {
+  id: string;
+  name: string;
+  created_at: number;
+  path_json: string;
+  gate_radius: number;
+  creator_name: string | null;
+}
+
+function toSegment(r: RawSegment): Segment {
+  let path: PathPoint[] = [];
+  try {
+    path = JSON.parse(r.path_json);
+  } catch {
+    path = [];
+  }
+  return { id: r.id, name: r.name, createdAt: r.created_at, path, gateRadius: r.gate_radius, creatorName: r.creator_name };
+}
+
+/** Saves a challenge. Re-importing one you already have keeps your name for it. */
+export async function saveSegment(seg: Segment): Promise<void> {
+  await getDb().runAsync(
+    `INSERT INTO segments (id, name, created_at, path_json, gate_radius, creator_name) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO NOTHING`,
+    seg.id, seg.name, seg.createdAt, JSON.stringify(seg.path), seg.gateRadius, seg.creatorName,
+  );
+}
+
+export async function getSegment(id: string): Promise<Segment | null> {
+  const r = await getDb().getFirstAsync<RawSegment>('SELECT * FROM segments WHERE id = ?', id);
+  return r ? toSegment(r) : null;
+}
+
+export async function listSegments(): Promise<Segment[]> {
+  const rows = await getDb().getAllAsync<RawSegment>('SELECT * FROM segments ORDER BY created_at DESC');
+  return rows.map(toSegment);
+}
+
+export async function renameSegment(id: string, name: string) {
+  await getDb().runAsync('UPDATE segments SET name = ? WHERE id = ?', name, id);
+}
+
+export async function deleteSegment(id: string) {
+  const d = getDb();
+  await d.withTransactionAsync(async () => {
+    await d.runAsync('DELETE FROM attempts WHERE segment_id = ?', id);
+    await d.runAsync('DELETE FROM segments WHERE id = ?', id);
+  });
+}
+
+interface RawAttempt {
+  id: string;
+  segment_id: string;
+  session_id: string | null;
+  player_id: string;
+  player_name: string | null;
+  time: number;
+  at: number;
+  ghost_json: string | null;
+}
+
+function toAttempt(r: RawAttempt): Attempt {
+  let ghost: number[] | null = null;
+  try {
+    ghost = r.ghost_json ? JSON.parse(r.ghost_json) : null;
+  } catch {
+    ghost = null;
+  }
+  return {
+    id: r.id, segmentId: r.segment_id, sessionId: r.session_id, playerId: r.player_id,
+    playerName: r.player_name ?? 'Skier', time: r.time, at: r.at, ghost,
+  };
+}
+
+/** Inserts attempts; an attempt that already exists (same player + start) is updated. */
+export async function upsertAttempts(attempts: Attempt[]): Promise<void> {
+  if (!attempts.length) return;
+  const d = getDb();
+  await d.withTransactionAsync(async () => {
+    for (const a of attempts) {
+      await d.runAsync(
+        `INSERT INTO attempts (id, segment_id, session_id, player_id, player_name, time, at, ghost_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET player_name = excluded.player_name, time = excluded.time,
+           ghost_json = COALESCE(excluded.ghost_json, attempts.ghost_json),
+           session_id = COALESCE(attempts.session_id, excluded.session_id)`,
+        a.id, a.segmentId, a.sessionId, a.playerId, a.playerName, a.time, a.at, a.ghost ? JSON.stringify(a.ghost) : null,
+      );
+    }
+  });
+}
+
+export async function listAttempts(segmentId?: string): Promise<Attempt[]> {
+  const rows = segmentId
+    ? await getDb().getAllAsync<RawAttempt>('SELECT * FROM attempts WHERE segment_id = ? ORDER BY at DESC', segmentId)
+    : await getDb().getAllAsync<RawAttempt>('SELECT * FROM attempts ORDER BY at DESC');
+  return rows.map(toAttempt);
+}
+
+export async function listSessionAttempts(sessionId: string): Promise<Attempt[]> {
+  const rows = await getDb().getAllAsync<RawAttempt>('SELECT * FROM attempts WHERE session_id = ? ORDER BY at', sessionId);
+  return rows.map(toAttempt);
+}
+
+export async function deleteSessionAttempts(sessionId: string, segmentId?: string) {
+  if (segmentId) await getDb().runAsync('DELETE FROM attempts WHERE session_id = ? AND segment_id = ?', sessionId, segmentId);
+  else await getDb().runAsync('DELETE FROM attempts WHERE session_id = ?', sessionId);
+}
+
+/** Your own name changed: update it on your attempts so shared leaderboards show the new one. */
+export async function renamePlayer(playerId: string, name: string) {
+  await getDb().runAsync('UPDATE attempts SET player_name = ? WHERE player_id = ?', name, playerId);
 }

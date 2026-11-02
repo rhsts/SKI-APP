@@ -12,11 +12,28 @@ the phone in your pocket, and the app logs your day:
   (or drag) to replay the day with the elevation profile
 - **Season totals and personal records**: days, runs, vertical, distance, time on the snow; fastest speed,
   longest run, biggest day
+- **Challenges with friends**: turn any run into a challenge, send a link, and race each other's times
 - Works offline. Everything is stored on the phone (SQLite).
 
-> **Coming next (phase 2): challenges.** Mark a stretch of a run as a segment, get timed automatically
-> every time you ski it, chase your personal best against a live "ghost", and invite friends to beat your
-> time. The database already has `segments` and `attempts` tables for this.
+## Challenges
+
+1. Open a ski day in **Days** and tap the 🏳 flag on a run. Drag the start and finish to the stretch you
+   want to race, give it a name, and save. The app finds your time on it from every day you've recorded.
+2. Tap **Challenge a friend** to send an invite link (WhatsApp, Messages, …). The link contains the course
+   and the leaderboard, so there's no account or server.
+3. Your friend opens the link and taps **Accept challenge**. Next time either of you records a day and skis
+   through the start and finish, you're **timed automatically**. While you ski it, the Record screen shows a
+   live timer and how far ahead (green) or behind (red) you are versus the leader's **ghost**.
+4. Tap **Send my time back** to share your result. Opening the reply updates the other person's leaderboard.
+   Sending the same result twice never creates duplicates.
+
+How timing works: the clock starts when you leave the 30 m start circle and stops when you enter the 30 m
+finish circle, measured to 0.1 s between GPS fixes. You have to follow the course (stray more than 60 m off
+the line and the attempt is dropped), and you can't take a shortcut to the finish.
+
+**If a link doesn't open the app**, copy the whole message and tap **Paste invite** at the top of the
+Challenges tab. This always works. Some messengers don't make custom app links (`skiapp://…`) clickable,
+and in Expo Go links only work for phones on the same Wi-Fi as the computer running `npx expo start`.
 
 ## Try it on your phone (Android, no build needed)
 
@@ -67,13 +84,16 @@ All the logic is in `src/lib/stats.ts` and is covered by unit tests.
 | Vertical | Altitude smoothed over 5 fixes, with 4 m hysteresis so GPS altitude noise doesn't add up |
 | Runs / lifts | The altitude trend has to reverse by 25 m to start a new leg. Descents are runs. Climbs are lifts if they rise ≥ 0.5 m/s, move ≤ 8 m/s, and go mostly straight. Anything else (hiking, breaks) is "other" |
 | Ski time | The sum of all runs. Standing still at the top or bottom of a run isn't counted |
+| Challenge time | `src/lib/segments.ts`: gate crossings interpolated between fixes, course-following check, a 21-point ghost for live comparison |
+| Invite links | `src/lib/share.ts`: course and best times packed into a compact URL-safe code (~2–4 KB), strictly validated when opened |
 
 ## Project layout
 
 ```
-src/app/           screens (Expo Router): Record, Days, Season, Profile, day/[id]
+src/app/           screens (Expo Router): Record, Days, Challenges, Season, Profile, day/[id], segment/*, c (invite)
 src/lib/           pure TypeScript: geo maths, stats, season, formatting, simulator
-src/tracking/      background GPS task, recording state, place lookup, demo days
+src/tracking/      background GPS task, recording state + live challenge timing, place lookup, demo days
+src/challenges/    create, time, import and share challenges
 src/db/            SQLite schema and queries
 src/components/    map, elevation chart, stat tiles, timeline cards
 __tests__/         Jest tests for the logic

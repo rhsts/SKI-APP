@@ -1,0 +1,120 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { importChallenge } from '../challenges/service';
+import { SegmentMap } from '../components/SegmentMap';
+import { getSegment } from '../db';
+import { fmtAlt, fmtDist, fmtRaceTime } from '../lib/format';
+import { leaderboard, pathInfo } from '../lib/segments';
+import { decodeChallenge, type ChallengePayload } from '../lib/share';
+import { useSettings } from '../settings';
+import { colors, s } from '../theme';
+import { refreshRacers } from '../tracking/tracker';
+
+/**
+ * Opened from an invite link (skiapp://c?d=…) or "Paste invite".
+ * Shows who's challenging you and lets you accept.
+ */
+export default function InviteScreen() {
+  const { d } = useLocalSearchParams<{ d?: string }>();
+  const { units, playerId } = useSettings();
+  const [have, setHave] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const parsed = useMemo((): { ok: ChallengePayload } | { error: string } => {
+    try {
+      if (!d) throw new Error('This invite link is empty.');
+      return { ok: decodeChallenge(String(d)) };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'This invite link is broken.' };
+    }
+  }, [d]);
+
+  useEffect(() => {
+    if ('ok' in parsed) getSegment(parsed.ok.segment.id).then((x) => setHave(!!x));
+  }, [parsed]);
+
+  if ('error' in parsed) {
+    return (
+      <View style={[s.screen, styles.center]}>
+        <Ionicons name="alert-circle-outline" size={44} color={colors.danger} />
+        <Text style={[s.h2, { textAlign: 'center' }]}>{parsed.error}</Text>
+        <Text style={[s.muted, { textAlign: 'center' }]}>Ask your friend to send the invite again.</Text>
+        <Pressable onPress={() => router.replace('/challenges')} style={styles.secondary}>
+          <Text style={styles.secondaryText}>Go to Challenges</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const { segment, attempts, fromName } = parsed.ok;
+  const info = pathInfo(segment.path);
+  const board = leaderboard(attempts);
+  const leader = board[0];
+  const fromMe = attempts.length > 0 && attempts.every((a) => a.playerId === playerId);
+
+  const accept = async () => {
+    setSaving(true);
+    try {
+      const res = await importChallenge(parsed.ok);
+      await refreshRacers();
+      router.replace(`/segment/${res.segmentId}`);
+    } catch {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ScrollView style={s.screen} contentContainerStyle={styles.content}>
+      <View style={[s.card, styles.hero]}>
+        <Text style={{ fontSize: 40 }}>⛷️</Text>
+        <Text style={[s.h1, { textAlign: 'center' }]}>
+          {have ? `New times on “${segment.name}”` : `${fromName ?? 'A friend'} challenges you!`}
+        </Text>
+        <Text style={[s.muted, { textAlign: 'center' }]}>
+          {have
+            ? `${fromName ?? 'Your friend'} sent their latest times. Add them to your leaderboard.`
+            : `Ski “${segment.name}” faster than ${leader ? fmtRaceTime(leader.time) : 'them'}.`}
+        </Text>
+      </View>
+
+      <SegmentMap path={segment.path} gateRadius={segment.gateRadius} />
+      <Text style={s.muted}>
+        {segment.name} · {fmtDist(info.length, units)}{info.drop != null ? ` · ↓ ${fmtAlt(info.drop, units)}` : ''}
+      </Text>
+
+      {board.length ? (
+        <View style={[s.card, { gap: 8 }]}>
+          <Text style={s.label}>Leaderboard</Text>
+          {board.map((e) => (
+            <View key={e.playerId} style={styles.lbRow}>
+              <Text style={s.body}>#{e.rank} {e.playerName}{e.playerId === playerId ? ' (you)' : ''}</Text>
+              <Text style={[s.body, { fontWeight: '800' }]}>{fmtRaceTime(e.time)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {fromMe ? <Text style={[s.muted, { textAlign: 'center' }]}>This is your own invite: it only has your times.</Text> : null}
+
+      <Pressable onPress={accept} disabled={saving || have === null} style={({ pressed }) => [styles.accept, pressed && { opacity: 0.85 }]}>
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.acceptText}>{have ? 'Update leaderboard' : 'Accept challenge'}</Text>}
+      </Pressable>
+      <Text style={[s.muted, { textAlign: 'center' }]}>
+        After you accept, just record your ski day. When you ski through the start and finish, you’re timed automatically.
+      </Text>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { padding: 16, gap: 12, paddingBottom: 40 },
+  center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
+  hero: { alignItems: 'center', gap: 6, paddingVertical: 20 },
+  lbRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  accept: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  acceptText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  secondary: { borderWidth: 1.5, borderColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
+  secondaryText: { color: colors.accent, fontWeight: '700' },
+});

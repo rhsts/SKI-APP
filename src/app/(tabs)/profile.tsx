@@ -31,7 +31,7 @@ export default function ProfileScreen() {
           value={name}
           onChangeText={setName}
           onEndEditing={() => updateSettings({ name: name.trim() })}
-          placeholder="Shown when you challenge friends (coming soon)"
+          placeholder="Shown to friends on challenge leaderboards"
           style={styles.input}
           maxLength={30}
         />

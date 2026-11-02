@@ -2,11 +2,14 @@ import * as Location from 'expo-location';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSyncExternalStore } from 'react';
 import {
-  createSession, deleteSession, finishSession, getPoints, insertPoints, kvSet,
+  createSession, deleteSession, finishSession, getPoints, insertPoints, kvSet, listAttempts, listSegments, upsertAttempts,
 } from '../db';
 import { simulateDay } from '../lib/sim';
 import { computeStats, smoothedSpeeds, cleanTrack } from '../lib/stats';
 import type { DayStats, TrackPoint } from '../lib/types';
+import { matchSession, myAttempt } from '../challenges/service';
+import { ghostTimeAt, leaderboard, pickTarget, Racer } from '../lib/segments';
+import { getSettings } from '../settings';
 import { lookupPlace } from './place';
 import { LOCATION_TASK, readActive, toTrackPoint, type ActiveSession } from './task';
 
@@ -31,11 +34,40 @@ export interface TrackerState {
   /** An unfinished day found at launch that the user should resume or finish. */
   recovered: boolean;
   error: string | null;
+  /** A challenge you're skiing right now. */
+  race: LiveRace | null;
+  /** The challenge you just finished, shown until dismissed. */
+  finish: RaceFinish | null;
+}
+
+export interface LiveRace {
+  segmentId: string;
+  name: string;
+  elapsed: number; // s
+  progress: number; // 0..1
+  rivalName: string | null;
+  rivalIsMe: boolean;
+  /** Seconds behind (+) or ahead (−) of the rival's ghost at this point of the course. */
+  delta: number | null;
+}
+
+export interface RaceFinish {
+  segmentId: string;
+  name: string;
+  time: number;
+  rank: number;
+  of: number;
+  isPersonalBest: boolean;
+  previousBest: number | null;
+  /** The rival you were chasing, and your gap to their time (negative = you beat them). */
+  rivalName: string | null;
+  rivalIsMe: boolean;
+  rivalGap: number | null;
 }
 
 const initial: TrackerState = {
   status: 'idle', active: null, points: [], stats: null, currentSpeed: 0, lastFixAt: null,
-  foregroundOnly: false, recovered: false, error: null,
+  foregroundOnly: false, recovered: false, error: null, race: null, finish: null,
 };
 
 let state = initial;
@@ -86,6 +118,7 @@ async function pollOnce() {
   const tail = cleanTrack(points.slice(-8));
   const spd = tail.length ? smoothedSpeeds(tail) : [0];
   set({ points, stats, currentSpeed: spd[spd.length - 1] ?? 0, lastFixAt: fresh[fresh.length - 1].t });
+  feedRacers(fresh, a.sessionId);
 }
 
 function startPolling() {
@@ -172,6 +205,89 @@ async function saveActive(a: ActiveSession | null) {
   await kvSet('active', a ? JSON.stringify(a) : null);
 }
 
+// ---------- live challenge timing ----------
+
+interface LiveRacer {
+  racer: Racer;
+  target: ReturnType<typeof pickTarget>;
+}
+
+let racers: LiveRacer[] = [];
+
+/** (Re)loads the challenges to time while recording. Call after creating or importing one. */
+export async function refreshRacers(): Promise<void> {
+  const segments = (await listSegments()).filter((s) => s.path.length >= 2);
+  const attempts = await listAttempts();
+  const me = getSettings().playerId;
+  const keep = new Map(racers.map((r) => [r.racer.segment.id, r.racer]));
+  racers = segments.map((seg) => ({
+    racer: keep.get(seg.id) ?? new Racer(seg),
+    target: pickTarget(attempts.filter((a) => a.segmentId === seg.id), me),
+  }));
+}
+
+async function onFinish(lr: LiveRacer, sessionId: string, ev: { startT: number; time: number; ghost: number[] }) {
+  const seg = lr.racer.segment;
+  const me = getSettings().playerId;
+  const before = await listAttempts(seg.id);
+  const prevBest = before.filter((a) => a.playerId === me).reduce<number | null>((m, a) => (m == null || a.time < m ? a.time : m), null);
+  const attempt = myAttempt(seg, sessionId, ev);
+  await upsertAttempts([attempt]);
+  const board = leaderboard([...before.filter((a) => a.id !== attempt.id), attempt]);
+  const mine = board.find((e) => e.playerId === me)!;
+  const target = lr.target;
+  set({
+    finish: {
+      segmentId: seg.id,
+      name: seg.name,
+      time: ev.time,
+      rank: mine.rank,
+      of: board.length,
+      isPersonalBest: prevBest == null || ev.time < prevBest,
+      previousBest: prevBest,
+      rivalName: target ? target.name : null,
+      rivalIsMe: target?.mine ?? false,
+      rivalGap: target ? ev.time - target.time : null,
+    },
+  });
+  lr.target = pickTarget([...before, attempt], me);
+}
+
+function feedRacers(fresh: TrackPoint[], sessionId: string) {
+  if (!racers.length) return;
+  for (const p of fresh) {
+    if (p.acc != null && p.acc > 40) continue;
+    for (const lr of racers) {
+      const ev = lr.racer.push(p);
+      if (ev?.type === 'finish') onFinish(lr, sessionId, ev).catch((e) => set({ error: String(e) }));
+    }
+  }
+  // Show the race you're furthest into.
+  const active = racers
+    .filter((lr) => lr.racer.status === 'racing')
+    .sort((a, b) => b.racer.progress - a.racer.progress)[0];
+  if (!active) {
+    if (state.race) set({ race: null });
+    return;
+  }
+  const { racer, target } = active;
+  set({
+    race: {
+      segmentId: racer.segment.id,
+      name: racer.segment.name,
+      elapsed: racer.elapsed,
+      progress: racer.progress,
+      rivalName: target?.name ?? null,
+      rivalIsMe: target?.mine ?? false,
+      delta: target ? racer.elapsed - ghostTimeAt(target.ghost, racer.progress) : null,
+    },
+  });
+}
+
+export function dismissFinish() {
+  set({ finish: null });
+}
+
 // ---------- actions ----------
 
 export async function startDay(simulate: boolean): Promise<void> {
@@ -182,7 +298,9 @@ export async function startDay(simulate: boolean): Promise<void> {
   const active: ActiveSession = { sessionId, startedAt, paused: false, source: simulate ? 'sim' : 'gps' };
   await saveActive(active);
   set({ ...initial, status: 'recording', active });
+  racers = [];
   try {
+    await refreshRacers();
     await startSource(active);
     startPolling();
   } catch (e) {
@@ -208,6 +326,7 @@ export async function resumeDay(): Promise<void> {
   await saveActive(active);
   set({ status: 'recording', active, recovered: false, error: null });
   try {
+    await refreshRacers();
     await startSource(active);
     startPolling();
   } catch (e) {
@@ -230,11 +349,15 @@ export async function stopDay(): Promise<string | null> {
   const stats = computeStats(points);
   if (points.length < 20 || stats.duration < 60) {
     await deleteSession(a.sessionId);
+    racers = [];
     set({ ...initial });
     return null;
   }
   const place = a.source === 'sim' ? 'Demo Mountain' : await lookupPlace(points);
   await finishSession(a.sessionId, points[points.length - 1].t, stats, place);
+  // Re-time all challenges on the complete day (catches anything missed live).
+  await matchSession(a.sessionId, points);
+  racers = [];
   set({ ...initial });
   return a.sessionId;
 }
@@ -254,6 +377,7 @@ export async function recoverActiveDay(): Promise<void> {
   if (!a.paused && bgRunning) {
     // The background service kept recording while the UI was gone: just reattach.
     set({ ...initial, status: 'recording', active: a, points, stats });
+    await refreshRacers();
     startPolling();
     return;
   }
