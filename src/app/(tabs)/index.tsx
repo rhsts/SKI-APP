@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatGrid, StatTile } from '../../components/StatTile';
+import { badgesEarnedBy } from '../../days/badges';
 import { fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
 import { liveStatus } from '../../lib/stats';
 import { useSettings } from '../../settings';
@@ -41,7 +42,16 @@ export default function RecordScreen() {
         onPress: () =>
           run(async () => {
             const id = await stopDay();
-            if (id) router.push(`/day/${id}`);
+            if (id) {
+              router.push(`/day/${id}`);
+              const fresh = await badgesEarnedBy(id).catch(() => []);
+              if (fresh.length) {
+                Alert.alert(
+                  fresh.length === 1 ? '🏅 New badge!' : `🏅 ${fresh.length} new badges!`,
+                  fresh.map((b) => `${b.emoji} ${b.title}: ${b.description}`).join('\n'),
+                );
+              }
+            }
             else Alert.alert('Too short to save', 'Record at least a minute of GPS to save a day.');
           }),
       },

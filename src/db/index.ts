@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { DEFAULT_GOALS, type Goals } from '../lib/goals';
 import type { PisteMatch } from '../lib/pistes';
 import type { Attempt, PathPoint, Segment } from '../lib/segments';
 import type { DayStats, TrackPoint, Units } from '../lib/types';
@@ -105,15 +106,17 @@ export interface Settings {
   theme: 'system' | 'light' | 'dark';
   /** Buzz on a new top speed and at the end of each run. */
   vibrate: boolean;
+  goals: Goals;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');
   if (!raw) return DEFAULT_SETTINGS;
   try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const saved = JSON.parse(raw);
+    return { ...DEFAULT_SETTINGS, ...saved, goals: { ...DEFAULT_GOALS, ...(saved.goals ?? {}) } };
   } catch {
     return DEFAULT_SETTINGS;
   }

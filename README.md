@@ -4,15 +4,23 @@ A ski-day tracker for Android and iOS built with Expo / React Native. Start reco
 the phone in your pocket, and the app logs your day:
 
 - **Top speed**, average ski speed, and current speed while you ride
-- **Vertical** (height skied down / ridden up), peak and lowest altitude
+- **Vertical** (height skied down / ridden up), peak and lowest altitude. Uses the phone's **barometer**
+  when it has one, which is far steadier than GPS altitude
 - **Runs vs lifts**: each run and each lift ride is detected automatically, with its own speed,
-  vertical, distance and duration
+  vertical, distance and duration. A **"Run done" card** and a buzz when you finish a run, and a flash
+  when you set a new top speed
+- **Run names**: each run is matched to the OpenStreetMap piste it followed (name and difficulty colour)
 - **Where**: the resort or village name is looked up automatically, and you can rename it
-- **Map with replay**: your route on a terrain map, runs coloured by speed, lifts dashed. Press play
-  (or drag) to replay the day with the elevation profile
-- **Season totals and personal records**: days, runs, vertical, distance, time on the snow; fastest speed,
-  longest run, biggest day
-- **Challenges with friends**: turn any run into a challenge, send a link, and race each other's times
+- **Map with replay**: your route on a terrain map, runs coloured by speed, lifts dashed. Drag on the
+  elevation graph (or press play) to replay the day
+- **Battery saver**: GPS slows down on lifts and breaks, and the Record screen shows how many hours of
+  tracking are left. The Android notification shows live runs, vertical and top speed
+- **Season**: totals, personal records, **goals** (weekly vertical, season top speed, ski days) and **badges**
+- **Share & export**: share a day as an image, export GPX (Strava, Komoot, Google Earth), compare two days,
+  and back up / restore everything
+- **Challenges with friends**: turn any run into a challenge, send a link, race each other's ghosts,
+  see split times, and run group challenges with up to 20 skiers
+- **Dark mode** (follows the phone) and big gloves-friendly record buttons
 - Works offline. Everything is stored on the phone (SQLite).
 
 ## Challenges
