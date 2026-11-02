@@ -19,6 +19,22 @@ module.exports = ({ config }) => {
     plugins: [
       ...(config.plugins ?? []),
       [
+        'expo-build-properties',
+        {
+          android: {
+            // R8 shrinking removed WorkManager's Room database class (WorkDatabase_Impl), which
+            // crashed the app at launch. Keep release builds unshrunk; the rules below are a
+            // safety net in case shrinking is turned back on.
+            enableMinifyInReleaseBuilds: false,
+            enableShrinkResourcesInReleaseBuilds: false,
+            extraProguardRules: [
+              '-keep class * extends androidx.room.RoomDatabase { <init>(); }',
+              '-keep class androidx.work.impl.** { *; }',
+            ].join('\n'),
+          },
+        },
+      ],
+      [
         'expo-image-picker',
         {
           photosPermission: 'Ski Tracker adds photos you choose to the map of your ski day.',

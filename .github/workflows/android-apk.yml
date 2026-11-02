@@ -53,7 +53,10 @@ jobs:
           npx jest --ci
 
       - name: Generate the Android project
-        run: npx expo prebuild --platform android --no-install
+        run: |
+          npx expo prebuild --platform android --no-install
+          echo "--- shrinking settings ---"
+          grep -n -i "minify\|shrinkResources" android/gradle.properties android/app/build.gradle || true
 
       - name: Build release APK
         working-directory: android
