@@ -7,6 +7,8 @@ import { ElevationChart } from '../../components/ElevationChart';
 import { RouteMap } from '../../components/RouteMap';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { BreakRow, TimelineCard } from '../../components/TimelineCard';
+import { exportGpx } from '../../days/files';
+import { lookupPistes } from '../../days/pistes';
 import { deleteSession, getPoints, getSession, listSegments, listSessionAttempts, renameSession, type SessionRow } from '../../db';
 import type { Attempt, Segment } from '../../lib/segments';
 import {
@@ -36,7 +38,14 @@ export default function DayScreen() {
 
   useEffect(() => {
     if (!id) return;
-    getSession(id).then((ses) => { setSession(ses); setName(ses?.place ?? ''); });
+    getSession(id).then((ses) => {
+      setSession(ses);
+      setName(ses?.place ?? '');
+      // Piste names from OpenStreetMap, looked up once per day (needs internet; retried next time if offline).
+      if (ses && ses.pistes == null && !ses.isDemo) {
+        lookupPistes(ses.id).then((p) => p && setSession((cur) => (cur ? { ...cur, pistes: p } : cur)));
+      }
+    });
     getPoints(id).then(setRaw);
   }, [id]);
 
@@ -101,6 +110,17 @@ export default function DayScreen() {
       { text: 'Delete', style: 'destructive', onPress: async () => { await deleteSession(session.id); router.back(); } },
     ]);
 
+  const gpx = () =>
+    exportGpx(session.id).catch((e) => Alert.alert('Couldn’t export', e instanceof Error ? e.message : String(e)));
+
+  // Android shows at most three buttons in an alert.
+  const menu = () =>
+    Alert.alert(session.place ?? 'Ski day', undefined, [
+      { text: 'Export GPX (Strava, Komoot…)', onPress: gpx },
+      { text: 'Delete day', style: 'destructive', onPress: remove },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+
   const saveName = async () => {
     await renameSession(session.id, name);
     setSession({ ...session, place: name.trim() || null });
@@ -113,9 +133,14 @@ export default function DayScreen() {
         options={{
           title: fmtDate(session.startedAt),
           headerRight: () => (
-            <Pressable onPress={remove} hitSlop={10} accessibilityLabel="Delete day">
-              <Ionicons name="trash-outline" size={22} color={colors.danger} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 18 }}>
+              <Pressable onPress={() => router.push({ pathname: '/day/share', params: { id: session.id } })} hitSlop={10} accessibilityLabel="Share as image">
+                <Ionicons name="share-social-outline" size={22} color={colors.accent} />
+              </Pressable>
+              <Pressable onPress={menu} hitSlop={10} accessibilityLabel="More">
+                <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.accent} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -204,6 +229,7 @@ export default function DayScreen() {
             number={numbers[i]}
             units={units}
             selected={focus === i}
+            piste={session.pistes?.[String(a.startTime)] ?? null}
             onChallenge={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(i) } })}
             onPress={() => {
               const next = focus === i ? null : i;

@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import type { PisteMatch } from '../lib/pistes';
 import type { Attempt, PathPoint, Segment } from '../lib/segments';
 import type { DayStats, TrackPoint, Units } from '../lib/types';
 
@@ -8,7 +9,7 @@ import type { DayStats, TrackPoint, Units } from '../lib/types';
  * killed app never loses a day.
  */
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
@@ -30,6 +31,7 @@ function migrate(d: SQLite.SQLiteDatabase) {
     `);
   }
   if (version < 3) d.execSync('ALTER TABLE points ADD COLUMN pres REAL');
+  if (version < 4) d.execSync('ALTER TABLE sessions ADD COLUMN pistes_json TEXT');
   d.execSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -130,6 +132,8 @@ export interface SessionRow {
   place: string | null;
   stats: DayStats | null;
   isDemo: boolean;
+  /** Piste name per run (keyed by run start time); null = not looked up yet. */
+  pistes: Record<string, PisteMatch> | null;
 }
 
 interface RawSession {
@@ -139,6 +143,7 @@ interface RawSession {
   place: string | null;
   stats_json: string | null;
   is_demo: number;
+  pistes_json: string | null;
 }
 
 function toSession(r: RawSession): SessionRow {
@@ -148,7 +153,13 @@ function toSession(r: RawSession): SessionRow {
   } catch {
     stats = null;
   }
-  return { id: r.id, startedAt: r.started_at, endedAt: r.ended_at, place: r.place, stats, isDemo: !!r.is_demo };
+  let pistes: Record<string, PisteMatch> | null = null;
+  try {
+    pistes = r.pistes_json ? JSON.parse(r.pistes_json) : null;
+  } catch {
+    pistes = null;
+  }
+  return { id: r.id, startedAt: r.started_at, endedAt: r.ended_at, place: r.place, stats, isDemo: !!r.is_demo, pistes };
 }
 
 export async function createSession(startedAt: number, isDemo = false): Promise<string> {
@@ -165,6 +176,21 @@ export async function finishSession(id: string, endedAt: number, stats: DayStats
     'UPDATE sessions SET ended_at = ?, stats_json = ?, place = COALESCE(?, place) WHERE id = ?',
     endedAt, JSON.stringify(stats), place, id,
   );
+}
+
+export async function setSessionPistes(id: string, pistes: Record<string, PisteMatch>) {
+  await getDb().runAsync('UPDATE sessions SET pistes_json = ? WHERE id = ?', JSON.stringify(pistes), id);
+}
+
+/** Inserts a finished day with a known id (restoring a backup). Returns false if it already exists. */
+export async function insertSessionRaw(s: {
+  id: string; startedAt: number; endedAt: number | null; place: string | null; isDemo: boolean; stats: DayStats;
+}): Promise<boolean> {
+  const r = await getDb().runAsync(
+    'INSERT OR IGNORE INTO sessions (id, started_at, ended_at, place, stats_json, is_demo) VALUES (?, ?, ?, ?, ?, ?)',
+    s.id, s.startedAt, s.endedAt ?? s.startedAt, s.place, JSON.stringify(s.stats), s.isDemo ? 1 : 0,
+  );
+  return r.changes > 0;
 }
 
 export async function renameSession(id: string, place: string) {

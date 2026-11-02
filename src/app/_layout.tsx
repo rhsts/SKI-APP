@@ -41,6 +41,8 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="day/[id]" options={{ title: 'Ski day' }} />
+        <Stack.Screen name="day/share" options={{ title: 'Share your day' }} />
+        <Stack.Screen name="compare" options={{ title: 'Compare days' }} />
         <Stack.Screen name="segment/new" options={{ title: 'New challenge' }} />
         <Stack.Screen name="segment/[id]" options={{ title: 'Challenge' }} />
         <Stack.Screen name="c" options={{ title: 'Challenge invite' }} />

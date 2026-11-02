@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { fmtAlt, fmtDist, fmtDuration, fmtSpeed, fmtTimeOfDay } from '../lib/format';
+import { difficultyColor, difficultyLabel, type PisteMatch } from '../lib/pistes';
 import type { Activity, Units } from '../lib/types';
 import { useTheme, useStyles, type Palette } from '../theme';
 
@@ -12,10 +13,12 @@ interface Props {
   onPress?: () => void;
   /** Shown on runs: turn this run into a challenge. */
   onChallenge?: () => void;
+  /** The piste this run was on, from OpenStreetMap. */
+  piste?: PisteMatch | null;
 }
 
 /** One entry in the day's timeline: a run or a lift ride. */
-export function TimelineCard({ activity: a, number, units, selected, onPress, onChallenge }: Props) {
+export function TimelineCard({ activity: a, number, units, selected, onPress, onChallenge, piste }: Props) {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const isRun = a.kind === 'run';
@@ -37,6 +40,15 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
             ) : null}
           </View>
         </View>
+        {isRun && piste ? (
+          <View style={styles.pisteRow}>
+            <View style={[styles.dot, { backgroundColor: difficultyColor(piste.difficulty) }]} />
+            <Text style={[s.body, { fontWeight: '700', flex: 1 }]} numberOfLines={1}>
+              {piste.name ?? difficultyLabel(piste.difficulty) ?? 'Piste'}
+              {piste.name && difficultyLabel(piste.difficulty) ? <Text style={s.muted}>  {difficultyLabel(piste.difficulty)}</Text> : null}
+            </Text>
+          </View>
+        ) : null}
         {isRun ? (
           <View style={styles.row}>
             <Metric label="Top" value={fmtSpeed(a.topSpeed, units)} />
@@ -85,5 +97,7 @@ const makeStyles = (colors: Palette) =>
     icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
     metric: { fontSize: 14, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    pisteRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
     breakRow: { flexDirection: 'row', gap: 6, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 2 },
   });

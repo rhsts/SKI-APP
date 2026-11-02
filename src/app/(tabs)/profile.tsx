@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { createBackup, restoreBackup } from '../../days/files';
 import { deleteAllData, deleteDemoData } from '../../db';
 import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
@@ -95,7 +96,38 @@ export default function ProfileScreen() {
 
       <View style={[s.card, styles.section]}>
         <Text style={s.label}>Data</Text>
-        <Text style={s.muted}>Everything is stored only on this phone.</Text>
+        <Text style={s.muted}>
+          Everything is stored only on this phone. Save a backup to Google Drive or email before you switch phones.
+        </Text>
+        <Row
+          label="Back up all days"
+          busy={busy === 'backup'}
+          onPress={async () => {
+            setBusy('backup');
+            try {
+              await createBackup();
+            } catch (e) {
+              Alert.alert('Backup failed', e instanceof Error ? e.message : String(e));
+            } finally {
+              setBusy(null);
+            }
+          }}
+        />
+        <Row
+          label="Restore from a backup"
+          busy={busy === 'restore'}
+          onPress={async () => {
+            setBusy('restore');
+            try {
+              const r = await restoreBackup();
+              if (r) Alert.alert('Backup restored', `Added ${r.days} ${r.days === 1 ? 'day' : 'days'} and ${r.challenges} ${r.challenges === 1 ? 'challenge' : 'challenges'}. Days you already had were kept.`);
+            } catch (e) {
+              Alert.alert('Couldn’t restore', e instanceof Error ? e.message : String(e));
+            } finally {
+              setBusy(null);
+            }
+          }}
+        />
         <Row
           label="Delete all ski days"
           danger

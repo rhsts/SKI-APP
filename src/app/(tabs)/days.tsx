@@ -14,6 +14,19 @@ export default function DaysScreen() {
   const { units } = useSettings();
   const [days, setDays] = useState<SessionRow[] | null>(null);
   const [adding, setAdding] = useState(false);
+  // Compare mode: pick two days.
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+
+  const toggle = (id: string) => {
+    const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id].slice(-2);
+    setPicked(next);
+    if (next.length === 2) {
+      setPicking(false);
+      setPicked([]);
+      router.push({ pathname: '/compare', params: { a: next[0], b: next[1] } });
+    }
+  };
 
   const load = useCallback(() => {
     listSessions().then(setDays).catch(() => setDays([]));
@@ -28,6 +41,19 @@ export default function DaysScreen() {
       contentContainerStyle={styles.list}
       data={days}
       keyExtractor={(d) => d.id}
+      ListHeaderComponent={
+        days.length >= 2 ? (
+          <Pressable
+            onPress={() => { setPicking(!picking); setPicked([]); }}
+            style={[styles.compare, picking && { backgroundColor: colors.accent }]}
+          >
+            <Ionicons name="git-compare-outline" size={18} color={picking ? colors.onAccent : colors.accent} />
+            <Text style={[styles.compareText, picking && { color: colors.onAccent }]}>
+              {picking ? `Pick ${2 - picked.length} day${picked.length ? '' : 's'} to compare · Cancel` : 'Compare two days'}
+            </Text>
+          </Pressable>
+        ) : undefined
+      }
       ListEmptyComponent={
         <View style={[s.card, styles.empty]}>
           <Ionicons name="snow-outline" size={40} color={colors.accent} />
@@ -55,7 +81,13 @@ export default function DaysScreen() {
       renderItem={({ item }) => {
         const st = item.stats;
         return (
-          <Pressable style={({ pressed }) => [s.card, styles.row, pressed && { opacity: 0.85 }]} onPress={() => router.push(`/day/${item.id}`)}>
+          <Pressable
+            style={({ pressed }) => [s.card, styles.row, picked.includes(item.id) && styles.picked, pressed && { opacity: 0.85 }]}
+            onPress={() => (picking ? toggle(item.id) : router.push(`/day/${item.id}`))}
+          >
+            {picking ? (
+              <Ionicons name={picked.includes(item.id) ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={colors.accent} />
+            ) : null}
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={s.h2} numberOfLines={1}>{item.place ?? 'Ski day'}</Text>
               <Text style={s.muted}>{fmtDate(item.startedAt)}{item.isDemo ? ' · demo' : ''}</Text>
@@ -68,7 +100,7 @@ export default function DaysScreen() {
                 </View>
               ) : null}
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+            {picking ? null : <Ionicons name="chevron-forward" size={20} color={colors.muted} />}
           </Pressable>
         );
       }}
@@ -90,7 +122,13 @@ function Metric({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['n
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     list: { padding: 16, gap: 10 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 2, borderColor: 'transparent' },
+    picked: { borderColor: colors.accent },
+    compare: {
+      flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 10,
+      borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, marginBottom: 2,
+    },
+    compareText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
     metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
     metric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     metricText: { fontSize: 13, fontWeight: '700', color: colors.text },

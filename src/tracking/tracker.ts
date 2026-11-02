@@ -14,6 +14,7 @@ import { ghostTimeAt, leaderboard, pickTarget, Racer } from '../lib/segments';
 import { getSettings } from '../settings';
 import { batteryHoursLeft } from '../lib/power';
 import { readPressure, startBarometer, stopBarometer } from './barometer';
+import { lookupPistes } from '../days/pistes';
 import { lookupPlace } from './place';
 import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
 
@@ -447,6 +448,8 @@ export async function stopDay(): Promise<string | null> {
   await finishSession(a.sessionId, points[points.length - 1].t, stats, place);
   // Re-time all challenges on the complete day (catches anything missed live).
   await matchSession(a.sessionId, points);
+  // Piste names in the background; the day screen retries if this fails (e.g. no signal).
+  if (a.source === 'gps') lookupPistes(a.sessionId).catch(() => undefined);
   racers = [];
   set({ ...initial });
   return a.sessionId;
