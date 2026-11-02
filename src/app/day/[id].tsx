@@ -8,13 +8,16 @@ import { RouteMap } from '../../components/RouteMap';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { BreakRow, TimelineCard } from '../../components/TimelineCard';
 import { exportGpx } from '../../days/files';
-import { lookupPistes } from '../../days/pistes';
+import { lookupPistes, pistesUpToDate } from '../../mountain/pistes';
+import { mapFor, type TrailMap } from '../../lib/trailmap';
 import { suggestChallenges } from '../../lib/suggest';
 import { difficultyBreakdown } from '../../lib/breakdown';
 import { DifficultyBar } from '../../components/DifficultyBar';
 import { SportPicker } from '../../components/SportPicker';
-import { setSessionSport } from '../../db';
-import { deleteSession, kvGet, kvSet, getPoints, getSession, listSegments, listSessionAttempts, renameSession, type SessionRow } from '../../db';
+import {
+  deleteSession, getPoints, getSession, kvGet, kvSet, listSegments, listSessionAttempts, listTrailMaps, renameSession,
+  setSessionSport, type SessionRow,
+} from '../../db';
 import type { Attempt, Segment } from '../../lib/segments';
 import {
   fmtAlt, fmtDate, fmtDist, fmtDuration, fmtRaceTime, fmtSpeed, fmtTimeOfDay,
@@ -42,6 +45,7 @@ export default function DayScreen() {
   const [timed, setTimed] = useState<{ attempt: Attempt; segment: Segment }[]>([]);
   const [segments, setSegments] = useState<Segment[] | null>(null);
   const [hideSuggest, setHideSuggest] = useState(true);
+  const [trail, setTrail] = useState<TrailMap | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -49,8 +53,10 @@ export default function DayScreen() {
       setSession(ses);
       setName(ses?.place ?? '');
       // Piste names from OpenStreetMap, looked up once per day (needs internet; retried next time if offline).
-      if (ses && ses.pistes == null && !ses.isDemo) {
-        lookupPistes(ses.id).then((p) => p && setSession((cur) => (cur ? { ...cur, pistes: p } : cur)));
+      if (ses && !pistesUpToDate(ses.pistes) && !ses.isDemo) {
+        lookupPistes(ses.id).then((p) => {
+          if (p) setSession((cur) => (cur ? { ...cur, pistes: p } : cur));
+        });
       }
     });
     getPoints(id).then(setRaw);
@@ -68,6 +74,13 @@ export default function DayScreen() {
       });
     }, [id]),
   );
+
+  // Offline trail map for this area (saved when the day's pistes were looked up, or downloaded).
+  useEffect(() => {
+    if (!raw?.length || !session?.pistes) return;
+    const mid = raw[Math.floor(raw.length / 2)];
+    listTrailMaps().then((maps) => setTrail(mapFor(maps, mid)));
+  }, [raw, session?.pistes]);
 
   // Recompute from raw points so indices always match the cleaned track.
   const day = useMemo(() => {
@@ -179,7 +192,7 @@ export default function DayScreen() {
         }}
       />
 
-      <RouteMap points={pts} speeds={speeds} activities={timeline} cursor={cursor} focus={focus} />
+      <RouteMap points={pts} speeds={speeds} activities={timeline} cursor={cursor} focus={focus} trail={trail} />
 
       <View style={[s.card, { gap: 8 }]}>
         <View style={styles.replayRow}>

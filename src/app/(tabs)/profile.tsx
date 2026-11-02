@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { createBackup, importGpx, restoreBackup } from '../../days/files';
-import { deleteAllData, deleteDemoData } from '../../db';
+import { deleteAllData, deleteDemoData, deleteTrailMaps } from '../../db';
 import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
@@ -142,6 +142,11 @@ export default function ProfileScreen() {
               setBusy(null);
             }
           }}
+        />
+        <Row
+          label="Delete saved trail maps"
+          busy={busy === 'maps'}
+          onPress={() => act('maps', deleteTrailMaps, 'Saved trail maps deleted')}
         />
         <Row
           label="Delete all ski days"

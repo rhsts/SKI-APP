@@ -2,7 +2,9 @@ import { useMemo, useRef } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { simplify } from '../lib/geo';
+import type { TrailMap } from '../lib/trailmap';
 import type { Activity, TrackPoint } from '../lib/types';
+import { TrailOverlay } from './TrailOverlay';
 import { useTheme, useStyles, type Palette, speedColor } from '../theme';
 
 interface Props {
@@ -14,6 +16,8 @@ interface Props {
   /** Highlights one activity and dims the rest. */
   focus?: number | null;
   style?: StyleProp<ViewStyle>;
+  /** The resort's pistes and lifts, drawn underneath. */
+  trail?: TrailMap | null;
 }
 
 interface Line {
@@ -28,7 +32,7 @@ interface Line {
 const DIM_RUN = 'rgba(11,107,203,0.25)';
 
 /** Your day on a terrain map: runs coloured by speed, lifts dashed. */
-export function RouteMap({ points, speeds, activities, cursor, focus, style }: Props) {
+export function RouteMap({ points, speeds, activities, cursor, focus, style, trail }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
   const ref = useRef<MapView>(null);
@@ -84,6 +88,7 @@ export function RouteMap({ points, speeds, activities, cursor, focus, style }: P
         toolbarEnabled={false}
         rotateEnabled={false}
       >
+        {trail ? <TrailOverlay map={trail} /> : null}
         {lines.map((l, i) => {
           const dim = focus != null && focus !== i;
           if (l.coords.length < 2) return null;

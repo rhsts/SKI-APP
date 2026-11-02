@@ -1,4 +1,4 @@
-import { localProjector, type LatLon } from './geo';
+import { distance, localProjector, type LatLon } from './geo';
 import type { Activity, TrackPoint } from './types';
 
 /**
@@ -38,7 +38,71 @@ export function bboxOf(points: LatLon[], marginDeg = 0.005): [number, number, nu
 
 export function overpassQuery([s, w, n, e]: [number, number, number, number]): string {
   const bb = `${s.toFixed(5)},${w.toFixed(5)},${n.toFixed(5)},${e.toFixed(5)}`;
-  return `[out:json][timeout:25];(way["piste:type"="downhill"](${bb});relation["piste:type"="downhill"](${bb}););out geom tags;`;
+  return `[out:json][timeout:40];(way["piste:type"="downhill"](${bb});relation["piste:type"="downhill"](${bb});way["aerialway"~"^(${LIFT_TYPES.join('|')})$"](${bb}););out geom tags;`;
+}
+
+/** Lift kinds we draw and name (OSM aerialway=*). */
+export const LIFT_TYPES = [
+  'chair_lift', 'gondola', 'cable_car', 'mixed_lift', 'drag_lift', 't-bar', 'j-bar', 'platter', 'rope_tow', 'magic_carpet', 'funicular',
+];
+
+const LIFT_LABEL: Record<string, string> = {
+  chair_lift: 'Chairlift', gondola: 'Gondola', cable_car: 'Cable car', mixed_lift: 'Chairlift/gondola',
+  drag_lift: 'Drag lift', 't-bar': 'T-bar', 'j-bar': 'J-bar', platter: 'Platter lift', rope_tow: 'Rope tow',
+  magic_carpet: 'Magic carpet', funicular: 'Funicular',
+};
+
+export interface Lift {
+  id: string;
+  name: string | null;
+  type: string;
+  coords: LatLon[];
+}
+
+export function liftLabel(type: string): string {
+  return LIFT_LABEL[type] ?? 'Lift';
+}
+
+/** Lifts in an Overpass response. */
+export function parseLifts(json: unknown): Lift[] {
+  const els = (json as { elements?: OverpassElement[] })?.elements;
+  if (!Array.isArray(els)) return [];
+  const out: Lift[] = [];
+  for (const el of els) {
+    const type = el.tags?.aerialway;
+    if (el.type !== 'way' || !type || !LIFT_TYPES.includes(type)) continue;
+    const g = el.geometry;
+    if (!Array.isArray(g) || g.length < 2 || !g.every((p) => p && typeof p.lat === 'number' && typeof p.lon === 'number')) continue;
+    out.push({ id: `l${el.id}`, name: el.tags?.name?.slice(0, 40) ?? null, type, coords: g });
+  }
+  return out;
+}
+
+/**
+ * Names each lift ride after the OSM lift it followed: its start must be near
+ * one end of the lift line and its end near the other.
+ */
+export function matchLiftRides(points: TrackPoint[], rides: Activity[], lifts: Lift[], endTolerance = 120): Record<string, PisteMatch> {
+  const result: Record<string, PisteMatch> = {};
+  for (const ride of rides) {
+    if (ride.kind !== 'lift') continue;
+    const a = points[ride.startIndex], b = points[ride.endIndex];
+    let best: { lift: Lift; err: number } | null = null;
+    for (const lift of lifts) {
+      const lo = lift.coords[0], hi = lift.coords[lift.coords.length - 1];
+      const err = Math.min(distance(a, lo) + distance(b, hi), distance(a, hi) + distance(b, lo));
+      if (err <= 2 * endTolerance && (!best || err < best.err)) best = { lift, err };
+    }
+    if (best) {
+      const label = liftLabel(best.lift.type);
+      result[String(ride.startTime)] = {
+        name: best.lift.name ? `${best.lift.name} · ${label}` : label,
+        difficulty: null,
+        coverage: 1,
+      };
+    }
+  }
+  return result;
 }
 
 const DIFFICULTIES = ['novice', 'easy', 'intermediate', 'advanced', 'expert', 'freeride'];
@@ -71,6 +135,8 @@ export function parseOverpass(json: unknown): Piste[] {
   for (const el of els) {
     const geomOk = (g: unknown): g is { lat: number; lon: number }[] =>
       Array.isArray(g) && g.length >= 2 && g.every((p) => p && typeof p.lat === 'number' && typeof p.lon === 'number');
+    // The same response also holds lifts: only downhill pistes count here.
+    if (el.tags?.['piste:type'] !== 'downhill') continue;
     if (el.type === 'way' && geomOk(el.geometry)) {
       out.push({ id: `w${el.id}`, name: nameOf(el.tags), difficulty: difficultyOf(el.tags), coords: el.geometry });
     } else if (el.type === 'relation' && Array.isArray(el.members)) {

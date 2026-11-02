@@ -7,7 +7,7 @@ import {
   upsertAttempts,
 } from '../db';
 import { lookupPlace } from '../tracking/place';
-import { lookupPistes } from './pistes';
+import { lookupPistes } from '../mountain/pistes';
 import { buildBackup, packPoints, parseBackup, unpackPoints } from '../lib/backup';
 import { fileNameFor, parseGpx, splitDays, toGpx } from '../lib/gpx';
 import { isSport } from '../lib/sport';

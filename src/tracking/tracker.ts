@@ -16,7 +16,7 @@ import { compareSplits, SECTION_NAMES } from '../lib/ghost';
 import { batteryHoursLeft } from '../lib/power';
 import type { Sport } from '../lib/sport';
 import { readPressure, startBarometer, stopBarometer } from './barometer';
-import { lookupPistes } from '../days/pistes';
+import { lookupPistes } from '../mountain/pistes';
 import { lookupPlace } from './place';
 import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
 

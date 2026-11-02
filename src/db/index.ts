@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import { DEFAULT_GOALS, type Goals } from '../lib/goals';
 import { isSport, type Sport } from '../lib/sport';
 import type { PisteMatch } from '../lib/pistes';
+import type { TrailMap } from '../lib/trailmap';
 import type { Attempt, PathPoint, Segment } from '../lib/segments';
 import type { DayStats, TrackPoint, Units } from '../lib/types';
 
@@ -11,7 +12,7 @@ import type { DayStats, TrackPoint, Units } from '../lib/types';
  * killed app never loses a day.
  */
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
@@ -35,6 +36,13 @@ function migrate(d: SQLite.SQLiteDatabase) {
   if (version < 3) d.execSync('ALTER TABLE points ADD COLUMN pres REAL');
   if (version < 4) d.execSync('ALTER TABLE sessions ADD COLUMN pistes_json TEXT');
   if (version < 5) d.execSync("ALTER TABLE sessions ADD COLUMN sport TEXT NOT NULL DEFAULT 'ski'");
+  if (version < 6) {
+    d.execSync(`CREATE TABLE IF NOT EXISTS trail_maps (
+      id TEXT PRIMARY KEY NOT NULL,
+      fetched_at INTEGER NOT NULL,
+      json TEXT NOT NULL
+    )`);
+  }
   d.execSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -388,4 +396,27 @@ export async function deleteSessionAttempts(sessionId: string, segmentId?: strin
 /** Your own name changed: update it on your attempts so shared leaderboards show the new one. */
 export async function renamePlayer(playerId: string, name: string) {
   await getDb().runAsync('UPDATE attempts SET player_name = ? WHERE player_id = ?', name, playerId);
+}
+
+// ---------- offline trail maps ----------
+
+export async function saveTrailMap(map: TrailMap): Promise<void> {
+  await getDb().runAsync('INSERT OR REPLACE INTO trail_maps (id, fetched_at, json) VALUES (?, ?, ?)', map.id, map.fetchedAt, JSON.stringify(map));
+}
+
+export async function listTrailMaps(): Promise<TrailMap[]> {
+  const rows = await getDb().getAllAsync<{ json: string }>('SELECT json FROM trail_maps ORDER BY fetched_at DESC');
+  const out: TrailMap[] = [];
+  for (const r of rows) {
+    try {
+      out.push(JSON.parse(r.json));
+    } catch {
+      // Skip a damaged entry.
+    }
+  }
+  return out;
+}
+
+export async function deleteTrailMaps(): Promise<void> {
+  await getDb().runAsync('DELETE FROM trail_maps');
 }

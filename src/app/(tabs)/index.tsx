@@ -7,6 +7,7 @@ import { badgesEarnedBy } from '../../days/badges';
 import { fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
 import { liveStatus } from '../../lib/stats';
 import { updateSettings, useSettings } from '../../settings';
+import { MountainCard } from '../../components/MountainCard';
 import { SportPicker } from '../../components/SportPicker';
 import { useTheme, useStyles, type Palette } from '../../theme';
 import { dismissFinish, dismissLastRun, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish, type RunSummary } from '../../tracking/tracker';
@@ -126,6 +127,8 @@ export default function RecordScreen() {
           </View>
         ) : null}
       </View>
+
+      {t.status !== 'recording' || t.points.length ? <MountainCard points={t.points} units={units} /> : null}
 
       {st || t.status !== 'idle' ? (
         <StatGrid>

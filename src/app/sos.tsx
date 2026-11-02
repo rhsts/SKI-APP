@@ -3,7 +3,9 @@ import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { listTrailMaps } from '../db';
 import { emergencyNumbers, formatCoords } from '../lib/emergency';
+import { mapFor, nearestFeature } from '../lib/trailmap';
 import { fmtAlt, fmtTimeOfDay } from '../lib/format';
 import { useSettings } from '../settings';
 import { useStyles, useTheme, type Palette } from '../theme';
@@ -23,6 +25,7 @@ export default function SosScreen() {
     last ? { lat: last.lat, lon: last.lon, alt: last.alt, acc: last.acc, at: last.t } : null,
   );
   const [locating, setLocating] = useState(true);
+  const [near, setNear] = useState<ReturnType<typeof nearestFeature>>(null);
   const numbers = emergencyNumbers(Intl.DateTimeFormat().resolvedOptions().locale ?? 'en');
 
   useEffect(() => {
@@ -39,6 +42,17 @@ export default function SosScreen() {
       }
     })();
   }, []);
+
+  // Nearest named piste or lift from the offline trail map: rescuers always ask.
+  useEffect(() => {
+    if (!fix) return;
+    listTrailMaps()
+      .then((maps) => {
+        const m = mapFor(maps, fix);
+        setNear(m ? nearestFeature(m, fix) : null);
+      })
+      .catch(() => undefined);
+  }, [fix]);
 
   const c = fix ? formatCoords(fix.lat, fix.lon) : null;
   const call = (n: string) => Linking.openURL(`tel:${n}`).catch(() => Alert.alert('Can’t start a call', `Dial ${n} yourself.`));
@@ -65,6 +79,11 @@ export default function SosScreen() {
           <>
             <Text selectable style={styles.coords}>{c.decimal}</Text>
             <Text selectable style={[s.body, { fontVariant: ['tabular-nums'] }]}>{c.dms}</Text>
+            {near ? (
+              <Text style={[s.body, { fontWeight: '700' }]}>
+                {near.kind === 'lift' ? '🚡' : '⛷️'} {near.meters < 30 ? 'On' : `${near.meters} m from`} {near.kind === 'lift' ? 'lift' : 'piste'} “{near.name}”
+              </Text>
+            ) : null}
             <Text style={s.muted}>
               Altitude {fmtAlt(fix.alt, units)}
               {fix.acc != null ? ` · accurate to ±${Math.round(fix.acc)} m` : ''}
@@ -83,7 +102,7 @@ export default function SosScreen() {
               </Pressable>
               <Pressable
                 style={styles.btn}
-                onPress={() => Share.share({ message: `I need help. My location: ${c.decimal}\n${c.mapsLink}` })}
+                onPress={() => Share.share({ message: `I need help. My location: ${c.decimal}${near ? ` (near ${near.kind} “${near.name}”)` : ''}\n${c.mapsLink}` })}
               >
                 <Ionicons name="share-outline" size={18} color={colors.accent} />
                 <Text style={styles.btnText}>Send location</Text>
