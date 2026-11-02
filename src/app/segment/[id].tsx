@@ -9,12 +9,14 @@ import { deleteSegment, getSegment, listAttempts } from '../../db';
 import { fmtAlt, fmtDate, fmtDelta, fmtDist, fmtRaceTime } from '../../lib/format';
 import { leaderboard, pathInfo, type Attempt, type Segment } from '../../lib/segments';
 import { useSettings } from '../../settings';
-import { colors, s } from '../../theme';
+import { useTheme, useStyles, type Palette } from '../../theme';
 import { refreshRacers } from '../../tracking/tracker';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
 export default function SegmentScreen() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { units, playerId, name } = useSettings();
   const [segment, setSegment] = useState<Segment | null | undefined>(undefined);
@@ -113,9 +115,9 @@ export default function SegmentScreen() {
       </View>
 
       <Pressable onPress={invite} disabled={sharing} style={({ pressed }) => [styles.invite, pressed && { opacity: 0.85 }]}>
-        {sharing ? <ActivityIndicator color="#fff" /> : (
+        {sharing ? <ActivityIndicator color={colors.onAccent} /> : (
           <>
-            <Ionicons name="paper-plane" size={20} color="#fff" />
+            <Ionicons name="paper-plane" size={20} color={colors.onAccent} />
             <Text style={styles.inviteText}>{myBest && board.length > 1 && myBest.rank > 1 ? 'Send my time back' : 'Challenge a friend'}</Text>
           </>
         )}
@@ -158,14 +160,15 @@ export default function SegmentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
-  hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-  big: { fontSize: 44, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
-  invite: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16 },
-  inviteText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  lbRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
-  rank: { fontSize: 22, width: 36, textAlign: 'center', fontWeight: '800', color: colors.muted },
-  lbTime: { fontSize: 18, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
-  attempt: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.faint },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    content: { padding: 16, gap: 12, paddingBottom: 40 },
+    hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
+    big: { fontSize: 44, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+    invite: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16 },
+    inviteText: { color: colors.onAccent, fontSize: 18, fontWeight: '800' },
+    lbRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
+    rank: { fontSize: 22, width: 36, textAlign: 'center', fontWeight: '800', color: colors.muted },
+    lbTime: { fontSize: 18, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+    attempt: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.faint },
+  });

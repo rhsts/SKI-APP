@@ -8,7 +8,7 @@ import { fmtAlt, fmtDist, fmtRaceTime } from '../../lib/format';
 import { leaderboard, pathInfo, type LeaderboardEntry, type Segment } from '../../lib/segments';
 import { extractCode } from '../../lib/share';
 import { useSettings } from '../../settings';
-import { colors, s } from '../../theme';
+import { useTheme, useStyles, type Palette } from '../../theme';
 
 interface Row {
   segment: Segment;
@@ -19,6 +19,8 @@ interface Row {
 }
 
 export default function ChallengesScreen() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const { units, playerId } = useSettings();
   const [rows, setRows] = useState<Row[] | null>(null);
 
@@ -78,7 +80,7 @@ export default function ChallengesScreen() {
             style={({ pressed }) => [s.card, styles.row, pressed && { opacity: 0.85 }]}
             onPress={() => router.push(`/segment/${item.segment.id}`)}
           >
-            <View style={[styles.badge, { backgroundColor: iLead ? '#FFF4E0' : colors.accentSoft }]}>
+            <View style={[styles.badge, { backgroundColor: iLead ? colors.warnSoft : colors.accentSoft }]}>
               <Ionicons name={iLead ? 'trophy' : 'flag'} size={20} color={iLead ? colors.warn : colors.accent} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
@@ -105,16 +107,17 @@ export default function ChallengesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  list: { padding: 16, gap: 10 },
-  paste: {
-    flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-    borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
-  },
-  pasteText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
-  empty: { alignItems: 'center', gap: 10, paddingVertical: 32 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  badge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  times: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
-  time: { fontSize: 14, fontWeight: '700', color: colors.text },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    list: { padding: 16, gap: 10 },
+    paste: {
+      flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
+      borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
+    },
+    pasteText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    empty: { alignItems: 'center', gap: 10, paddingVertical: 32 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    badge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    times: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
+    time: { fontSize: 14, fontWeight: '700', color: colors.text },
+  });

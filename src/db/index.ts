@@ -99,9 +99,10 @@ export interface Settings {
   name: string;
   units: Units;
   simulate: boolean;
+  theme: 'system' | 'light' | 'dark';
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system' };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');

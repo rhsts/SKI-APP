@@ -7,9 +7,11 @@ import { listSessions, type SessionRow } from '../../db';
 import { fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed } from '../../lib/format';
 import { seasonKeys, seasonOf, summariseSeason, type DaySummary, type SeasonRecord } from '../../lib/season';
 import { useSettings } from '../../settings';
-import { colors, s } from '../../theme';
+import { useTheme, useStyles, type Palette } from '../../theme';
 
 export default function SeasonScreen() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const { units } = useSettings();
   const [days, setDays] = useState<SessionRow[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export default function SeasonScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
         {keys.map((k) => (
           <Pressable key={k} onPress={() => setPicked(k)} style={[styles.pill, k === key && styles.pillOn]}>
-            <Text style={[styles.pillText, k === key && { color: '#fff' }]}>Season {k}</Text>
+            <Text style={[styles.pillText, k === key && { color: colors.onAccent }]}>Season {k}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -73,6 +75,8 @@ export default function SeasonScreen() {
 function RecordRow({ icon, label, rec, fmt }: {
   icon: React.ComponentProps<typeof Ionicons>['name']; label: string; rec: SeasonRecord | null; fmt: (v: number) => string;
 }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   return (
     <Pressable
       disabled={!rec}
@@ -89,14 +93,15 @@ function RecordRow({ icon, label, rec, fmt }: {
   );
 }
 
-const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
-  pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
-  pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  pillText: { fontWeight: '700', color: colors.text },
-  hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-  big: { fontSize: 44, fontWeight: '900', color: colors.text },
-  record: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  medal: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF4E0', alignItems: 'center', justifyContent: 'center' },
-  recValue: { fontSize: 20, fontWeight: '800', color: colors.text },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    content: { padding: 16, gap: 12, paddingBottom: 32 },
+    pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
+    pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+    pillText: { fontWeight: '700', color: colors.text },
+    hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
+    big: { fontSize: 44, fontWeight: '900', color: colors.text },
+    record: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    medal: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.warnSoft, alignItems: 'center', justifyContent: 'center' },
+    recValue: { fontSize: 20, fontWeight: '800', color: colors.text },
+  });

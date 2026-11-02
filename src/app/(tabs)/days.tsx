@@ -5,10 +5,12 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { listSessions, type SessionRow } from '../../db';
 import { fmtAlt, fmtDate, fmtDuration, fmtSpeed } from '../../lib/format';
 import { useSettings } from '../../settings';
-import { colors, s } from '../../theme';
+import { useTheme, useStyles, type Palette } from '../../theme';
 import { addDemoDay } from '../../tracking/demo';
 
 export default function DaysScreen() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const { units } = useSettings();
   const [days, setDays] = useState<SessionRow[] | null>(null);
   const [adding, setAdding] = useState(false);
@@ -46,7 +48,7 @@ export default function DaysScreen() {
               }
             }}
           >
-            {adding ? <ActivityIndicator color="#fff" /> : <Text style={styles.demoText}>Add a demo day</Text>}
+            {adding ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.demoText}>Add a demo day</Text>}
           </Pressable>
         </View>
       }
@@ -75,6 +77,8 @@ export default function DaysScreen() {
 }
 
 function Metric({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
+  const { colors } = useTheme();
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.metric}>
       <Ionicons name={icon} size={14} color={colors.accent} />
@@ -83,13 +87,14 @@ function Metric({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['n
   );
 }
 
-const styles = StyleSheet.create({
-  list: { padding: 16, gap: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
-  metric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metricText: { fontSize: 13, fontWeight: '700', color: colors.text },
-  empty: { alignItems: 'center', gap: 10, paddingVertical: 32 },
-  demo: { backgroundColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 6, minWidth: 160, alignItems: 'center' },
-  demoText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    list: { padding: 16, gap: 10 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
+    metric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    metricText: { fontSize: 13, fontWeight: '700', color: colors.text },
+    empty: { alignItems: 'center', gap: 10, paddingVertical: 32 },
+    demo: { backgroundColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 6, minWidth: 160, alignItems: 'center' },
+    demoText: { color: colors.onAccent, fontWeight: '800', fontSize: 16 },
+  });

@@ -10,11 +10,13 @@ import { buildSegmentPath, MIN_SEGMENT_LENGTH, pathInfo } from '../../lib/segmen
 import { cleanTrack, computeStats } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { colors, s } from '../../theme';
+import { useTheme, useStyles, type Palette } from '../../theme';
 import { refreshRacers } from '../../tracking/tracker';
 
 /** Turn (part of) a recorded run into a challenge. */
 export default function NewChallengeScreen() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const { session, run } = useLocalSearchParams<{ session: string; run: string }>();
   const { units } = useSettings();
   const [pts, setPts] = useState<TrackPoint[] | null>(null);
@@ -114,13 +116,15 @@ export default function NewChallengeScreen() {
         disabled={saving || tooShort}
         style={({ pressed }) => [styles.save, (tooShort || saving) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
       >
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Create challenge</Text>}
+        {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveText}>Create challenge</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
+  const { s } = useTheme();
+  const styles = useStyles(makeStyles);
   return (
     <View style={{ alignItems: 'center', flex: 1 }}>
       <Text style={s.label}>{label}</Text>
@@ -129,11 +133,12 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
-  facts: { flexDirection: 'row', marginTop: 8 },
-  factValue: { fontSize: 18, fontWeight: '800', color: colors.text },
-  input: { fontSize: 18, fontWeight: '600', color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 6 },
-  save: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  saveText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    content: { padding: 16, gap: 12, paddingBottom: 40 },
+    facts: { flexDirection: 'row', marginTop: 8 },
+    factValue: { fontSize: 18, fontWeight: '800', color: colors.text },
+    input: { fontSize: 18, fontWeight: '600', color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 6 },
+    save: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+    saveText: { color: colors.onAccent, fontSize: 18, fontWeight: '800' },
+  });

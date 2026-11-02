@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, s } from '../theme';
+import { useTheme, useStyles, type Palette } from '../theme';
 
 interface Props {
   label: string;
@@ -9,6 +9,8 @@ interface Props {
 }
 
 export function StatTile({ label, value, sub, icon }: Props) {
+  const { s } = useTheme();
+  const styles = useStyles(makeStyles);
   return (
     <View style={[s.card, styles.tile]}>
       <View style={styles.head}>
@@ -23,12 +25,14 @@ export function StatTile({ label, value, sub, icon }: Props) {
 
 /** Two tiles per row. */
 export function StatGrid({ children }: { children: React.ReactNode }) {
+  const styles = useStyles(makeStyles);
   return <View style={styles.grid}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  tile: { flexBasis: '47%', flexGrow: 1, paddingVertical: 12, gap: 2 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  value: { fontSize: 24, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    tile: { flexBasis: '47%', flexGrow: 1, paddingVertical: 12, gap: 2 },
+    head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    value: { fontSize: 24, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+  });

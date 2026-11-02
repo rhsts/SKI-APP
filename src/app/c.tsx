@@ -9,7 +9,7 @@ import { fmtAlt, fmtDist, fmtRaceTime } from '../lib/format';
 import { leaderboard, pathInfo } from '../lib/segments';
 import { decodeChallenge, type ChallengePayload } from '../lib/share';
 import { useSettings } from '../settings';
-import { colors, s } from '../theme';
+import { useTheme, useStyles, type Palette } from '../theme';
 import { refreshRacers } from '../tracking/tracker';
 
 /**
@@ -17,6 +17,8 @@ import { refreshRacers } from '../tracking/tracker';
  * Shows who's challenging you and lets you accept.
  */
 export default function InviteScreen() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const { d } = useLocalSearchParams<{ d?: string }>();
   const { units, playerId } = useSettings();
   const [have, setHave] = useState<boolean | null>(null);
@@ -99,7 +101,7 @@ export default function InviteScreen() {
       {fromMe ? <Text style={[s.muted, { textAlign: 'center' }]}>This is your own invite: it only has your times.</Text> : null}
 
       <Pressable onPress={accept} disabled={saving || have === null} style={({ pressed }) => [styles.accept, pressed && { opacity: 0.85 }]}>
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.acceptText}>{have ? 'Update leaderboard' : 'Accept challenge'}</Text>}
+        {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.acceptText}>{have ? 'Update leaderboard' : 'Accept challenge'}</Text>}
       </Pressable>
       <Text style={[s.muted, { textAlign: 'center' }]}>
         After you accept, just record your ski day. When you ski through the start and finish, you’re timed automatically.
@@ -108,13 +110,14 @@ export default function InviteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
-  center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-  hero: { alignItems: 'center', gap: 6, paddingVertical: 20 },
-  lbRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  accept: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  acceptText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  secondary: { borderWidth: 1.5, borderColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
-  secondaryText: { color: colors.accent, fontWeight: '700' },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    content: { padding: 16, gap: 12, paddingBottom: 40 },
+    center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
+    hero: { alignItems: 'center', gap: 6, paddingVertical: 20 },
+    lbRow: { flexDirection: 'row', justifyContent: 'space-between' },
+    accept: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+    acceptText: { color: colors.onAccent, fontSize: 18, fontWeight: '800' },
+    secondary: { borderWidth: 1.5, borderColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
+    secondaryText: { color: colors.accent, fontWeight: '700' },
+  });

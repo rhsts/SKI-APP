@@ -6,17 +6,19 @@ import { StatGrid, StatTile } from '../../components/StatTile';
 import { fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
 import { liveStatus } from '../../lib/stats';
 import { useSettings } from '../../settings';
-import { colors, s } from '../../theme';
+import { useTheme, useStyles, type Palette } from '../../theme';
 import { dismissFinish, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish } from '../../tracking/tracker';
 
-const STATUS_LABEL = {
+const statusLabels = (colors: Palette) => ({
   skiing: { text: 'Skiing', icon: 'trending-down', color: colors.run },
   lift: { text: 'On a lift', icon: 'arrow-up', color: colors.lift },
   stopped: { text: 'Stopped', icon: 'pause', color: colors.muted },
   moving: { text: 'Moving', icon: 'walk', color: colors.good },
-} as const;
+}) as const;
 
 export default function RecordScreen() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const t = useTracker();
   const { units, simulate } = useSettings();
   const [busy, setBusy] = useState(false);
@@ -47,7 +49,7 @@ export default function RecordScreen() {
 
   const st = t.stats;
   const waiting = t.status === 'recording' && t.points.length === 0;
-  const live = t.status === 'recording' && st ? STATUS_LABEL[liveStatus(st, t.currentSpeed)] : null;
+  const live = t.status === 'recording' && st ? statusLabels(colors)[liveStatus(st, t.currentSpeed)] : null;
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
@@ -136,12 +138,14 @@ export default function RecordScreen() {
 
 /** Live challenge: elapsed time, progress, and gap to the ghost you're chasing. */
 function RaceCard({ r }: { r: LiveRace }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const ahead = r.delta != null && r.delta < 0;
   const deltaColor = r.delta == null ? colors.muted : ahead ? colors.good : colors.danger;
   return (
     <View style={[s.card, styles.race]}>
       <View style={styles.raceHead}>
-        <Ionicons name="flag" size={16} color="#fff" />
+        <Ionicons name="flag" size={16} color={colors.onInk} />
         <Text style={styles.raceTitle} numberOfLines={1}>{r.name}</Text>
       </View>
       <View style={styles.raceRow}>
@@ -175,6 +179,8 @@ function finishMessage(f: RaceFinish): string {
 }
 
 function FinishCard({ f }: { f: RaceFinish }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const headline = f.of > 1 ? `${fmtRaceTime(f.time)}  ·  #${f.rank} of ${f.of}` : fmtRaceTime(f.time);
   const line = finishMessage(f);
   return (
@@ -196,6 +202,7 @@ function FinishCard({ f }: { f: RaceFinish }) {
 }
 
 function Chip({ text, icon, color }: { text: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={[styles.chip, { borderColor: color }]}>
       <Ionicons name={icon} size={14} color={color} />
@@ -207,40 +214,44 @@ function Chip({ text, icon, color }: { text: string; icon: React.ComponentProps<
 function Button({ label, icon, color, onPress, big }: {
   label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; onPress: () => void; big?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles(makeStyles);
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       style={({ pressed }) => [styles.button, big && styles.bigButton, { backgroundColor: color, opacity: pressed ? 0.8 : 1 }]}
     >
-      <Ionicons name={icon} size={big ? 24 : 20} color="#fff" />
+      <Ionicons name={icon} size={big ? 30 : 26} color={colors.onAccent} />
       <Text style={styles.buttonText}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
-  banner: { flexDirection: 'row', gap: 10, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: colors.warn },
-  hero: { alignItems: 'center', paddingVertical: 20, gap: 2 },
-  chipRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  chipText: { fontSize: 13, fontWeight: '700' },
-  speed: { fontSize: 96, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'], lineHeight: 104 },
-  speedUnit: { fontSize: 18, fontWeight: '700', color: colors.muted, marginTop: -6, marginBottom: 6 },
-  race: { backgroundColor: colors.text, gap: 8 },
-  raceHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  raceTitle: { color: '#fff', fontWeight: '800', fontSize: 15, flex: 1 },
-  raceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  raceTime: { color: '#fff', fontSize: 40, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  raceDelta: { fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  raceSub: { color: '#B9C4D2', fontSize: 13, fontWeight: '600' },
-  progressTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
-  progressFill: { height: 6, backgroundColor: colors.good },
-  finish: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderLeftWidth: 4, borderLeftColor: colors.good },
-  finishTime: { fontSize: 26, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
-  buttons: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 4 },
-  button: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 14 },
-  bigButton: { paddingVertical: 20 },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    content: { padding: 16, gap: 12, paddingBottom: 32 },
+    banner: { flexDirection: 'row', gap: 10, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: colors.warn },
+    hero: { alignItems: 'center', paddingVertical: 20, gap: 2 },
+    chipRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
+    chipText: { fontSize: 13, fontWeight: '700' },
+    speed: { fontSize: 96, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'], lineHeight: 104 },
+    speedUnit: { fontSize: 18, fontWeight: '700', color: colors.muted, marginTop: -6, marginBottom: 6 },
+    race: { backgroundColor: colors.ink, gap: 8 },
+    raceHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    raceTitle: { color: colors.onInk, fontWeight: '800', fontSize: 15, flex: 1 },
+    raceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+    raceTime: { color: colors.onInk, fontSize: 40, fontWeight: '900', fontVariant: ['tabular-nums'] },
+    raceDelta: { fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
+    raceSub: { color: colors.onInkMuted, fontSize: 13, fontWeight: '600' },
+    progressTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
+    progressFill: { height: 6, backgroundColor: colors.good },
+    finish: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderLeftWidth: 4, borderLeftColor: colors.good },
+    finishTime: { fontSize: 26, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+    buttons: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 4 },
+    // Big targets: easy to hit with ski gloves on.
+    button: { flex: 1, flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', minHeight: 72, borderRadius: 18 },
+    bigButton: { minHeight: 88 },
+    buttonText: { color: colors.onAccent, fontSize: 22, fontWeight: '800' },
+  });

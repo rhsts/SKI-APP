@@ -8,10 +8,11 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { getDb } from '../db';
 import { initSettings } from '../settings';
-import { colors } from '../theme';
+import { useTheme } from '../theme';
 import { recoverActiveDay } from '../tracking/tracker';
 
 export default function RootLayout() {
+  const { colors, dark } = useTheme();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -28,8 +29,16 @@ export default function RootLayout() {
   // routed correctly; a cover hides the screens until the database is ready.
   return (
     <>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ contentStyle: { backgroundColor: colors.bg }, headerBackTitle: 'Back' }}>
+      <StatusBar style={dark ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          contentStyle: { backgroundColor: colors.bg },
+          headerStyle: { backgroundColor: colors.bg },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
+          headerBackTitle: 'Back',
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="day/[id]" options={{ title: 'Ski day' }} />
         <Stack.Screen name="segment/new" options={{ title: 'New challenge' }} />

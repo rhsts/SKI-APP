@@ -4,7 +4,7 @@ import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { fmtAlt, fmtSpeed, fmtTimeOfDay } from '../lib/format';
 import { activityAt, indexAtX } from '../lib/scrub';
 import type { Activity, Units } from '../lib/types';
-import { colors, s } from '../theme';
+import { useTheme, useStyles, type Palette } from '../theme';
 
 interface Props {
   times: number[];
@@ -29,6 +29,8 @@ const LABEL_H = 22;
 export function ElevationChart({
   times, alts, speeds, activities, cursor, units, height = 140, onScrubStart, onScrub,
 }: Props) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const [width, setWidth] = useState(0);
   const pad = 6;
   const plotTop = LABEL_H;
@@ -113,7 +115,7 @@ export function ElevationChart({
               {cx != null ? (
                 <>
                   <Line x1={cx} x2={cx} y1={plotTop} y2={height} stroke={colors.text} strokeWidth={1.5} />
-                  {cy != null ? <Circle cx={cx} cy={cy} r={7} fill={colors.accent} stroke="#fff" strokeWidth={3} /> : null}
+                  {cy != null ? <Circle cx={cx} cy={cy} r={7} fill={colors.accent} stroke={colors.card} strokeWidth={3} /> : null}
                 </>
               ) : null}
             </>
@@ -133,10 +135,11 @@ export function ElevationChart({
   );
 }
 
-const styles = StyleSheet.create({
-  legend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 },
-  bubble: { position: 'absolute', top: 0, height: LABEL_H - 4, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.text },
-  bubbleText: { color: '#fff', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  hintWrap: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
-  hint: { fontSize: 12, fontWeight: '600', color: colors.muted },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    legend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 },
+    bubble: { position: 'absolute', top: 0, height: LABEL_H - 4, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.ink },
+    bubbleText: { color: colors.onInk, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    hintWrap: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
+    hint: { fontSize: 12, fontWeight: '600', color: colors.muted },
+  });

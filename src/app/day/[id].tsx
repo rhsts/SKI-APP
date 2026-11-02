@@ -16,11 +16,13 @@ import { activityAt } from '../../lib/scrub';
 import { cleanTrack, computeStats, smoothedAltitudes, smoothedSpeeds } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { colors, s } from '../../theme';
+import { useTheme, useStyles, type Palette } from '../../theme';
 
 const REPLAY_RATE = 60; // 1 minute of the day per second
 
 export default function DayScreen() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { units } = useSettings();
   const [session, setSession] = useState<SessionRow | null>(null);
@@ -145,7 +147,7 @@ export default function DayScreen() {
             style={styles.play}
             accessibilityLabel={playing ? 'Pause replay' : 'Play replay'}
           >
-            <Ionicons name={playing ? 'pause' : 'play'} size={22} color="#fff" />
+            <Ionicons name={playing ? 'pause' : 'play'} size={22} color={colors.onAccent} />
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={s.label}>Replay</Text>
@@ -218,19 +220,23 @@ export default function DayScreen() {
 
 /** Shown instead of closing the app if something on this screen throws. */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   return (
     <View style={[s.screen, { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }]}>
       <Ionicons name="alert-circle-outline" size={44} color={colors.danger} />
       <Text style={[s.h2, { textAlign: 'center' }]}>Something went wrong showing this day</Text>
       <Text style={[s.muted, { textAlign: 'center' }]}>{error.message}</Text>
       <Pressable onPress={retry} style={styles.play}>
-        <Ionicons name="refresh" size={22} color="#fff" />
+        <Ionicons name="refresh" size={22} color={colors.onAccent} />
       </Pressable>
     </View>
   );
 }
 
 function SpeedLegend() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.legend}>
       <Text style={s.muted}>Slow</Text>
@@ -244,13 +250,14 @@ function SpeedLegend() {
   );
 }
 
-const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: { flex: 1, fontSize: 22, fontWeight: '700', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
-  replayRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
-  timedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  swatch: { width: 18, height: 6, borderRadius: 3 },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    content: { padding: 16, gap: 12, paddingBottom: 40 },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    input: { flex: 1, fontSize: 22, fontWeight: '700', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
+    replayRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+    legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
+    timedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    swatch: { width: 18, height: 6, borderRadius: 3 },
+  });

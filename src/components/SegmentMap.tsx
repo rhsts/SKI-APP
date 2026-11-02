@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { PathPoint } from '../lib/segments';
-import { colors } from '../theme';
+import { useTheme, useStyles, type Palette } from '../theme';
 
 interface Props {
   path: PathPoint[];
@@ -14,6 +14,8 @@ interface Props {
 
 /** A challenge course: the line to ski, a green start gate and a chequered finish gate. */
 export function SegmentMap({ path, gateRadius = 30, context, style }: Props) {
+  const { colors } = useTheme();
+  const styles = useStyles(makeStyles);
   const ref = useRef<MapView>(null);
   const coords = useMemo(() => path.map(([latitude, longitude]) => ({ latitude, longitude })), [path]);
   const ctx = useMemo(() => context?.map((p) => ({ latitude: p.lat, longitude: p.lon })), [context]);
@@ -50,7 +52,7 @@ export function SegmentMap({ path, gateRadius = 30, context, style }: Props) {
         </Marker>
         {last ? (
           <Marker coordinate={last} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false}>
-            <View style={[styles.flag, { backgroundColor: colors.text }]}><Text style={styles.flagText}>🏁 FINISH</Text></View>
+            <View style={[styles.flag, { backgroundColor: '#0E1B2C' }]}><Text style={styles.flagText}>🏁 FINISH</Text></View>
           </Marker>
         ) : null}
       </MapView>
@@ -58,8 +60,9 @@ export function SegmentMap({ path, gateRadius = 30, context, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { height: 260, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
-  flag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  flagText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-});
+const makeStyles = (colors: Palette) =>
+  StyleSheet.create({
+    wrap: { height: 260, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
+    flag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    flagText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  });
