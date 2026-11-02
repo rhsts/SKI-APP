@@ -66,6 +66,16 @@ export default function ProfileScreen() {
       </View>
 
       <View style={[s.card, styles.section]}>
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.body}>Vibrate</Text>
+            <Text style={s.muted}>Buzz on a new top speed and when a run is finished.</Text>
+          </View>
+          <Switch value={settings.vibrate} onValueChange={(v) => updateSettings({ vibrate: v })} trackColor={{ true: colors.accent }} />
+        </View>
+      </View>
+
+      <View style={[s.card, styles.section]}>
         <Text style={s.label}>Try it without snow</Text>
         <View style={styles.switchRow}>
           <View style={{ flex: 1 }}>

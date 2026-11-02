@@ -1,3 +1,4 @@
+import { fuseAltitude } from './altitude';
 import { distance } from './geo';
 import type { Activity, ActivityKind, DayStats, TrackPoint } from './types';
 
@@ -249,7 +250,8 @@ export function segmentActivities(
 
 /** Everything the app shows about a day, computed from raw GPS fixes. */
 export function computeStats(rawPoints: TrackPoint[]): DayStats {
-  const pts = cleanTrack(rawPoints);
+  // Barometer (when the phone has one) gives far steadier altitude than GPS.
+  const pts = fuseAltitude(cleanTrack(rawPoints));
   const n = pts.length;
   const empty: DayStats = {
     duration: 0, movingTime: 0, skiTime: 0, liftTime: 0, distance: 0, skiDistance: 0,
@@ -315,4 +317,17 @@ export function liveStatus(stats: DayStats, lastSpeed: number): 'skiing' | 'lift
   if (last?.kind === 'run') return 'skiing';
   if (last?.kind === 'lift') return 'lift';
   return 'moving';
+}
+
+/**
+ * Runs that are over: you're on the next lift, or have stood at the bottom for 90 s.
+ * (A short stop mid-run doesn't end it, so the live "run done" card isn't premature.)
+ */
+export function completedRuns(stats: DayStats): Activity[] {
+  const acts = stats.activities;
+  return acts.filter((a, i) => {
+    if (a.kind !== 'run') return false;
+    const after = acts.slice(i + 1);
+    return after.some((x) => x.kind === 'lift') || after.reduce((s, x) => s + (x.kind === 'other' ? x.duration : 0), 0) >= 90;
+  });
 }

@@ -7,7 +7,7 @@ import { fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtTimeO
 import { liveStatus } from '../../lib/stats';
 import { useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
-import { dismissFinish, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish } from '../../tracking/tracker';
+import { dismissFinish, dismissLastRun, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish, type RunSummary } from '../../tracking/tracker';
 
 const statusLabels = (colors: Palette) => ({
   skiing: { text: 'Skiing', icon: 'trending-down', color: colors.run },
@@ -64,6 +64,13 @@ export default function RecordScreen() {
 
       {t.finish ? <FinishCard f={t.finish} /> : null}
       {t.race && t.status === 'recording' ? <RaceCard r={t.race} /> : null}
+      {t.newTop && t.status === 'recording' ? (
+        <View style={[s.card, styles.topFlash]}>
+          <Text style={{ fontSize: 26 }}>⚡</Text>
+          <Text style={styles.topFlashText}>New top speed: {fmtSpeed(t.newTop.speed, units)}</Text>
+        </View>
+      ) : null}
+      {t.lastRun && t.status !== 'idle' && !t.race ? <RunCard r={t.lastRun} /> : null}
 
       <View style={[s.card, styles.hero]}>
         <View style={styles.chipRow}>
@@ -85,6 +92,19 @@ export default function RecordScreen() {
         <Text style={s.muted}>
           {st ? `${fmtClock(st.duration)} on the mountain` : 'Tap start when you reach the slopes'}
         </Text>
+        {t.battery && t.status !== 'idle' ? (
+          <View style={styles.batteryRow}>
+            <Ionicons
+              name={t.battery.level < 0.2 ? 'battery-dead' : t.battery.level < 0.5 ? 'battery-half' : 'battery-full'}
+              size={16}
+              color={t.battery.level < 0.2 ? colors.danger : colors.muted}
+            />
+            <Text style={[s.muted, t.battery.level < 0.2 && { color: colors.danger }]}>
+              {Math.round(t.battery.level * 100)}%
+              {t.battery.hoursLeft != null ? ` · about ${fmtHours(t.battery.hoursLeft)} of tracking left` : ''}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {st || t.status !== 'idle' ? (
@@ -201,6 +221,45 @@ function FinishCard({ f }: { f: RaceFinish }) {
   );
 }
 
+function fmtHours(h: number): string {
+  if (h >= 24) return '24h+';
+  return h >= 1 ? `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}m` : `${Math.round(h * 60)} min`;
+}
+
+/** The run you just finished, shown while you ride the next lift. */
+function RunCard({ r }: { r: RunSummary }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
+  const { units } = useSettings();
+  return (
+    <View style={[s.card, styles.runCard]}>
+      <View style={styles.runHead}>
+        <Text style={s.label}>Run {r.number} done</Text>
+        <Pressable onPress={dismissLastRun} hitSlop={12} accessibilityLabel="Dismiss">
+          <Ionicons name="close" size={20} color={colors.muted} />
+        </Pressable>
+      </View>
+      <View style={styles.runStats}>
+        <RunStat label="Top" value={fmtSpeed(r.topSpeed, units)} />
+        <RunStat label="Vertical" value={fmtAlt(r.verticalDown, units)} />
+        <RunStat label="Distance" value={fmtDist(r.distance, units)} />
+        <RunStat label="Time" value={fmtClock(r.duration)} />
+      </View>
+    </View>
+  );
+}
+
+function RunStat({ label, value }: { label: string; value: string }) {
+  const { s } = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={{ alignItems: 'center', flex: 1 }}>
+      <Text style={[s.label, { fontSize: 10 }]}>{label}</Text>
+      <Text style={styles.runValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+    </View>
+  );
+}
+
 function Chip({ text, icon, color }: { text: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }) {
   const styles = useStyles(makeStyles);
   return (
@@ -249,6 +308,13 @@ const makeStyles = (colors: Palette) =>
     progressFill: { height: 6, backgroundColor: colors.good },
     finish: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderLeftWidth: 4, borderLeftColor: colors.good },
     finishTime: { fontSize: 26, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+    batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+    topFlash: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.warnSoft, borderLeftWidth: 4, borderLeftColor: colors.warn },
+    topFlashText: { fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 },
+    runCard: { gap: 8, borderLeftWidth: 4, borderLeftColor: colors.run },
+    runHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    runStats: { flexDirection: 'row' },
+    runValue: { fontSize: 18, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
     buttons: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 4 },
     // Big targets: easy to hit with ski gloves on.
     button: { flex: 1, flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', minHeight: 72, borderRadius: 18 },

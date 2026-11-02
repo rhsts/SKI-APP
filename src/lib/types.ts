@@ -6,6 +6,8 @@ export interface TrackPoint {
   alt: number | null;
   acc: number | null;
   spd: number | null;
+  /** Air pressure in hPa from the phone's barometer, when it has one. */
+  pres?: number | null;
 }
 
 export type ActivityKind = 'run' | 'lift' | 'other';

@@ -8,7 +8,7 @@ import type { DayStats, TrackPoint, Units } from '../lib/types';
  * killed app never loses a day.
  */
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
@@ -29,6 +29,7 @@ function migrate(d: SQLite.SQLiteDatabase) {
       CREATE INDEX IF NOT EXISTS attempts_session ON attempts(session_id);
     `);
   }
+  if (version < 3) d.execSync('ALTER TABLE points ADD COLUMN pres REAL');
   d.execSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -100,9 +101,11 @@ export interface Settings {
   units: Units;
   simulate: boolean;
   theme: 'system' | 'light' | 'dark';
+  /** Buzz on a new top speed and at the end of each run. */
+  vibrate: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system' };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');
@@ -214,10 +217,10 @@ export async function insertPoints(sessionId: string, pts: TrackPoint[]): Promis
   const d = getDb();
   await d.withTransactionAsync(async () => {
     const stmt = await d.prepareAsync(
-      'INSERT INTO points (session_id, t, lat, lon, alt, acc, spd) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO points (session_id, t, lat, lon, alt, acc, spd, pres) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     );
     try {
-      for (const p of pts) await stmt.executeAsync(sessionId, p.t, p.lat, p.lon, p.alt, p.acc, p.spd);
+      for (const p of pts) await stmt.executeAsync(sessionId, p.t, p.lat, p.lon, p.alt, p.acc, p.spd, p.pres ?? null);
     } finally {
       await stmt.finalizeAsync();
     }
@@ -227,7 +230,7 @@ export async function insertPoints(sessionId: string, pts: TrackPoint[]): Promis
 /** Points of a session, optionally only those newer than `afterT`. */
 export async function getPoints(sessionId: string, afterT = -1): Promise<TrackPoint[]> {
   return getDb().getAllAsync<TrackPoint>(
-    'SELECT t, lat, lon, alt, acc, spd FROM points WHERE session_id = ? AND t > ? ORDER BY t',
+    'SELECT t, lat, lon, alt, acc, spd, pres FROM points WHERE session_id = ? AND t > ? ORDER BY t',
     sessionId, afterT,
   );
 }

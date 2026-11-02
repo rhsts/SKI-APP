@@ -1,3 +1,4 @@
+import { altitudeToPressure } from './altitude';
 import { localProjector, type LatLon } from './geo';
 import type { TrackPoint } from './types';
 
@@ -15,6 +16,10 @@ export interface SimOptions {
   runTopSpeeds?: number[];
   /** Leave out Doppler speed so speed has to be derived from positions. */
   noDoppler?: boolean;
+  /** Add barometer readings (true altitude + weather drift + sensor noise). */
+  barometer?: boolean;
+  /** GPS altitude noise amplitude in metres (default 3). */
+  gpsAltNoise?: number;
   /** Indices of fixes to replace with a wild GPS jump. */
   spikes?: number[];
 }
@@ -68,6 +73,8 @@ export function simulateDay(opts: SimOptions = {}): SimDay {
   const { fromXY } = localProjector(SIM_ORIGIN);
   const points: TrackPoint[] = [];
   let t = opts.start ?? Date.UTC(2026, 0, 17, 8, 45);
+  const t0 = t;
+  const altNoise = opts.gpsAltNoise ?? 3;
 
   const emit = (x: number, y: number, alt: number, spd: number) => {
     const p = fromXY(x + noise(2.5), y + noise(2.5));
@@ -75,9 +82,13 @@ export function simulateDay(opts: SimOptions = {}): SimDay {
       t,
       lat: p.lat,
       lon: p.lon,
-      alt: alt + noise(3),
+      alt: alt + noise(altNoise),
       acc: 4 + rnd() * 4,
       spd: opts.noDoppler ? null : Math.max(0, spd + noise(0.3)),
+      // Weather: pressure falls ~0.8 hPa per hour (≈ 7 m of fake climb per hour) + sensor noise.
+      ...(opts.barometer
+        ? { pres: altitudeToPressure(alt) - ((t - t0) / 3600000) * 0.8 + noise(0.03) }
+        : {}),
     });
     t += 1000;
   };

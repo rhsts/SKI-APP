@@ -1,17 +1,21 @@
+import * as Battery from 'expo-battery';
+import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSyncExternalStore } from 'react';
 import {
-  createSession, deleteSession, finishSession, getPoints, insertPoints, kvSet, listAttempts, listSegments, upsertAttempts,
+  createSession, deleteSession, finishSession, getPoints, insertPoints, kvGet, kvSet, listAttempts, listSegments, upsertAttempts,
 } from '../db';
 import { simulateDay } from '../lib/sim';
-import { computeStats, smoothedSpeeds, cleanTrack } from '../lib/stats';
+import { cleanTrack, completedRuns, computeStats, smoothedSpeeds } from '../lib/stats';
 import type { DayStats, TrackPoint } from '../lib/types';
 import { matchSession, myAttempt } from '../challenges/service';
 import { ghostTimeAt, leaderboard, pickTarget, Racer } from '../lib/segments';
 import { getSettings } from '../settings';
+import { batteryHoursLeft } from '../lib/power';
+import { readPressure, startBarometer, stopBarometer } from './barometer';
 import { lookupPlace } from './place';
-import { LOCATION_TASK, readActive, toTrackPoint, type ActiveSession } from './task';
+import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
 
 /**
  * Recording state shared by every screen. GPS fixes go GPS → SQLite (via the
@@ -38,6 +42,20 @@ export interface TrackerState {
   race: LiveRace | null;
   /** The challenge you just finished, shown until dismissed. */
   finish: RaceFinish | null;
+  /** The run you just finished, shown on the Record screen. */
+  lastRun: RunSummary | null;
+  /** A new top speed for the day, shown for a few seconds. */
+  newTop: { speed: number; at: number } | null;
+  /** Battery level (0..1) and estimated hours of tracking left. */
+  battery: { level: number; hoursLeft: number | null } | null;
+}
+
+export interface RunSummary {
+  number: number;
+  topSpeed: number;
+  verticalDown: number;
+  distance: number;
+  duration: number;
 }
 
 export interface LiveRace {
@@ -68,6 +86,7 @@ export interface RaceFinish {
 const initial: TrackerState = {
   status: 'idle', active: null, points: [], stats: null, currentSpeed: 0, lastFixAt: null,
   foregroundOnly: false, recovered: false, error: null, race: null, finish: null,
+  lastRun: null, newTop: null, battery: null,
 };
 
 let state = initial;
@@ -119,6 +138,80 @@ async function pollOnce() {
   const spd = tail.length ? smoothedSpeeds(tail) : [0];
   set({ points, stats, currentSpeed: spd[spd.length - 1] ?? 0, lastFixAt: fresh[fresh.length - 1].t });
   feedRacers(fresh, a.sessionId);
+  checkMoments(stats);
+  if (now - lastBatteryAt > 60000) {
+    lastBatteryAt = now;
+    updateBattery().catch(() => undefined);
+  }
+}
+
+// ---------- moments: run finished, new top speed, battery ----------
+
+let announcedRuns = 0;
+let bestTop = 0;
+let lastBatteryAt = 0;
+let newTopTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Start counting from the current state so recovering a day doesn't replay old moments. */
+function resetMoments(stats: DayStats | null) {
+  announcedRuns = stats ? completedRuns(stats).length : 0;
+  bestTop = stats?.topSpeed ?? 0;
+  lastBatteryAt = 0;
+}
+
+
+function buzz(kind: 'success' | 'tap') {
+  if (!getSettings().vibrate) return;
+  const p = kind === 'success'
+    ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+    : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  p.catch(() => undefined);
+}
+
+function checkMoments(stats: DayStats) {
+  const done = completedRuns(stats);
+  if (done.length > announcedRuns) {
+    const r = done[done.length - 1];
+    announcedRuns = done.length;
+    set({
+      lastRun: { number: done.length, topSpeed: r.topSpeed, verticalDown: r.verticalDown, distance: r.distance, duration: r.duration },
+    });
+    buzz('tap');
+  }
+  // A new top speed: only once it beats the old one by ~1 km/h, and not for slow starts.
+  if (stats.topSpeed > bestTop + 0.3 && stats.topSpeed > 8) {
+    const first = bestTop === 0;
+    bestTop = stats.topSpeed;
+    if (!first) {
+      set({ newTop: { speed: stats.topSpeed, at: Date.now() } });
+      buzz('success');
+      if (newTopTimer) clearTimeout(newTopTimer);
+      newTopTimer = setTimeout(() => set({ newTop: null }), 8000);
+    }
+  } else if (stats.topSpeed > bestTop) {
+    bestTop = stats.topSpeed;
+  }
+}
+
+export function dismissLastRun() {
+  set({ lastRun: null });
+}
+
+async function updateBattery() {
+  const level = await Battery.getBatteryLevelAsync();
+  if (!(level >= 0)) return; // -1 when unknown (e.g. emulator)
+  let start: { level: number; t: number } | null = null;
+  try {
+    start = JSON.parse((await kvGet('batteryStart')) ?? 'null');
+  } catch {
+    start = null;
+  }
+  // Charging or a fresh start: measure the drain from here.
+  if (!start || level > start.level) {
+    start = { level, t: Date.now() };
+    await kvSet('batteryStart', JSON.stringify(start));
+  }
+  set({ battery: { level, hoursLeft: batteryHoursLeft(start.level, start.t, level, Date.now()) } });
 }
 
 function startPolling() {
@@ -141,7 +234,7 @@ async function startSource(a: ActiveSession): Promise<void> {
   if (a.source === 'sim') {
     // Continue the fake day from where it was, or start a new one.
     const already = state.points.length;
-    const day = simulateDay({ start: a.startedAt, runs: 4, seed: a.startedAt % 1000 }).points;
+    const day = simulateDay({ start: a.startedAt, runs: 4, seed: a.startedAt % 1000, barometer: true }).points;
     let i = already;
     simTimer = setInterval(() => {
       if (i >= day.length) return;
@@ -159,27 +252,20 @@ async function startSource(a: ActiveSession): Promise<void> {
     timeInterval: 1000,
     distanceInterval: 2,
   };
+  await startBarometer();
   try {
     const bg = await Location.requestBackgroundPermissionsAsync();
     if (bg.status !== 'granted') throw new Error('no background permission');
-    await Location.startLocationUpdatesAsync(LOCATION_TASK, {
-      ...options,
-      activityType: Location.ActivityType.Fitness,
-      pausesUpdatesAutomatically: false,
-      showsBackgroundLocationIndicator: true,
-      foregroundService: {
-        notificationTitle: 'Tracking your ski day',
-        notificationBody: 'Speed, vertical and runs are being recorded.',
-        notificationColor: '#0B6BCB',
-        killServiceOnDestroy: false,
-      },
-    });
+    await resetGpsState();
+    await Location.startLocationUpdatesAsync(LOCATION_TASK, locationTaskOptions('precise'));
     set({ foregroundOnly: false });
   } catch {
     // Expo Go on iOS, or "Allow all the time" refused: track while the app is open
     // and keep the screen awake so the phone doesn't stop GPS.
     watchSub = await Location.watchPositionAsync(options, (loc) => {
-      insertPoints(a.sessionId, [toTrackPoint(loc)]).catch((e) => set({ error: String(e) }));
+      readPressure()
+        .then((pres) => insertPoints(a.sessionId, [{ ...toTrackPoint(loc), pres }]))
+        .catch((e) => set({ error: String(e) }));
     });
     await activateKeepAwakeAsync('ski-tracking');
     set({ foregroundOnly: true });
@@ -191,6 +277,7 @@ async function stopSource(): Promise<void> {
   simTimer = null;
   watchSub?.remove();
   watchSub = null;
+  stopBarometer();
   deactivateKeepAwake('ski-tracking');
   try {
     if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK)) {
@@ -299,6 +386,8 @@ export async function startDay(simulate: boolean): Promise<void> {
   await saveActive(active);
   set({ ...initial, status: 'recording', active });
   racers = [];
+  resetMoments(null);
+  await kvSet('batteryStart', null);
   try {
     await refreshRacers();
     await startSource(active);
@@ -325,6 +414,7 @@ export async function resumeDay(): Promise<void> {
   const active = { ...state.active, paused: false };
   await saveActive(active);
   set({ status: 'recording', active, recovered: false, error: null });
+  resetMoments(state.stats);
   try {
     await refreshRacers();
     await startSource(active);
@@ -377,6 +467,7 @@ export async function recoverActiveDay(): Promise<void> {
   if (!a.paused && bgRunning) {
     // The background service kept recording while the UI was gone: just reattach.
     set({ ...initial, status: 'recording', active: a, points, stats });
+    resetMoments(stats);
     await refreshRacers();
     startPolling();
     return;
