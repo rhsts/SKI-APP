@@ -13,10 +13,11 @@ import { matchSession, myAttempt } from '../challenges/service';
 import { ghostTimeAt, leaderboard, pickTarget, Racer } from '../lib/segments';
 import { getSettings } from '../settings';
 import { compareSplits, SECTION_NAMES } from '../lib/ghost';
-import { batteryHoursLeft } from '../lib/power';
+import { AUTO_PAUSE_MS, batteryHoursLeft, restingFor } from '../lib/power';
 import type { Sport } from '../lib/sport';
 import { readPressure, startBarometer, stopBarometer } from './barometer';
 import { lookupPistes } from '../mountain/pistes';
+import { refreshGeofences } from './geofence';
 import { lookupPlace } from './place';
 import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
 
@@ -49,6 +50,8 @@ export interface TrackerState {
   lastRun: RunSummary | null;
   /** A new top speed for the day, shown for a few seconds. */
   newTop: { speed: number; at: number } | null;
+  /** Standing still for 10+ minutes: GPS is sleeping until you move. */
+  autoPaused: boolean;
   /** Battery level (0..1) and estimated hours of tracking left. */
   battery: { level: number; hoursLeft: number | null } | null;
 }
@@ -91,7 +94,7 @@ export interface RaceFinish {
 const initial: TrackerState = {
   status: 'idle', active: null, points: [], stats: null, currentSpeed: 0, lastFixAt: null,
   foregroundOnly: false, recovered: false, error: null, race: null, finish: null,
-  lastRun: null, newTop: null, battery: null,
+  lastRun: null, newTop: null, battery: null, autoPaused: false,
 };
 
 let state = initial;
@@ -141,7 +144,10 @@ async function pollOnce() {
   }
   const tail = cleanTrack(points.slice(-8));
   const spd = tail.length ? smoothedSpeeds(tail) : [0];
-  set({ points, stats, currentSpeed: spd[spd.length - 1] ?? 0, lastFixAt: fresh[fresh.length - 1].t });
+  set({
+    points, stats, currentSpeed: spd[spd.length - 1] ?? 0, lastFixAt: fresh[fresh.length - 1].t,
+    autoPaused: restingFor(points.slice(-900)) >= AUTO_PAUSE_MS,
+  });
   feedRacers(fresh, a.sessionId);
   checkMoments(stats);
   if (now - lastBatteryAt > 60000) {
@@ -461,7 +467,11 @@ export async function stopDay(): Promise<string | null> {
   // Re-time all challenges on the complete day (catches anything missed live).
   await matchSession(a.sessionId, points);
   // Piste names in the background; the day screen retries if this fails (e.g. no signal).
-  if (a.source === 'gps') lookupPistes(a.sessionId).catch(() => undefined);
+  if (a.source === 'gps') {
+    lookupPistes(a.sessionId).catch(() => undefined);
+    // A new ski area may need a reminder geofence.
+    refreshGeofences().catch(() => undefined);
+  }
   racers = [];
   set({ ...initial });
   return a.sessionId;

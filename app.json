@@ -44,7 +44,8 @@
           "isAndroidForegroundServiceEnabled": true
         }
       ],
-      "expo-system-ui"
+      "expo-system-ui",
+      "expo-notifications"
     ],
     "scheme": "skiapp"
   }

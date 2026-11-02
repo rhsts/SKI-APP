@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { listTrailMaps } from '../db';
+import { listTrailMaps, sessionStarts } from '../db';
+import { areaAt, skiAreas, type SkiArea } from '../lib/areas';
 import { mapFor, type TrailMap } from '../lib/trailmap';
 import type { TrackPoint, Units } from '../lib/types';
 import { fmtSnow, fmtTemp, fmtWind, weatherInfo, type Weather } from '../lib/weather';
@@ -26,6 +27,7 @@ export function MountainCard({ points, units }: { points: TrackPoint[]; units: U
   const [trail, setTrail] = useState<TrailMap | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [area, setArea] = useState<SkiArea | null>(null);
   const first = points[0];
 
   // The area: where today's recording started, else the phone's last known position.
@@ -64,6 +66,9 @@ export function MountainCard({ points, units }: { points: TrackPoint[]; units: U
     if (!pos) return;
     getWeather(pos.lat, pos.lon, pos.alt).then(setWeather);
     listTrailMaps().then((maps) => setTrail(mapFor(maps, pos)));
+    sessionStarts()
+      .then((starts) => setArea(areaAt(skiAreas(starts.filter((x) => !x.isDemo)), pos)))
+      .catch(() => undefined);
   }, [pos]);
 
   const download = async () => {
@@ -97,6 +102,12 @@ export function MountainCard({ points, units }: { points: TrackPoint[]; units: U
 
   return (
     <View style={[s.card, { gap: 10 }]}>
+      {area ? (
+        <Text style={[s.body, { fontWeight: '700' }]}>
+          📍 {points.length ? area.name : `You’re at ${area.name}`}
+          <Text style={s.muted}>  {area.days} {area.days === 1 ? 'day' : 'days'} here before</Text>
+        </Text>
+      ) : null}
       {w ? (
         <>
           <View style={styles.row}>

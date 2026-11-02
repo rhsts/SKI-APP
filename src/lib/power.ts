@@ -7,12 +7,35 @@ import type { TrackPoint } from './types';
  * saves a lot of battery.
  */
 
-export type GpsMode = 'precise' | 'eco';
+/** precise: skiing · eco: lifts and short stops · sleep: auto-paused during a long break. */
+export type GpsMode = 'precise' | 'eco' | 'sleep';
 
 export const GPS_OPTIONS: Record<GpsMode, { timeInterval: number; distanceInterval: number }> = {
   precise: { timeInterval: 1000, distanceInterval: 2 },
   eco: { timeInterval: 5000, distanceInterval: 15 },
+  sleep: { timeInterval: 60000, distanceInterval: 40 },
 };
+
+/** Standing still this long (lunch, café) auto-pauses: GPS drops to one fix a minute. */
+export const AUTO_PAUSE_MS = 10 * 60 * 1000;
+const STILL_RADIUS_M = 60;
+
+/**
+ * How long you've been standing still at the end of the track (ms): all fixes
+ * since then are within 60 m of the latest one and slow.
+ */
+export function restingFor(points: TrackPoint[]): number {
+  const last = points[points.length - 1];
+  if (!last) return 0;
+  let since = last.t;
+  for (let i = points.length - 2; i >= 0; i--) {
+    const p = points[i];
+    const moving = p.spd != null && Number.isFinite(p.spd) && p.spd > 1.5;
+    if (moving || distance(p, last) > STILL_RADIUS_M) break;
+    since = p.t;
+  }
+  return last.t - since;
+}
 
 /**
  * Picks the GPS mode from the last minute of fixes:
@@ -23,6 +46,13 @@ export const GPS_OPTIONS: Record<GpsMode, { timeInterval: number; distanceInterv
  */
 export function decideGpsMode(recent: TrackPoint[], current: GpsMode): GpsMode {
   if (recent.length < 2) return current;
+  // Long break: sleep until you move again (a fix that has moved away, or real speed).
+  if (restingFor(recent) >= AUTO_PAUSE_MS) return 'sleep';
+  if (current === 'sleep') {
+    const l = recent[recent.length - 1], p = recent[recent.length - 2];
+    const moved = distance(l, p) > STILL_RADIUS_M || (l.spd != null && l.spd > 1.5);
+    return moved ? 'precise' : 'sleep';
+  }
   const last = recent[recent.length - 1];
   const window = recent.filter((p) => last.t - p.t <= 45000);
   if (window.length < 2) return current;

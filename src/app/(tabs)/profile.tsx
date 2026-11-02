@@ -6,6 +6,7 @@ import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
 import { addDemoDay } from '../../tracking/demo';
+import { refreshGeofences, requestReminderPermissions } from '../../tracking/geofence';
 import { useTracker } from '../../tracking/tracker';
 
 export default function ProfileScreen() {
@@ -63,6 +64,31 @@ export default function ProfileScreen() {
               </Text>
             </Pressable>
           ))}
+        </View>
+      </View>
+
+      <View style={[s.card, styles.section]}>
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.body}>Remind me to start recording</Text>
+            <Text style={s.muted}>A notification when you arrive at a ski area you’ve skied before.</Text>
+          </View>
+          <Switch
+            value={settings.remindStart}
+            onValueChange={async (v) => {
+              if (v) {
+                const problem = await requestReminderPermissions();
+                if (problem) {
+                  Alert.alert('Can’t set up reminders', problem);
+                  return;
+                }
+              }
+              await updateSettings({ remindStart: v });
+              const n = await refreshGeofences().catch(() => 0);
+              if (v) Alert.alert('Reminders on', n ? `Watching ${n} ski ${n === 1 ? 'area' : 'areas'} you’ve visited.` : 'You’ll get reminders once you’ve recorded a day somewhere.');
+            }}
+            trackColor={{ true: colors.accent }}
+          />
         </View>
       </View>
 

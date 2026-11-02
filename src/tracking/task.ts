@@ -86,7 +86,8 @@ async function adapt(sessionId: string, lastT: number) {
   } catch {
     st = { mode: 'precise', body: DEFAULT_NOTIFICATION, notifiedAt: 0 };
   }
-  const recent = await getPoints(sessionId, lastT - 60000);
+  // 11 minutes of history: enough to notice a 10-minute break (auto-pause).
+  const recent = await getPoints(sessionId, lastT - 11 * 60000);
   const mode = decideGpsMode(recent, st.mode);
   const now = Date.now();
   const notify = now - st.notifiedAt >= NOTIFY_EVERY_MS;

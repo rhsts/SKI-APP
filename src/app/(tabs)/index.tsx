@@ -99,6 +99,8 @@ export default function RecordScreen() {
             <Chip text={simulate ? 'Ready · simulated GPS' : 'Ready'} icon="snow" color={colors.accent} />
           ) : t.status === 'paused' ? (
             <Chip text="Paused" icon="pause" color={colors.warn} />
+          ) : t.autoPaused ? (
+            <Chip text="Auto-paused · break" icon="cafe" color={colors.warn} />
           ) : waiting ? (
             <Chip text="Waiting for GPS…" icon="locate" color={colors.muted} />
           ) : live ? (

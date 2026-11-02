@@ -1,5 +1,5 @@
 import { altitudeToPressure, fuseAltitude, hasBarometer, pressureToAltitude } from '../src/lib/altitude';
-import { batteryHoursLeft, decideGpsMode, notificationBody } from '../src/lib/power';
+import { batteryHoursLeft, decideGpsMode, notificationBody, restingFor, type GpsMode } from '../src/lib/power';
 import { simulateDay } from '../src/lib/sim';
 import { cleanTrack, completedRuns, computeStats } from '../src/lib/stats';
 import type { TrackPoint } from '../src/lib/types';
@@ -60,12 +60,26 @@ describe('battery saver GPS mode', () => {
   it('uses real days sensibly: mostly eco time is lifts and breaks', () => {
     const day = simulateDay();
     const pts = day.points;
-    let eco = 0, precise = 0, mode: 'eco' | 'precise' = 'precise';
+    let eco = 0, precise = 0, sleep = 0, mode: GpsMode = 'precise';
+    // The background task looks at the last 11 minutes of fixes.
     for (let i = 60; i < pts.length; i += 5) {
-      mode = decideGpsMode(pts.slice(i - 60, i), mode);
-      if (mode === 'eco') eco++; else precise++;
+      mode = decideGpsMode(pts.slice(Math.max(0, i - 660), i), mode);
+      if (mode === 'eco') eco++; else if (mode === 'sleep') sleep++; else precise++;
     }
-    expect(eco).toBeGreaterThan(precise); // lunch + lifts dominate a day
+    expect(eco + sleep).toBeGreaterThan(precise); // lunch + lifts dominate a day
+    expect(sleep).toBeGreaterThan(0); // the 25-minute lunch auto-pauses
+    // Lunch + the lift queue after it is ~29 min standing still; sleep only covers the part after 10 min.
+    expect(sleep * 5).toBeLessThan(20 * 60);
+  });
+
+  it('auto-pauses after 10 minutes standing still and wakes when you move', () => {
+    const still = series(11 * 60, () => ({}));
+    expect(restingFor(still)).toBe((11 * 60 - 1) * 1000);
+    expect(decideGpsMode(still, 'eco')).toBe('sleep');
+    expect(decideGpsMode(still.slice(0, 5 * 60), 'eco')).toBe('eco'); // 5 min: just a stop
+    const moved = [...still, { ...still[0], t: 11 * 60 * 1000 + 60000, lat: 47.002, spd: 8 }];
+    expect(restingFor(moved)).toBe(0);
+    expect(decideGpsMode(moved, 'sleep')).toBe('precise');
   });
 
   it('estimates hours of battery left', () => {

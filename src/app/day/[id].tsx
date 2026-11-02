@@ -13,10 +13,12 @@ import { mapFor, type TrailMap } from '../../lib/trailmap';
 import { suggestChallenges } from '../../lib/suggest';
 import { difficultyBreakdown } from '../../lib/breakdown';
 import { DifficultyBar } from '../../components/DifficultyBar';
+import { PhotoStrip } from '../../components/PhotoStrip';
+import { addPhotos, removePhoto } from '../../days/photos';
 import { SportPicker } from '../../components/SportPicker';
 import {
-  deleteSession, getPoints, getSession, kvGet, kvSet, listSegments, listSessionAttempts, listTrailMaps, renameSession,
-  setSessionSport, type SessionRow,
+  deleteSession, getPoints, getSession, kvGet, kvSet, listPhotos, listSegments, listSessionAttempts, listTrailMaps,
+  renameSession, setSessionSport, type PhotoRow, type SessionRow,
 } from '../../db';
 import type { Attempt, Segment } from '../../lib/segments';
 import {
@@ -46,6 +48,9 @@ export default function DayScreen() {
   const [segments, setSegments] = useState<Segment[] | null>(null);
   const [hideSuggest, setHideSuggest] = useState(true);
   const [trail, setTrail] = useState<TrailMap | null>(null);
+  const [photos, setPhotos] = useState<PhotoRow[]>([]);
+  const [openPhoto, setOpenPhoto] = useState<string | null>(null);
+  const [addingPhotos, setAddingPhotos] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -60,6 +65,7 @@ export default function DayScreen() {
       }
     });
     getPoints(id).then(setRaw);
+    listPhotos(id).then(setPhotos).catch(() => setPhotos([]));
   }, [id]);
 
   // Challenge times set on this day (refreshed when coming back from creating one).
@@ -192,7 +198,16 @@ export default function DayScreen() {
         }}
       />
 
-      <RouteMap points={pts} speeds={speeds} activities={timeline} cursor={cursor} focus={focus} trail={trail} />
+      <RouteMap
+        points={pts}
+        speeds={speeds}
+        activities={timeline}
+        cursor={cursor}
+        focus={focus}
+        trail={trail}
+        photos={photos}
+        onPhotoPress={setOpenPhoto}
+      />
 
       <View style={[s.card, { gap: 8 }]}>
         <View style={styles.replayRow}>
@@ -240,6 +255,31 @@ export default function DayScreen() {
       </StatGrid>
 
       <DifficultyBar shares={shares} units={units} />
+
+      <PhotoStrip
+        photos={photos}
+        open={openPhoto}
+        onOpen={setOpenPhoto}
+        busy={addingPhotos}
+        onAdd={async () => {
+          setAddingPhotos(true);
+          try {
+            const r = await addPhotos(session.id);
+            if (r) {
+              setPhotos(await listPhotos(session.id));
+              if (r.skipped) Alert.alert('Some photos were skipped', `${r.skipped} ${r.skipped === 1 ? 'photo wasn’t' : 'photos weren’t'} taken during this day.`);
+            }
+          } catch (e) {
+            Alert.alert('Couldn’t add photos', e instanceof Error ? e.message : String(e));
+          } finally {
+            setAddingPhotos(false);
+          }
+        }}
+        onRemove={async (p) => {
+          await removePhoto(p);
+          setPhotos((cur) => cur.filter((x) => x.id !== p.id));
+        }}
+      />
 
       {suggestion ? (
         <View style={[s.card, styles.suggest]}>

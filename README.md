@@ -21,6 +21,17 @@ the phone in your pocket, and the app logs your day:
 - **Challenges with friends**: turn any run into a challenge, send a link, race each other's ghosts,
   see split times, and run group challenges with up to 20 skiers
 - **Dark mode** (follows the phone) and big gloves-friendly record buttons
+- **Piste breakdown**: time and vertical on green/blue/red/black per day, season and all time
+- **Lifts**: each ride named after its lift, plus time spent in **lift lines**
+- **Run detail**: per-run map, speed and elevation charts, average slope and steepest part
+- **Sport type** (ski, snowboard, telemark, sit-ski, ski touring) and **ski touring** climbs detected
+- **All-time** totals and records next to each season
+- **Offline trail map**: pistes and lifts downloaded to the phone, drawn on your map and on a live map
+- **Snow & weather**: temperature, wind, fresh snow, snow depth and a 3-day outlook at your altitude
+- **Photos** pinned on the map where you took them
+- **SOS**: one-tap emergency call, your coordinates, nearest piste/lift and send-location
+- **Auto-pause** during long breaks and **reminders to start** when you arrive at a ski area you know
+- **Import GPX** from other apps (Ski Tracks, Strava, watches)
 - Works offline. Everything is stored on the phone (SQLite).
 
 ## Challenges

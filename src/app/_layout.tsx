@@ -9,7 +9,11 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { getDb } from '../db';
 import { initSettings } from '../settings';
 import { useTheme } from '../theme';
+// Importing this also registers the ski-area reminder (geofence) task.
+import { setupNotifications } from '../tracking/geofence';
 import { recoverActiveDay } from '../tracking/tracker';
+
+setupNotifications();
 
 export default function RootLayout() {
   const { colors, dark } = useTheme();

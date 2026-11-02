@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle, Text } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { simplify } from '../lib/geo';
 import type { TrailMap } from '../lib/trailmap';
@@ -18,6 +18,9 @@ interface Props {
   style?: StyleProp<ViewStyle>;
   /** The resort's pistes and lifts, drawn underneath. */
   trail?: TrailMap | null;
+  /** Your photos, pinned where they were taken. */
+  photos?: { id: string; lat: number; lon: number }[];
+  onPhotoPress?: (id: string) => void;
 }
 
 interface Line {
@@ -32,7 +35,7 @@ interface Line {
 const DIM_RUN = 'rgba(11,107,203,0.25)';
 
 /** Your day on a terrain map: runs coloured by speed, lifts dashed. */
-export function RouteMap({ points, speeds, activities, cursor, focus, style, trail }: Props) {
+export function RouteMap({ points, speeds, activities, cursor, focus, style, trail, photos, onPhotoPress }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
   const ref = useRef<MapView>(null);
@@ -118,6 +121,18 @@ export function RouteMap({ points, speeds, activities, cursor, focus, style, tra
             />
           );
         })}
+        {photos?.map((p) => (
+          <Marker
+            key={p.id}
+            coordinate={{ latitude: p.lat, longitude: p.lon }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+            onPress={() => onPhotoPress?.(p.id)}
+            zIndex={4}
+          >
+            <View style={styles.photoPin}><Text style={{ fontSize: 13 }}>📷</Text></View>
+          </Marker>
+        ))}
         {c ? (
           <Marker coordinate={{ latitude: c.lat, longitude: c.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
             <View style={styles.dot} />
@@ -131,5 +146,6 @@ export function RouteMap({ points, speeds, activities, cursor, focus, style, tra
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     wrap: { height: 280, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
+    photoPin: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.accent },
     dot: { width: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, borderWidth: 3, borderColor: '#fff' },
   });

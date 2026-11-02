@@ -12,7 +12,7 @@ import type { DayStats, TrackPoint, Units } from '../lib/types';
  * killed app never loses a day.
  */
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
@@ -42,6 +42,17 @@ function migrate(d: SQLite.SQLiteDatabase) {
       fetched_at INTEGER NOT NULL,
       json TEXT NOT NULL
     )`);
+  }
+  if (version < 7) {
+    d.execSync(`CREATE TABLE IF NOT EXISTS photos (
+      id TEXT PRIMARY KEY NOT NULL,
+      session_id TEXT NOT NULL,
+      uri TEXT NOT NULL,
+      t INTEGER NOT NULL,
+      lat REAL NOT NULL,
+      lon REAL NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS photos_session ON photos(session_id, t);`);
   }
   d.execSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
@@ -119,9 +130,11 @@ export interface Settings {
   goals: Goals;
   /** Sport picked for the next day you record. */
   sport: Sport;
+  /** Notify me when I arrive at a ski area I've skied before. */
+  remindStart: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski' };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');
@@ -236,6 +249,7 @@ export async function deleteSession(id: string) {
   await d.withTransactionAsync(async () => {
     await d.runAsync('DELETE FROM points WHERE session_id = ?', id);
     await d.runAsync('DELETE FROM attempts WHERE session_id = ?', id);
+    await d.runAsync('DELETE FROM photos WHERE session_id = ?', id);
     await d.runAsync('DELETE FROM sessions WHERE id = ?', id);
   });
 }
@@ -243,7 +257,7 @@ export async function deleteSession(id: string) {
 export async function deleteAllData() {
   const d = getDb();
   await d.withTransactionAsync(async () => {
-    for (const t of ['points', 'sessions', 'attempts', 'segments']) await d.runAsync(`DELETE FROM ${t}`);
+    for (const t of ['points', 'sessions', 'attempts', 'segments', 'photos']) await d.runAsync(`DELETE FROM ${t}`);
     await d.runAsync("DELETE FROM kv WHERE key != 'settings'");
   });
 }
@@ -419,4 +433,42 @@ export async function listTrailMaps(): Promise<TrailMap[]> {
 
 export async function deleteTrailMaps(): Promise<void> {
   await getDb().runAsync('DELETE FROM trail_maps');
+}
+
+// ---------- photos ----------
+
+export interface PhotoRow {
+  id: string;
+  sessionId: string;
+  uri: string;
+  t: number;
+  lat: number;
+  lon: number;
+}
+
+export async function insertPhoto(p: PhotoRow): Promise<void> {
+  await getDb().runAsync(
+    'INSERT OR REPLACE INTO photos (id, session_id, uri, t, lat, lon) VALUES (?, ?, ?, ?, ?, ?)',
+    p.id, p.sessionId, p.uri, p.t, p.lat, p.lon,
+  );
+}
+
+export async function listPhotos(sessionId: string): Promise<PhotoRow[]> {
+  return getDb().getAllAsync<PhotoRow>(
+    'SELECT id, session_id AS sessionId, uri, t, lat, lon FROM photos WHERE session_id = ? ORDER BY t', sessionId,
+  );
+}
+
+export async function deletePhoto(id: string): Promise<void> {
+  await getDb().runAsync('DELETE FROM photos WHERE id = ?', id);
+}
+
+/** Where each day started (its first GPS fix), for working out the ski areas you visit. */
+export async function sessionStarts(): Promise<{ id: string; place: string | null; isDemo: number; lat: number; lon: number }[]> {
+  return getDb().getAllAsync(
+    `SELECT s.id, s.place, s.is_demo AS isDemo, p.lat, p.lon FROM sessions s
+     JOIN points p ON p.session_id = s.id
+     AND p.t = (SELECT MIN(t) FROM points WHERE session_id = s.id)
+     WHERE s.ended_at IS NOT NULL`,
+  );
 }
