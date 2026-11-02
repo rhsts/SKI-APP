@@ -31,9 +31,23 @@ How timing works: the clock starts when you leave the 30 m start circle and stop
 finish circle, measured to 0.1 s between GPS fixes. You have to follow the course (stray more than 60 m off
 the line and the attempt is dropped), and you can't take a shortcut to the finish.
 
-**If a link doesn't open the app**, copy the whole message and tap **Paste invite** at the top of the
-Challenges tab. This always works. Some messengers don't make custom app links (`skiapp://…`) clickable,
-and in Expo Go links only work for phones on the same Wi-Fi as the computer running `npx expo start`.
+### Invite links and the web page
+
+Invites are normal web links, such as `https://rhsts.github.io/SKI-APP/c/#d=…`, so they're tappable in every
+messenger. The page (`docs/c/`) shows who challenged you, the route, the time to beat and the leaderboard,
+and has an **Open in Ski Tracker** button. The challenge data is in the part after `#`, which browsers never
+send to the server.
+
+If the app doesn't open (for example while testing in Expo Go), tap **Copy invite** on the page, then
+**Challenges → Paste invite from a friend** in the app.
+
+**One-time setup (GitHub Pages):**
+1. GitHub → the repo → **Settings → General → Danger Zone → Change visibility → Public**.
+2. **Settings → Pages → Build and deployment**: Source **Deploy from a branch**, then choose the branch
+   with this code and the **`/docs`** folder → **Save**.
+3. After about a minute, https://rhsts.github.io/SKI-APP/ shows the Ski Tracker page.
+
+To host the page somewhere else, change `INVITE_PAGE_URL` in `src/config.ts`.
 
 ## Try it on your phone (Android, no build needed)
 

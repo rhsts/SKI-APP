@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ski Tracker</title>
+  <style>
+    :root { --bg: #F3F6FA; --text: #0E1B2C; --muted: #5C6B7E; color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --bg: #0B1420; --text: #EAF0F7; --muted: #9AA8B8; color-scheme: dark; }
+    }
+    :root[data-theme="dark"] { --bg: #0B1420; --text: #EAF0F7; --muted: #9AA8B8; color-scheme: dark; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.5 system-ui, -apple-system, Roboto, sans-serif; }
+    main { max-width: 480px; margin: 0 auto; padding: 48px 16px; text-align: center; }
+    p { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <div style="font-size:56px" aria-hidden="true">⛷️</div>
+    <h1>Ski Tracker</h1>
+    <p>Track your ski days and challenge friends to beat your time on the slopes.</p>
+    <p>Got a challenge link? Open it on your phone to see the route and the time to beat.</p>
+  </main>
+</body>
+</html>

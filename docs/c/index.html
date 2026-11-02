@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <title>Ski Challenge</title>
+  <meta name="description" content="You've been challenged to a ski race. Open it in Ski Tracker.">
+  <meta property="og:title" content="⛷️ You've been challenged!">
+  <meta property="og:description" content="Beat my time on the slopes — open this in Ski Tracker.">
+  <style>
+    :root {
+      --bg: #F3F6FA; --card: #FFFFFF; --text: #0E1B2C; --muted: #5C6B7E; --line: #DDE4EC;
+      --accent: #0B6BCB; --on-accent: #FFFFFF; --accent-soft: #E3F0FC; --good: #1F9D55; --warn: #C27C0E; --danger: #D0342C;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0B1420; --card: #14202F; --text: #EAF0F7; --muted: #9AA8B8; --line: #26354A;
+        --accent: #4DA3F5; --on-accent: #0B1420; --accent-soft: #15304D; --good: #3CC27A; --warn: #E8A33C; --danger: #F0645C;
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #0B1420; --card: #14202F; --text: #EAF0F7; --muted: #9AA8B8; --line: #26354A;
+      --accent: #4DA3F5; --on-accent: #0B1420; --accent-soft: #15304D; --good: #3CC27A; --warn: #E8A33C; --danger: #F0645C;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 14px; }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--muted); font-size: 14px; letter-spacing: .04em; text-transform: uppercase; }
+    .card { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: 0 2px 10px rgba(14,27,44,.06); }
+    .hero { text-align: center; display: grid; gap: 6px; }
+    .hero .emoji { font-size: 44px; line-height: 1; }
+    h1 { margin: 0; font-size: 26px; line-height: 1.2; }
+    .muted { color: var(--muted); font-size: 15px; }
+    .label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .time { font-size: 48px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1.1; }
+    svg.route { width: 100%; height: 200px; display: block; background: var(--accent-soft); border-radius: 14px; }
+    .facts { display: flex; justify-content: space-around; margin-top: 10px; text-align: center; }
+    .facts b { display: block; font-size: 18px; }
+    ol.board { list-style: none; margin: 8px 0 0; padding: 0; }
+    ol.board li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+    ol.board li:first-child { border-top: 0; }
+    ol.board .rank { width: 30px; text-align: center; font-size: 20px; }
+    ol.board .who { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    ol.board .t { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+      border: 0; border-radius: 14px; padding: 16px; font: inherit; font-size: 18px; font-weight: 800;
+      background: var(--accent); color: var(--on-accent); cursor: pointer; text-decoration: none;
+    }
+    .btn.secondary { background: transparent; color: var(--accent); border: 2px solid var(--accent); font-size: 16px; padding: 13px; }
+    .btn:active { opacity: .85; }
+    .steps { margin: 6px 0 0; padding-left: 20px; }
+    .steps li { margin: 4px 0; }
+    .hint { display: none; border-left: 4px solid var(--warn); }
+    .hint.show { display: block; }
+    .error { text-align: center; display: grid; gap: 8px; }
+    .error h1 { color: var(--danger); font-size: 22px; }
+    [hidden] { display: none !important; }
+    footer { text-align: center; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><span aria-hidden="true">⛷️</span> Ski Tracker</div>
+
+    <section id="error" class="card error" hidden>
+      <div style="font-size:40px" aria-hidden="true">⚠️</div>
+      <h1 id="error-text">This invite link is broken.</h1>
+      <p class="muted">Ask your friend to send the challenge again.</p>
+    </section>
+
+    <div id="content" hidden>
+      <section class="card hero" style="margin-bottom:14px">
+        <div class="emoji" aria-hidden="true">🏁</div>
+        <h1 id="headline"></h1>
+        <div>
+          <div class="label">Time to beat</div>
+          <div class="time" id="target">–</div>
+        </div>
+        <p class="muted" id="setby"></p>
+      </section>
+
+      <section class="card" style="margin-bottom:14px">
+        <div class="label" id="segname"></div>
+        <svg class="route" id="route" viewBox="0 0 300 200" role="img" aria-label="Map of the challenge route"></svg>
+        <div class="facts">
+          <div><span class="label">Length</span><b id="length">–</b></div>
+          <div><span class="label">Drop</span><b id="drop">–</b></div>
+          <div><span class="label">Skiers</span><b id="count">–</b></div>
+        </div>
+      </section>
+
+      <div style="display:grid;gap:10px;margin-bottom:14px">
+        <a class="btn" id="open" href="#">Open in Ski Tracker</a>
+        <button class="btn secondary" id="copy" type="button">Copy invite</button>
+      </div>
+
+      <section class="card hint" id="hint" style="margin-bottom:14px">
+        <b>App didn’t open?</b>
+        <ol class="steps">
+          <li>Tap <b>Copy invite</b> above.</li>
+          <li>Open <b>Ski Tracker</b> → <b>Challenges</b>.</li>
+          <li>Tap <b>Paste invite from a friend</b>.</li>
+        </ol>
+        <p class="muted" style="margin:8px 0 0">Don’t have Ski Tracker yet? Ask the friend who sent this how to install it.</p>
+      </section>
+
+      <section class="card" id="board-card" hidden>
+        <div class="label">Leaderboard</div>
+        <ol class="board" id="board"></ol>
+      </section>
+    </div>
+
+    <footer>Nothing about this challenge is sent anywhere: it lives entirely in the link.</footer>
+  </main>
+
+  <script src="invite.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var SI = window.SkiInvite;
+      var PACKAGE = 'com.rhsts.skiapp';
+      var SCHEME = 'skiapp';
+      var $ = function (id) { return document.getElementById(id); };
+
+      function fail(msg) {
+        $('error-text').textContent = msg;
+        $('error').hidden = false;
+        $('content').hidden = true;
+      }
+
+      var code = SI.codeFromLocation(window.location);
+      if (!code) return fail('This invite link is missing its challenge.');
+      var c;
+      try { c = SI.decodeChallenge(code); } catch (e) { return fail(e.message); }
+
+      var seg = c.segment, board = c.leaderboard, leader = board[0];
+      document.title = 'Ski Challenge: ' + seg.name;
+
+      // Everything below uses textContent only: names come from the link and are never treated as HTML.
+      $('headline').textContent = (c.fromName || 'A friend') + ' challenges you!';
+      $('segname').textContent = seg.name;
+      $('target').textContent = leader ? SI.fmtRaceTime(leader.time) : '–';
+      $('setby').textContent = leader
+        ? 'Set by ' + leader.playerName + '. Ski it faster in Ski Tracker to take the lead.'
+        : 'Be the first to set a time.';
+
+      var len = SI.lengthOf(seg.path);
+      $('length').textContent = len < 1000 ? Math.round(len) + ' m' : (len / 1000).toFixed(1) + ' km';
+      var a0 = seg.path[0][2], a1 = seg.path[seg.path.length - 1][2];
+      $('drop').textContent = a0 != null && a1 != null ? Math.round(a0 - a1) + ' m' : '–';
+      $('count').textContent = String(board.length);
+
+      // Route sketch: equirectangular projection, fitted into the box, north up.
+      (function drawRoute() {
+        var svg = $('route'), NS = 'http://www.w3.org/2000/svg', W = 300, H = 200, pad = 18;
+        var lat0 = seg.path[0][0] * Math.PI / 180, kx = Math.cos(lat0);
+        var pts = seg.path.map(function (p) { return [p[1] * kx, -p[0]]; });
+        var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+        var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+        var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+        var scale = Math.min((W - 2 * pad) / Math.max(maxX - minX, 1e-9), (H - 2 * pad) / Math.max(maxY - minY, 1e-9));
+        var ox = (W - (maxX - minX) * scale) / 2, oy = (H - (maxY - minY) * scale) / 2;
+        var xy = pts.map(function (p) { return [ox + (p[0] - minX) * scale, oy + (p[1] - minY) * scale]; });
+        var line = document.createElementNS(NS, 'polyline');
+        line.setAttribute('points', xy.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '));
+        line.setAttribute('fill', 'none');
+        line.setAttribute('stroke', 'var(--accent)');
+        line.setAttribute('stroke-width', '5');
+        line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(line);
+        [[xy[0], 'var(--good)', 'Start'], [xy[xy.length - 1], 'var(--text)', 'Finish']].forEach(function (m) {
+          var dot = document.createElementNS(NS, 'circle');
+          dot.setAttribute('cx', m[0][0]); dot.setAttribute('cy', m[0][1]); dot.setAttribute('r', '8');
+          dot.setAttribute('fill', m[1]); dot.setAttribute('stroke', '#fff'); dot.setAttribute('stroke-width', '3');
+          var title = document.createElementNS(NS, 'title'); title.textContent = m[2]; dot.appendChild(title);
+          svg.appendChild(dot);
+        });
+      })();
+
+      if (board.length) {
+        var medals = ['🥇', '🥈', '🥉'];
+        board.forEach(function (e, i) {
+          var li = document.createElement('li');
+          var r = document.createElement('span'); r.className = 'rank'; r.textContent = medals[i] || '#' + (i + 1);
+          var w = document.createElement('span'); w.className = 'who'; w.textContent = e.playerName;
+          var t = document.createElement('span'); t.className = 't'; t.textContent = SI.fmtRaceTime(e.time);
+          li.appendChild(r); li.appendChild(w); li.appendChild(t);
+          $('board').appendChild(li);
+        });
+        $('board-card').hidden = false;
+      }
+      $('content').hidden = false;
+
+      // Open the app. Android: an intent link opens the installed app, or comes back here with a hint.
+      var appUrl = SCHEME + '://c?d=' + code;
+      var isAndroid = /Android/i.test(navigator.userAgent);
+      var here = window.location.href.split('#')[0];
+      var fallback = here + '#d=' + code + '&noapp=1';
+      var openHref = isAndroid
+        ? 'intent://c?d=' + code + '#Intent;scheme=' + SCHEME + ';package=' + PACKAGE +
+          ';S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end'
+        : appUrl;
+      $('open').setAttribute('href', openHref);
+      $('open').addEventListener('click', function () {
+        // If we're still here after a moment, the app probably isn't installed.
+        setTimeout(function () { if (!document.hidden) $('hint').classList.add('show'); }, 1800);
+      });
+      if (/[#&]noapp=1/.test(window.location.hash)) $('hint').classList.add('show');
+
+      $('copy').addEventListener('click', function () {
+        var text = here + '#d=' + code;
+        var done = function () { $('copy').textContent = 'Copied ✓ Now paste it in the app'; $('hint').classList.add('show'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, function () { window.prompt('Copy this invite:', text); });
+        } else {
+          window.prompt('Copy this invite:', text);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

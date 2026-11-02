@@ -1,5 +1,6 @@
 import * as Linking from 'expo-linking';
 import { Share } from 'react-native';
+import { INVITE_PAGE_URL } from '../config';
 import {
   deleteSessionAttempts, getPoints, getSegment, listAttempts, listSegments, listSessions, newId,
   saveSegment, upsertAttempts,
@@ -77,8 +78,13 @@ export async function importChallenge(p: ChallengePayload): Promise<{ segmentId:
   return { segmentId: p.segment.id, isNew: !existing, foundInHistory };
 }
 
-/** The link that opens this challenge in the app: skiapp://c?d=… (exp://…/--/c?d=… in Expo Go). */
+/**
+ * The link to share. A normal https link (always tappable in WhatsApp, Messages, …) to the
+ * invite page, which shows the challenge and opens the app. Without a page configured,
+ * falls back to a direct app link: skiapp://c?d=… (exp://…/--/c?d=… in Expo Go).
+ */
 export function challengeLink(code: string): string {
+  if (INVITE_PAGE_URL) return `${INVITE_PAGE_URL}#d=${code}`;
   return Linking.createURL('c', { queryParams: { d: code } });
 }
 
@@ -101,7 +107,6 @@ export async function shareChallenge(segmentId: string): Promise<void> {
   else line = `Race me on “${segment.name}”!`;
 
   const message =
-    `⛷️ ${line}\n\nOpen in Ski Tracker:\n${link}\n\n` +
-    `(If the link doesn’t open, copy this whole message and tap “Paste invite” in the Challenges tab.)`;
+    `⛷️ ${line}\n\nSee the route and the time to beat:\n${link}`;
   await Share.share({ message, title: `Ski challenge: ${segment.name}` });
 }
