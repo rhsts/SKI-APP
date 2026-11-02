@@ -84,6 +84,15 @@ export default function RecordScreen() {
       {t.lastRun && t.status !== 'idle' && !t.race ? <RunCard r={t.lastRun} /> : null}
 
       <View style={[s.card, styles.hero]}>
+        <Pressable
+          onPress={() => router.push('/sos')}
+          style={styles.sos}
+          hitSlop={8}
+          accessibilityLabel="Emergency: call for help and show my coordinates"
+        >
+          <Ionicons name="medkit" size={14} color="#fff" />
+          <Text style={styles.sosText}>SOS</Text>
+        </Pressable>
         <View style={styles.chipRow}>
           {t.status === 'idle' ? (
             <Chip text={simulate ? 'Ready · simulated GPS' : 'Ready'} icon="snow" color={colors.accent} />
@@ -308,6 +317,8 @@ const makeStyles = (colors: Palette) =>
     banner: { flexDirection: 'row', gap: 10, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: colors.warn },
     hero: { alignItems: 'center', paddingVertical: 20, gap: 2 },
     chipRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+    sos: { position: 'absolute', top: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+    sosText: { color: '#fff', fontWeight: '900', fontSize: 12 },
     chip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
     chipText: { fontSize: 13, fontWeight: '700' },
     speed: { fontSize: 96, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'], lineHeight: 104 },

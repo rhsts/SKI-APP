@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { createBackup, restoreBackup } from '../../days/files';
+import { createBackup, importGpx, restoreBackup } from '../../days/files';
 import { deleteAllData, deleteDemoData } from '../../db';
 import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
@@ -108,6 +108,21 @@ export default function ProfileScreen() {
               await createBackup();
             } catch (e) {
               Alert.alert('Backup failed', e instanceof Error ? e.message : String(e));
+            } finally {
+              setBusy(null);
+            }
+          }}
+        />
+        <Row
+          label="Import GPX files (Ski Tracks, Strava, watch…)"
+          busy={busy === 'gpx'}
+          onPress={async () => {
+            setBusy('gpx');
+            try {
+              const r = await importGpx();
+              if (r) Alert.alert('Import finished', `Added ${r.added} ${r.added === 1 ? 'day' : 'days'}${r.skipped ? `, skipped ${r.skipped} already in the app` : ''}.`);
+            } catch (e) {
+              Alert.alert('Couldn’t import', e instanceof Error ? e.message : String(e));
             } finally {
               setBusy(null);
             }

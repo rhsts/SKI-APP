@@ -3,11 +3,13 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { matchSession } from '../challenges/service';
 import {
-  getPoints, getSession, insertPoints, insertSessionRaw, listAttempts, listSegments, listSessions, saveSegment,
+  getPoints, getSession, insertPoints, insertSessionRaw, listAttempts, listSegments, listSessions, newId, saveSegment,
   upsertAttempts,
 } from '../db';
+import { lookupPlace } from '../tracking/place';
+import { lookupPistes } from './pistes';
 import { buildBackup, packPoints, parseBackup, unpackPoints } from '../lib/backup';
-import { fileNameFor, toGpx } from '../lib/gpx';
+import { fileNameFor, parseGpx, splitDays, toGpx } from '../lib/gpx';
 import { isSport } from '../lib/sport';
 import { computeStats } from '../lib/stats';
 
@@ -79,4 +81,50 @@ export async function restoreBackup(): Promise<{ days: number; challenges: numbe
   // Days restored before their challenges existed still get timed.
   for (const d of backup.days) await matchSession(d.id).catch(() => undefined);
   return { days, challenges };
+}
+
+/**
+ * Imports GPX files from other apps (Ski Tracks, Strava, a watch…). A file with
+ * several days is split at overnight gaps; days you already have (same start
+ * time) are skipped.
+ */
+export async function importGpx(): Promise<{ added: number; skipped: number; files: number } | null> {
+  const res = await DocumentPicker.getDocumentAsync({
+    type: ['application/gpx+xml', 'application/xml', 'text/xml', 'application/octet-stream', '*/*'],
+    copyToCacheDirectory: true,
+    multiple: true,
+  });
+  if (res.canceled || !res.assets?.length) return null;
+  const existing = (await listSessions()).map((s) => s.startedAt);
+  let added = 0, skipped = 0;
+  for (const asset of res.assets) {
+    const points = parseGpx(await new File(asset.uri).text());
+    if (!points.length) {
+      skipped++;
+      continue;
+    }
+    for (const day of splitDays(points)) {
+      if (day.length < 20) continue;
+      const startedAt = day[0].t;
+      if (existing.some((t) => Math.abs(t - startedAt) < 60000)) {
+        skipped++;
+        continue;
+      }
+      const id = newId();
+      const stats = computeStats(day);
+      await insertSessionRaw({
+        id, startedAt, endedAt: day[day.length - 1].t, place: await lookupPlace(day), isDemo: false, stats,
+      });
+      await insertPoints(id, day);
+      existing.push(startedAt);
+      await matchSession(id, day).catch(() => undefined);
+      lookupPistes(id).catch(() => undefined);
+      added++;
+    }
+  }
+  if (!added && skipped && res.assets.length) {
+    // Nothing usable: most likely the files had no timestamps.
+    throw new Error('No new ski days found. The file may be missing timestamps, or these days are already in the app.');
+  }
+  return { added, skipped, files: res.assets.length };
 }

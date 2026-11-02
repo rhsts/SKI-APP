@@ -280,6 +280,7 @@ export default function DayScreen() {
             units={units}
             selected={focus === i}
             piste={session.pistes?.[String(a.startTime)] ?? null}
+            onDetails={() => router.push({ pathname: '/run', params: { session: session.id, i: String(i) } })}
             onChallenge={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(i) } })}
             onPress={() => {
               const next = focus === i ? null : i;
