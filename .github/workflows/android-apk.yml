@@ -36,7 +36,7 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      # The Android SDK is preinstalled on GitHub's Ubuntu runners (ANDROID_HOME).
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -63,6 +63,11 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk "$OUT"
           ls -lh "$OUT"
           echo "file=$OUT" >> "$GITHUB_OUTPUT"
+          # Fingerprint of the key the APK is actually signed with (for restricting the Maps key).
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          SHA1=$("$APKSIGNER" verify --print-certs "$OUT" | sed -n 's/.*certificate SHA-1 digest: //p' | head -1 | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
+          echo "Signing SHA-1: $SHA1"
+          echo "sha1=$SHA1" >> "$GITHUB_OUTPUT"
           if [ -n "$GOOGLE_MAPS_API_KEY" ]; then echo "maps=✅ Maps enabled" >> "$GITHUB_OUTPUT"; else echo "maps=⚠️ Built without a Google Maps key: maps show a placeholder. Add the GOOGLE_MAPS_API_KEY secret and run the workflow again." >> "$GITHUB_OUTPUT"; fi
 
       - name: Publish release
@@ -78,5 +83,7 @@ jobs:
             Updates install over the previous version and keep your data.
 
             ${{ steps.apk.outputs.maps }}
+
+            To restrict your Google Maps key (Android apps): package `com.rhsts.skiapp`, SHA-1 `${{ steps.apk.outputs.sha1 }}`
 
             Built from ${{ github.sha }}.
