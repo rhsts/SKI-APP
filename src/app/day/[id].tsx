@@ -4,6 +4,7 @@ import Stack from 'expo-router/stack';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ElevationChart } from '../../components/ElevationChart';
+import { SpeedChart } from '../../components/SpeedChart';
 import { RouteMap } from '../../components/RouteMap';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { BreakRow, TimelineCard } from '../../components/TimelineCard';
@@ -30,7 +31,7 @@ import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
 
-const REPLAY_RATE = 60; // 1 minute of the day per second
+const REPLAY_RATE = 8; // a run plays back 8× faster than real time
 
 export default function DayScreen() {
   const { colors, s } = useTheme();
@@ -95,28 +96,60 @@ export default function DayScreen() {
     return { pts, times: pts.map((p) => p.t), speeds: smoothedSpeeds(pts), alts: smoothedAltitudes(pts), stats: computeStats(raw) };
   }, [raw]);
 
-  // Replay: advance the cursor through time.
+  // The run shown in the graph: the one you tapped, otherwise the first run of the day.
+  const runIdxs = useMemo(
+    () => (day ? day.stats.activities.map((a, i) => (a.kind === 'run' ? i : -1)).filter((i) => i >= 0) : []),
+    [day],
+  );
+  const selected = focus != null && runIdxs.includes(focus) ? focus : runIdxs[0] ?? null;
+  const selRun = day && selected != null ? day.stats.activities[selected] : null;
+  const range = selRun ? { a: selRun.startIndex, b: selRun.endIndex } : null;
+
+  // Replay: advance the cursor through the selected run.
   const cursorRef = useRef(cursor);
+  const rangeRef = useRef(range);
   useEffect(() => {
     cursorRef.current = cursor;
-  }, [cursor]);
+    rangeRef.current = range;
+  });
   useEffect(() => {
     if (!playing || !day) return;
     const timer = setInterval(() => {
       const pts = day.pts;
-      let i = cursorRef.current ?? 0;
-      if (i >= pts.length - 1) { setPlaying(false); return; }
+      const r = rangeRef.current;
+      if (!r) { setPlaying(false); return; }
+      let i = Math.max(r.a, Math.min(cursorRef.current ?? r.a, r.b));
+      if (i >= r.b) { setPlaying(false); return; }
       const target = pts[i].t + (REPLAY_RATE * 1000) / 20;
-      while (i < pts.length - 1 && pts[i].t < target) i++;
+      while (i < r.b && pts[i].t < target) i++;
       cursorRef.current = i;
       setCursor(i);
     }, 50);
     return () => clearInterval(timer);
   }, [playing, day]);
 
+  // Graph data for just the selected run (indices start at 0 within the run).
+  const runGraph = useMemo(() => {
+    if (!day || !selRun) return null;
+    const a = selRun.startIndex, b = selRun.endIndex + 1;
+    return {
+      times: day.times.slice(a, b),
+      alts: day.alts.slice(a, b),
+      speeds: day.speeds.slice(a, b),
+      activity: { ...selRun, startIndex: 0, endIndex: b - a - 1 },
+    };
+  }, [day, selRun]);
+
+  const selectRun = (i: number | null) => {
+    setPlaying(false);
+    setFocus(i);
+    const a = i != null ? day?.stats.activities[i] : null;
+    setCursor(a ? a.startIndex : null);
+  };
+
   if (!session || !day) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
 
-  const { pts, times, speeds, alts, stats } = day;
+  const { pts, speeds, stats } = day;
   const suggestion = segments && !hideSuggest ? suggestChallenges(pts, stats.activities, segments)[0] ?? null : null;
   const suggestedRunNo = suggestion ? stats.activities.slice(0, suggestion.activityIndex + 1).filter((a) => a.kind === 'run').length : 0;
   const timeline = stats.activities;
@@ -134,6 +167,8 @@ export default function DayScreen() {
         curActivity?.kind === 'run' ? 'Run' : curActivity?.kind === 'lift' ? 'On lift' : null,
       ].filter(Boolean).join(' · ')
     : 'Press play, or drag on the graph';
+  const localCursor = range && cursor != null && cursor >= range.a && cursor <= range.b ? cursor - range.a : null;
+  const selNo = selected != null ? numbers[selected] : 0;
 
   const remove = () =>
     Alert.alert('Delete this day?', 'This can’t be undone.', [
@@ -210,32 +245,70 @@ export default function DayScreen() {
       />
 
       <View style={[s.card, { gap: 8 }]}>
-        <View style={styles.replayRow}>
-          <Pressable
-            onPress={() => {
-              if (!playing && (cursor == null || cursor >= pts.length - 1)) setCursor(0);
-              setPlaying(!playing);
-            }}
-            style={styles.play}
-            accessibilityLabel={playing ? 'Pause replay' : 'Play replay'}
-          >
-            <Ionicons name={playing ? 'pause' : 'play'} size={22} color={colors.onAccent} />
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <Text style={s.label}>Replay</Text>
-            <Text style={s.body}>{readout}</Text>
-          </View>
-        </View>
-        <ElevationChart
-          times={times}
-          alts={alts}
-          speeds={speeds}
-          activities={timeline}
-          cursor={cursor}
-          units={units}
-          onScrubStart={() => setPlaying(false)}
-          onScrub={setCursor}
-        />
+        {runIdxs.length ? (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {runIdxs.map((i) => {
+                const on = i === selected;
+                return (
+                  <Pressable
+                    key={i}
+                    onPress={() => selectRun(i)}
+                    style={[styles.runChip, on && { backgroundColor: colors.accent, borderColor: colors.accent }]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                  >
+                    <Text style={[styles.runChipText, on && { color: colors.onAccent }]}>Run {numbers[i]}</Text>
+                    <Text style={[styles.runChipSub, on && { color: colors.onAccent }]}>{fmtTimeOfDay(timeline[i].startTime)}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <View style={styles.replayRow}>
+              <Pressable
+                onPress={() => {
+                  if (!range) return;
+                  if (!playing && (cursor == null || cursor < range.a || cursor >= range.b)) setCursor(range.a);
+                  setPlaying(!playing);
+                }}
+                style={styles.play}
+                accessibilityLabel={playing ? 'Pause replay' : `Replay run ${selNo}`}
+              >
+                <Ionicons name={playing ? 'pause' : 'play'} size={22} color={colors.onAccent} />
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>
+                  Run {selNo}{selRun ? ` · ${fmtSpeed(selRun.topSpeed, units)} top · ${fmtAlt(selRun.verticalDown, units)} ↓` : ''}
+                </Text>
+                <Text style={s.body}>{readout}</Text>
+              </View>
+              <Pressable
+                onPress={() => selected != null && router.push({ pathname: '/run', params: { session: session.id, i: String(selected) } })}
+                hitSlop={10}
+                accessibilityLabel={`Open run ${selNo} details`}
+              >
+                <Ionicons name="expand-outline" size={22} color={colors.accent} />
+              </Pressable>
+            </View>
+            {runGraph ? (
+              <>
+                <ElevationChart
+                  times={runGraph.times}
+                  alts={runGraph.alts}
+                  speeds={runGraph.speeds}
+                  activities={[runGraph.activity]}
+                  cursor={localCursor}
+                  units={units}
+                  onScrubStart={() => setPlaying(false)}
+                  onScrub={(i) => range && setCursor(range.a + i)}
+                />
+                <SpeedChart times={runGraph.times} speeds={runGraph.speeds} cursor={localCursor} units={units} height={90} />
+              </>
+            ) : null}
+          </>
+        ) : (
+          <Text style={s.muted}>No runs on this day to graph yet.</Text>
+        )}
         <SpeedLegend />
       </View>
 
@@ -337,6 +410,10 @@ export default function DayScreen() {
             onChallenge={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(i) } })}
             onPress={() => {
               const next = focus === i ? null : i;
+              if (a.kind === 'run' && next != null) {
+                selectRun(next);
+                return;
+              }
               setFocus(next);
               setPlaying(false);
               setCursor(next == null ? null : a.startIndex);
@@ -385,6 +462,9 @@ const makeStyles = (colors: Palette) =>
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     input: { flex: 1, fontSize: 22, fontWeight: '700', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
+    runChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1.5, borderColor: colors.faint, alignItems: 'center' },
+    runChipText: { fontWeight: '800', color: colors.text },
+    runChipSub: { fontSize: 11, color: colors.muted },
     replayRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
     legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
