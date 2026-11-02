@@ -7,7 +7,7 @@
 
   var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
   var GHOST_SAMPLES = 20;
-  var MAX_RESULTS = 10;
+  var MAX_RESULTS = 20; // keep in sync with src/lib/share.ts
   var ID_RE = /^[A-Za-z0-9._:-]{1,64}$/;
   var BROKEN = 'This invite link is broken or incomplete.';
 

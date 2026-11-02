@@ -4,7 +4,7 @@ import Stack from 'expo-router/stack';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { shareChallenge } from '../../challenges/service';
-import { SegmentMap } from '../../components/SegmentMap';
+import { RaceReplay } from '../../components/RaceReplay';
 import { deleteSegment, getSegment, listAttempts } from '../../db';
 import { fmtAlt, fmtDate, fmtDelta, fmtDist, fmtRaceTime } from '../../lib/format';
 import { leaderboard, pathInfo, type Attempt, type Segment } from '../../lib/segments';
@@ -39,20 +39,20 @@ export default function SegmentScreen() {
   const myBest = board.find((e) => e.playerId === playerId);
   const leader = board[0];
 
-  const invite = async () => {
+  const invite = async (group: boolean) => {
     if (!name.trim()) {
-      Alert.alert('What’s your name?', 'Add your name in Profile so your friend knows who challenged them.', [
-        { text: 'Later', style: 'cancel', onPress: () => doShare() },
+      Alert.alert('What’s your name?', 'Add your name in Profile so your friends know who challenged them.', [
+        { text: 'Later', style: 'cancel', onPress: () => doShare(group) },
         { text: 'Set name', onPress: () => router.push('/profile') },
       ]);
       return;
     }
-    await doShare();
+    await doShare(group);
   };
-  const doShare = async () => {
+  const doShare = async (group: boolean) => {
     setSharing(true);
     try {
-      await shareChallenge(segment.id);
+      await shareChallenge(segment.id, { group });
     } finally {
       setSharing(false);
     }
@@ -85,7 +85,7 @@ export default function SegmentScreen() {
         }}
       />
 
-      <SegmentMap path={segment.path} gateRadius={segment.gateRadius} />
+      <RaceReplay segment={segment} attempts={attempts} playerId={playerId} />
       <Text style={s.muted}>
         {fmtDist(info.length, units)}{info.drop != null ? ` · ↓ ${fmtAlt(info.drop, units)}` : ''}
         {segment.creatorName ? ` · made by ${segment.creatorName}` : ''}
@@ -114,7 +114,7 @@ export default function SegmentScreen() {
         )}
       </View>
 
-      <Pressable onPress={invite} disabled={sharing} style={({ pressed }) => [styles.invite, pressed && { opacity: 0.85 }]}>
+      <Pressable onPress={() => invite(false)} disabled={sharing} style={({ pressed }) => [styles.invite, pressed && { opacity: 0.85 }]}>
         {sharing ? <ActivityIndicator color={colors.onAccent} /> : (
           <>
             <Ionicons name="paper-plane" size={20} color={colors.onAccent} />
@@ -122,6 +122,13 @@ export default function SegmentScreen() {
           </>
         )}
       </Pressable>
+      <Pressable onPress={() => invite(true)} disabled={sharing} style={({ pressed }) => [styles.group, pressed && { opacity: 0.7 }]}>
+        <Ionicons name="people" size={18} color={colors.accent} />
+        <Text style={styles.groupText}>Share to a group chat</Text>
+      </Pressable>
+      <Text style={[s.muted, { textAlign: 'center', marginTop: -4 }]}>
+        Everyone who opens the link joins the same leaderboard (up to 20 skiers).
+      </Text>
 
       <Text style={[s.h2, { marginTop: 8 }]}>Leaderboard</Text>
       {board.length === 0 ? <Text style={s.muted}>No times yet.</Text> : null}
@@ -165,6 +172,11 @@ const makeStyles = (colors: Palette) =>
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
     big: { fontSize: 44, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+    group: {
+      flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
+      borderRadius: 14, borderWidth: 1.5, borderColor: colors.accent,
+    },
+    groupText: { color: colors.accent, fontWeight: '800', fontSize: 16 },
     invite: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16 },
     inviteText: { color: colors.onAccent, fontSize: 18, fontWeight: '800' },
     lbRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },

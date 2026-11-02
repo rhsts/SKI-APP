@@ -7,7 +7,7 @@ import { attemptId, GHOST_SAMPLES, leaderboard, type Attempt, type PathPoint, ty
  */
 
 export const SHARE_VERSION = 1;
-const MAX_RESULTS = 10;
+const MAX_RESULTS = 20; // enough for a whole group
 
 // ---------- compact number encoding (Google polyline varints) ----------
 

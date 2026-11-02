@@ -9,7 +9,8 @@ import { StatGrid, StatTile } from '../../components/StatTile';
 import { BreakRow, TimelineCard } from '../../components/TimelineCard';
 import { exportGpx } from '../../days/files';
 import { lookupPistes } from '../../days/pistes';
-import { deleteSession, getPoints, getSession, listSegments, listSessionAttempts, renameSession, type SessionRow } from '../../db';
+import { suggestChallenges } from '../../lib/suggest';
+import { deleteSession, kvGet, kvSet, getPoints, getSession, listSegments, listSessionAttempts, renameSession, type SessionRow } from '../../db';
 import type { Attempt, Segment } from '../../lib/segments';
 import {
   fmtAlt, fmtDate, fmtDist, fmtDuration, fmtRaceTime, fmtSpeed, fmtTimeOfDay,
@@ -35,6 +36,8 @@ export default function DayScreen() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [timed, setTimed] = useState<{ attempt: Attempt; segment: Segment }[]>([]);
+  const [segments, setSegments] = useState<Segment[] | null>(null);
+  const [hideSuggest, setHideSuggest] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -53,7 +56,9 @@ export default function DayScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!id) return;
+      kvGet(`suggest-dismissed:${id}`).then((v) => setHideSuggest(v === '1'));
       Promise.all([listSessionAttempts(id), listSegments()]).then(([atts, segs]) => {
+        setSegments(segs);
         const byId = new Map(segs.map((x) => [x.id, x]));
         setTimed(atts.filter((a) => byId.has(a.segmentId)).map((a) => ({ attempt: a, segment: byId.get(a.segmentId)! })));
       });
@@ -89,6 +94,8 @@ export default function DayScreen() {
   if (!session || !day) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
 
   const { pts, times, speeds, alts, stats } = day;
+  const suggestion = segments && !hideSuggest ? suggestChallenges(pts, stats.activities, segments)[0] ?? null : null;
+  const suggestedRunNo = suggestion ? stats.activities.slice(0, suggestion.activityIndex + 1).filter((a) => a.kind === 'run').length : 0;
   const timeline = stats.activities;
   let runNo = 0, liftNo = 0;
   const numbers = timeline.map((a) => (a.kind === 'run' ? ++runNo : a.kind === 'lift' ? ++liftNo : 0));
@@ -203,6 +210,31 @@ export default function DayScreen() {
         <StatTile label="Lowest point" value={fmtAlt(stats.minAlt, units)} />
       </StatGrid>
 
+      {suggestion ? (
+        <View style={[s.card, styles.suggest]}>
+          <Text style={{ fontSize: 26 }}>🏁</Text>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Text style={s.h2}>You skied this line {suggestion.times} times</Text>
+            <Text style={s.muted}>
+              Make it a challenge to get timed on it from now on and race your friends. Your fastest was Run {suggestedRunNo}.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 2 }}>
+              <Pressable onPress={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(suggestion.activityIndex) } })}>
+                <Text style={styles.link}>Make challenge</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setHideSuggest(true);
+                  kvSet(`suggest-dismissed:${session.id}`, '1');
+                }}
+              >
+                <Text style={[styles.link, { color: colors.muted }]}>Not now</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {timed.length ? (
         <View style={[s.card, { gap: 8 }]}>
           <Text style={s.label}>Challenge times</Text>
@@ -284,6 +316,8 @@ const makeStyles = (colors: Palette) =>
     replayRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
     legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
+    suggest: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderLeftWidth: 4, borderLeftColor: colors.good },
+    link: { color: colors.accent, fontWeight: '800', fontSize: 15 },
     timedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     swatch: { width: 18, height: 6, borderRadius: 3 },
   });

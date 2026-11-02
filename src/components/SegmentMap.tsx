@@ -10,10 +10,12 @@ interface Props {
   /** Faint surrounding track for context, e.g. the whole run while trimming. */
   context?: { lat: number; lon: number }[];
   style?: StyleProp<ViewStyle>;
+  /** Moving dots, e.g. you vs a rival's ghost during a race replay. */
+  markers?: { key: string; lat: number; lon: number; color: string; label: string }[];
 }
 
 /** A challenge course: the line to ski, a green start gate and a chequered finish gate. */
-export function SegmentMap({ path, gateRadius = 30, context, style }: Props) {
+export function SegmentMap({ path, gateRadius = 30, context, style, markers }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
   const ref = useRef<MapView>(null);
@@ -55,6 +57,14 @@ export function SegmentMap({ path, gateRadius = 30, context, style }: Props) {
             <View style={[styles.flag, { backgroundColor: '#0E1B2C' }]}><Text style={styles.flagText}>🏁 FINISH</Text></View>
           </Marker>
         ) : null}
+        {markers?.map((m) => (
+          <Marker key={m.key} coordinate={{ latitude: m.lat, longitude: m.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={5}>
+            <View style={styles.ghost}>
+              <View style={[styles.ghostDot, { backgroundColor: m.color }]} />
+              <Text style={[styles.ghostLabel, { backgroundColor: m.color }]} numberOfLines={1}>{m.label}</Text>
+            </View>
+          </Marker>
+        ))}
       </MapView>
     </View>
   );
@@ -64,5 +74,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     wrap: { height: 260, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
     flag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    ghost: { alignItems: 'center' },
+    ghostDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 3, borderColor: '#fff' },
+    ghostLabel: { color: '#fff', fontSize: 10, fontWeight: '800', paddingHorizontal: 4, borderRadius: 3, marginTop: 2, overflow: 'hidden', maxWidth: 80 },
     flagText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   });

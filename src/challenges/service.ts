@@ -89,7 +89,7 @@ export function challengeLink(code: string): string {
 }
 
 /** Opens the share sheet (WhatsApp, Messages, …) with an invite to beat the best time. */
-export async function shareChallenge(segmentId: string): Promise<void> {
+export async function shareChallenge(segmentId: string, opts: { group?: boolean } = {}): Promise<void> {
   const segment = await getSegment(segmentId);
   if (!segment) return;
   const attempts = await listAttempts(segmentId);
@@ -101,6 +101,15 @@ export async function shareChallenge(segmentId: string): Promise<void> {
   const link = challengeLink(code);
 
   let line: string;
+  if (opts.group) {
+    const top = board.slice(0, 5).map((e, i) => `${['🥇', '🥈', '🥉'][i] ?? `${i + 1}.`} ${e.playerName} ${fmtRaceTime(e.time)}`).join('\n');
+    const message =
+      `⛷️ Group challenge: “${segment.name}”! Ski it and get on the leaderboard.` +
+      (top ? `\n\n${top}` : '') +
+      `\n\nOpen the challenge:\n${link}`;
+    await Share.share({ message, title: `Group ski challenge: ${segment.name}` });
+    return;
+  }
   if (mine && leader && leader.playerId === me) line = `I did “${segment.name}” in ${fmtRaceTime(mine.time)}. Think you can beat me?`;
   else if (mine && leader) line = `My time on “${segment.name}”: ${fmtRaceTime(mine.time)}. ${leader.playerName} leads with ${fmtRaceTime(leader.time)}. Your turn!`;
   else if (leader) line = `${leader.playerName} set ${fmtRaceTime(leader.time)} on “${segment.name}”. Can you beat it?`;

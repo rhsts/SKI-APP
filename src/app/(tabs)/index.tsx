@@ -210,6 +210,7 @@ function FinishCard({ f }: { f: RaceFinish }) {
         <Text style={s.label}>{f.name}</Text>
         <Text style={styles.finishTime}>{headline}</Text>
         <Text style={s.body}>{line}</Text>
+        {f.splitNote ? <Text style={s.muted}>{f.splitNote}</Text> : null}
         <Pressable onPress={() => router.push(`/segment/${f.segmentId}`)}>
           <Text style={{ color: colors.accent, fontWeight: '700', marginTop: 4 }}>See leaderboard ›</Text>
         </Pressable>

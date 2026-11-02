@@ -12,6 +12,7 @@ import type { DayStats, TrackPoint } from '../lib/types';
 import { matchSession, myAttempt } from '../challenges/service';
 import { ghostTimeAt, leaderboard, pickTarget, Racer } from '../lib/segments';
 import { getSettings } from '../settings';
+import { compareSplits, SECTION_NAMES } from '../lib/ghost';
 import { batteryHoursLeft } from '../lib/power';
 import { readPressure, startBarometer, stopBarometer } from './barometer';
 import { lookupPistes } from '../days/pistes';
@@ -82,6 +83,8 @@ export interface RaceFinish {
   rivalName: string | null;
   rivalIsMe: boolean;
   rivalGap: number | null;
+  /** Where the time was won or lost against the rival, e.g. "Lost 1.8s in the middle section". */
+  splitNote: string | null;
 }
 
 const initial: TrackerState = {
@@ -336,6 +339,7 @@ async function onFinish(lr: LiveRacer, sessionId: string, ev: { startT: number; 
       rivalName: target ? target.name : null,
       rivalIsMe: target?.mine ?? false,
       rivalGap: target ? ev.time - target.time : null,
+      splitNote: target ? splitNote(ev.ghost, target.ghost) : null,
     },
   });
   lr.target = pickTarget([...before, attempt], me);
@@ -370,6 +374,13 @@ function feedRacers(fresh: TrackPoint[], sessionId: string) {
       delta: target ? racer.elapsed - ghostTimeAt(target.ghost, racer.progress) : null,
     },
   });
+}
+
+function splitNote(mine: number[], theirs: number[]): string | null {
+  const c = compareSplits(mine, theirs);
+  if (c.worst != null && c.deltas[c.worst] >= 0.5) return `Lost ${c.deltas[c.worst].toFixed(1)}s in the ${SECTION_NAMES[c.worst]} section.`;
+  if (c.best != null && c.deltas[c.best] <= -0.5) return `Gained ${Math.abs(c.deltas[c.best]).toFixed(1)}s in the ${SECTION_NAMES[c.best]} section.`;
+  return null;
 }
 
 export function dismissFinish() {
