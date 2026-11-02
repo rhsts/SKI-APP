@@ -1,7 +1,8 @@
 name: Build Android APK
 
-# Builds an installable APK and attaches it to a GitHub Release.
-# Needs (optional) repository secret GOOGLE_MAPS_API_KEY for maps.
+# Builds an installable APK, checks on an Android emulator that it starts without
+# crashing, and only then attaches it to a GitHub Release.
+# Optional repository secret GOOGLE_MAPS_API_KEY enables maps.
 on:
   push:
     branches: [main, claude/elegant-mendel-38c8p6]
@@ -16,13 +17,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  apk:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
       BUILD_NUMBER: ${{ github.run_number }}
       EXPO_NO_TELEMETRY: '1'
+    outputs:
+      file: ${{ steps.apk.outputs.file }}
+      sha1: ${{ steps.apk.outputs.sha1 }}
+      maps: ${{ steps.apk.outputs.maps }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +42,6 @@ jobs:
           java-version: 17
 
       # The Android SDK is preinstalled on GitHub's Ubuntu runners (ANDROID_HOME).
-
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Install dependencies
@@ -53,8 +57,8 @@ jobs:
 
       - name: Build release APK
         working-directory: android
-        # arm64 only: every phone from the last ~8 years, and a much smaller download.
-        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+        # arm64 for phones, x86_64 so the emulator check can run the same APK.
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,x86_64 --no-daemon
 
       - name: Collect APK
         id: apk
@@ -70,6 +74,53 @@ jobs:
           echo "sha1=$SHA1" >> "$GITHUB_OUTPUT"
           if [ -n "$GOOGLE_MAPS_API_KEY" ]; then echo "maps=✅ Maps enabled" >> "$GITHUB_OUTPUT"; else echo "maps=⚠️ Built without a Google Maps key: maps show a placeholder. Add the GOOGLE_MAPS_API_KEY secret and run the workflow again." >> "$GITHUB_OUTPUT"; fi
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: ${{ steps.apk.outputs.file }}
+          retention-days: 14
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Start the app on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: ./scripts/smoke-test.sh ${{ needs.build.outputs.file }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-test
+          path: smoke/
+
+  release:
+    needs: [build, smoke-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -77,13 +128,14 @@ jobs:
           name: Ski Tracker 1.0.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
-          files: ${{ steps.apk.outputs.file }}
+          files: ${{ needs.build.outputs.file }}
           body: |
-            **Install on Android:** tap `${{ steps.apk.outputs.file }}` below → allow your browser to "install unknown apps" → Install.
+            **Install on Android:** tap `${{ needs.build.outputs.file }}` below → allow your browser to "install unknown apps" → Install.
             Updates install over the previous version and keep your data.
+            ✔️ Checked on an Android emulator: the app starts and keeps running.
 
-            ${{ steps.apk.outputs.maps }}
+            ${{ needs.build.outputs.maps }}
 
-            To restrict your Google Maps key (Android apps): package `com.rhsts.skiapp`, SHA-1 `${{ steps.apk.outputs.sha1 }}`
+            To restrict your Google Maps key (Android apps): package `com.rhsts.skiapp`, SHA-1 `${{ needs.build.outputs.sha1 }}`
 
             Built from ${{ github.sha }}.
