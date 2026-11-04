@@ -8,6 +8,9 @@ rankings. A Raspberry Pi 4 handles this easily: it's built for a handful to a fe
 - **No accounts.** Each phone makes up a random id + secret the first time it connects. Group codes are
   6 characters, and only members can see a group.
 
+**New to this? Follow [SETUP-PI.md](SETUP-PI.md):** a step-by-step manual from an empty SD card to a working
+server, reachable from the mountain for free with Tailscale Funnel.
+
 ## Run it on a Raspberry Pi (Docker)
 
 You need a 64-bit Raspberry Pi OS. A USB SSD is better than the SD card, but either works.
@@ -26,7 +29,19 @@ The database is `server/data/ski-friends.db`. Copy that file to back everything 
 **At home** (phones on your Wi-Fi), the app's server address is `http://<pi-ip>:8787`, for example
 `http://192.168.1.20:8787`. Find the IP with `hostname -I`.
 
-## Reach it from the mountain: Cloudflare Tunnel
+## Reach it from the mountain: Tailscale Funnel (free, no domain)
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+sudo tailscale funnel --bg 8787
+```
+
+Turn on MagicDNS and HTTPS Certificates in the Tailscale admin first. The full steps are in
+[SETUP-PI.md](SETUP-PI.md#step-7-make-it-reachable-from-anywhere-tailscale-funnel-free). The app's server
+address is then `https://<pi>.<tailnet>.ts.net`.
+
+## Reach it from the mountain: Cloudflare Tunnel (your own domain)
 
 Phones on mobile data can't reach your home network directly. A Cloudflare Tunnel fixes that: you don't
 open any ports on your router, it works behind CGNAT, and you get HTTPS for free.
@@ -61,7 +76,8 @@ To start it at boot without Docker, put `npm start` in a systemd service, or use
 
 - `sudo apt update && sudo apt upgrade` every now and then.
 - Update the server: `git pull && docker compose up -d --build`.
-- Back up `server/data/` (e.g. a weekly copy to a USB stick).
+- Back up with `./backup.sh` (a safe copy while it runs, keeps the newest 8 in `backups/`). See SETUP-PI.md
+  for a weekly automatic backup.
 
 ## API
 
