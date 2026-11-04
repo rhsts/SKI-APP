@@ -94,6 +94,30 @@ test('groups, daily leaderboard and group challenges', async () => {
   assert.equal((await call(anna, 'POST', '/v1/groups/join', { code: g.code })).status, 404);
 });
 
+test('a server password keeps strangers out', async () => {
+  const locked = createServer(listener(createApi(openDb(':memory:'), { password: 'powder-day-42' })));
+  await new Promise((r) => locked.listen(0, r));
+  const url = `http://127.0.0.1:${locked.address().port}`;
+  const req = (pw) => fetch(`${url}/v1/groups`, {
+    headers: { authorization: anna.auth, ...(pw != null ? { 'x-server-password': pw } : {}) },
+  });
+  try {
+    const health = await (await fetch(`${url}/v1/health`)).json();
+    assert.equal(health.password, true);
+    const t0 = Date.now();
+    const wrong = await req('guess');
+    assert.equal(wrong.status, 401);
+    assert.equal((await wrong.json()).code, 'password');
+    assert.ok(Date.now() - t0 >= 900, 'wrong passwords are answered slowly');
+    assert.equal((await req(null)).status, 401);
+    assert.equal((await req('powder-day-42')).status, 200);
+    // Without a password set, the header isn't needed.
+    assert.equal((await (await fetch(`${base}/v1/health`)).json()).password, false);
+  } finally {
+    locked.close();
+  }
+});
+
 test('rejects junk', async () => {
   const res = await fetch(`${base}/v1/groups`, { method: 'POST', headers: { authorization: anna.auth }, body: '{nope' });
   assert.equal(res.status, 400);

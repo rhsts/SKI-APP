@@ -5,6 +5,8 @@ rankings. A Raspberry Pi 4 handles this easily: it's built for a handful to a fe
 
 - **No dependencies.** Plain Node.js (22.13 or newer) with its built-in HTTP server and SQLite.
 - **Shares totals only**: day totals and challenge times. GPS tracks stay on the phones.
+- **Server password.** Set `SERVER_PASSWORD` and only people who know it can use the server (the app asks
+  for it when connecting). Wrong guesses are answered slowly.
 - **No accounts.** Each phone makes up a random id + secret the first time it connects. Group codes are
   6 characters, and only members can see a group.
 
@@ -20,6 +22,7 @@ curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER   # then log out and back in
 git clone https://github.com/rhsts/SKI-APP.git
 cd SKI-APP/server
+echo "SERVER_PASSWORD=choose-a-password" > .env
 docker compose up -d --build
 ```
 
@@ -54,7 +57,7 @@ open any ports on your router, it works behind CGNAT, and you get HTTPS for free
 4. On the Pi, in `SKI-APP/server`:
 
    ```bash
-   echo "TUNNEL_TOKEN=<paste token>" > .env
+   echo "TUNNEL_TOKEN=<paste token>" >> .env
    docker compose --profile tunnel up -d
    ```
 
@@ -65,7 +68,7 @@ open any ports on your router, it works behind CGNAT, and you get HTTPS for free
 
 ```bash
 cd server
-npm start            # PORT=8787 and DB_FILE=./data/ski-friends.db by default
+SERVER_PASSWORD=choose-a-password npm start   # PORT=8787 and DB_FILE=./data/ski-friends.db by default
 npm test             # API tests
 ```
 
@@ -82,7 +85,8 @@ To start it at boot without Docker, put `npm start` in a systemd service, or use
 ## API
 
 All requests and responses are JSON. Every endpoint except `/v1/health` needs the header
-`Authorization: Bearer <playerId>:<secret>`.
+`Authorization: Bearer <playerId>:<secret>`, and, when a server password is set, `X-Server-Password: <password>`.
+A wrong password gets `401 {"error": "Wrong server password", "code": "password"}` after a one-second delay.
 
 | Method | Path | What |
 |---|---|---|

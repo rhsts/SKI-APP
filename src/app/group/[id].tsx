@@ -34,7 +34,7 @@ export default function GroupScreen() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { units, playerId } = useSettings();
+  const { units, playerId, serverUrl, serverPassword } = useSettings();
   const [detail, setDetail] = useState<GroupDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [today, setToday] = useState('');
@@ -103,7 +103,13 @@ export default function GroupScreen() {
 
   const invite = () =>
     Share.share({
-      message: `Join my ski group “${detail.name}” in Ski Tracker!\n\nChallenges → Friend groups → Join, and type the code: ${detail.code}`,
+      message: [
+        `Join my ski group “${detail.name}” in Ski Tracker!`,
+        '',
+        `1. Profile → Friends server: ${serverUrl}${serverPassword ? `\n   Password: ${serverPassword}` : ''}`,
+        '   Tap Connect.',
+        `2. Challenges → + New / join → code ${detail.code} → Join`,
+      ].join('\n'),
     });
 
   const leave = () =>

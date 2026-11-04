@@ -8,7 +8,7 @@ import { displayName, getSettings } from '../settings';
 /** Talks to the friends server (server/ in this repo, e.g. on a Raspberry Pi). */
 
 export class FriendsError extends Error {
-  constructor(message: string, readonly status: number | null = null) {
+  constructor(message: string, readonly status: number | null = null, readonly code: string | null = null) {
     super(message);
   }
 }
@@ -19,7 +19,9 @@ export function friendsEnabled(): boolean {
   return !!getSettings().serverUrl;
 }
 
-async function call<T>(method: string, path: string, body?: unknown, base = getSettings().serverUrl): Promise<T> {
+async function call<T>(
+  method: string, path: string, body?: unknown, base = getSettings().serverUrl, password = getSettings().serverPassword,
+): Promise<T> {
   if (!base) throw new FriendsError('Set up your friends server in Profile first.');
   const { playerId, deviceSecret } = getSettings();
   const ctrl = new AbortController();
@@ -31,6 +33,7 @@ async function call<T>(method: string, path: string, body?: unknown, base = getS
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${playerId}:${deviceSecret}`,
+        ...(password ? { 'x-server-password': password } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: ctrl.signal,
@@ -47,16 +50,24 @@ async function call<T>(method: string, path: string, body?: unknown, base = getS
     json = null;
   }
   if (!res.ok) {
-    const msg = json && typeof json === 'object' && 'error' in json ? String((json as { error: unknown }).error) : `Server error (${res.status})`;
-    throw new FriendsError(msg, res.status);
+    const err = (json && typeof json === 'object' ? json : {}) as { error?: unknown; code?: unknown };
+    if (err.code === 'password') {
+      throw new FriendsError(
+        password ? 'Wrong server password. Ask whoever runs the server for the right one.' : 'This server needs a password. Enter it in Profile → Friends server.',
+        res.status, 'password',
+      );
+    }
+    throw new FriendsError(err.error != null ? String(err.error) : `Server error (${res.status})`, res.status);
   }
   return json as T;
 }
 
-/** Checks that `base` is a Ski Tracker friends server. */
-export async function checkServer(base: string): Promise<void> {
-  const r = await call<{ ok?: boolean; app?: string }>('GET', '/v1/health', undefined, base);
+/** Checks that `base` is a Ski Tracker friends server and that `password` is right. */
+export async function checkServer(base: string, password = ''): Promise<void> {
+  const r = await call<{ ok?: boolean; app?: string; password?: boolean }>('GET', '/v1/health', undefined, base, password);
   if (r?.app !== 'ski-tracker-friends') throw new FriendsError('That address answers, but it isn’t a Ski Tracker friends server.');
+  // An authenticated call: fails with a clear message if the password is missing or wrong.
+  await call('GET', '/v1/groups', undefined, base, password);
 }
 
 export const api = {

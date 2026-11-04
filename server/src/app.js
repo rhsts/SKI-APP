@@ -18,11 +18,15 @@ const MAX_PATH_POINTS = 150;
 const MAX_GHOST = 64;
 
 export class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
+
+/** Wrong server passwords are answered after this delay, so guessing is slow. */
+export const WRONG_PASSWORD_DELAY_MS = 1000;
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const now = () => Date.now();
@@ -57,7 +61,18 @@ function validPath(path) {
   });
 }
 
-export function createApi(db) {
+/**
+ * `password`: the server password (SERVER_PASSWORD). When set, every request
+ * except /v1/health must send it in the "X-Server-Password" header.
+ */
+export function createApi(db, { password = '' } = {}) {
+  const passwordHash = password ? createHash('sha256').update(password).digest() : null;
+  function checkPassword(given) {
+    if (!passwordHash) return;
+    const h = createHash('sha256').update(typeof given === 'string' ? given : '').digest();
+    if (!timingSafeEqual(h, passwordHash)) throw new HttpError(401, 'Wrong server password', 'password');
+  }
+
   const q = (sql) => db.prepare(sql);
   const stmt = {
     player: q('SELECT id, secret_hash, name FROM players WHERE id = ?'),
@@ -289,11 +304,14 @@ export function createApi(db) {
   /** Handles one request; returns [status, json]. */
   function handle(method, url, headers, body) {
     const u = new URL(url, 'http://x');
-    if (method === 'GET' && u.pathname === '/v1/health') return [200, { ok: true, app: 'ski-tracker-friends', v: 1 }];
+    if (method === 'GET' && u.pathname === '/v1/health') {
+      return [200, { ok: true, app: 'ski-tracker-friends', v: 1, password: !!passwordHash }];
+    }
     for (const [m, re, fn] of routes) {
       if (m !== method) continue;
       const match = re.exec(u.pathname);
       if (!match) continue;
+      checkPassword(headers['x-server-password']);
       const me = auth(headers.authorization);
       return [200, fn(me, match.slice(1).map(decodeURIComponent), body, u.searchParams)];
     }
@@ -319,7 +337,7 @@ export function listener(api, log = () => undefined) {
     });
     req.on('end', () => {
       if (res.writableEnded) return;
-      let status = 200, out;
+      let status = 200, out, delay = 0;
       try {
         let body = null;
         if (chunks.length) {
@@ -332,10 +350,13 @@ export function listener(api, log = () => undefined) {
         [status, out] = api.handle(req.method, req.url, req.headers, body);
       } catch (e) {
         status = e instanceof HttpError ? e.status : 500;
-        out = { error: e instanceof HttpError ? e.message : 'Server error' };
+        out = { error: e instanceof HttpError ? e.message : 'Server error', ...(e?.code ? { code: e.code } : {}) };
+        if (e?.code === 'password') delay = WRONG_PASSWORD_DELAY_MS;
         if (!(e instanceof HttpError)) log(e);
       }
-      res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(out));
+      const send = () => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(out));
+      if (delay) setTimeout(send, delay);
+      else send();
     });
   };
 }

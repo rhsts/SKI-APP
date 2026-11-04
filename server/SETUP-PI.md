@@ -60,6 +60,7 @@ Enter. After each part there's a **✅ Checkpoint** telling you what you should 
   of sealed box, so it can't mess up the Pi and is easy to update or remove.
 - **Tailscale Funnel** gives the Pi a public `https://` address. Because the Pi opens the connection itself,
   you don't change anything on your router: no port forwarding, and it works with every internet provider.
+- A **server password** keeps strangers out: without it, the app can't connect.
 - Only **day totals** (vertical, top speed, runs, distance, ski time) and **challenge times** are stored.
   GPS tracks never leave the phones.
 
@@ -94,6 +95,7 @@ Pi name (hostname):      skipi
 Pi username:             pi
 Pi password:             ......................
 Pi home address (IP):    192.168.... (Part 4)
+Server password:         ...................... (Part 7.2)
 Public server address:   https://................ts.net (Part 9)
 ```
 
@@ -403,7 +405,30 @@ ls
 
 You should see, among others: `Dockerfile  docker-compose.yml  index.js  backup.sh  README.md  SETUP-PI.md`.
 
-### 7.2 Build and start the server
+### 7.2 Choose a server password
+
+Anyone who knows your server's address could otherwise use it. A **server password** stops that: the app
+only connects with the right password. You give it to your friends together with the address.
+
+Pick a password that's easy to share but hard to guess, like three random words and a number:
+`powder-goggles-fondue-42`. Then save it (put your own password between the quotes):
+
+```bash
+echo "SERVER_PASSWORD=powder-goggles-fondue-42" > .env
+```
+
+This writes it to a file called `.env` in the server folder, where Docker reads it. Check it:
+
+```bash
+cat .env
+```
+
+**Write the password down** in your note from Part 0.
+
+> **Changing it later:** run the `echo` command again with the new password, then
+> `docker compose up -d` to apply it. Everyone then enters the new password in the app.
+
+### 7.3 Build and start the server
 
 ```bash
 docker compose up -d --build
@@ -417,7 +442,7 @@ docker compose up -d --build
   ✔ Container server-friends-1  Started
   ```
 
-### 7.3 Check that it runs
+### 7.4 Check that it runs
 
 ```bash
 docker compose ps
@@ -434,18 +459,29 @@ curl http://localhost:8787/v1/health
 The answer should be exactly:
 
 ```
-{"ok":true,"app":"ski-tracker-friends","v":1}
+{"ok":true,"app":"ski-tracker-friends","v":1,"password":true}
 ```
+
+`"password":true` means your server password is on. The health check is the only thing that works without it.
 
 🎉 Your server is running.
 
-### 7.4 What just happened
+### 7.5 What just happened
 
 - Docker built a box with Node.js and the server, and started it.
 - The box restarts by itself if it crashes, and starts when the Pi starts (`restart: unless-stopped`).
 - All data is in **`~/SKI-APP/server/data/`**. This folder survives updates and restarts.
+- Check that the password is on:
 
-✅ **Checkpoint:** `docker compose ps` says **Up**, and `/v1/health` gives `{"ok":true,...}`.
+  ```bash
+  docker compose logs friends | grep -i password
+  ```
+
+  It should say `Server password is on`. If it says `WARNING: no SERVER_PASSWORD set`, redo step 7.2, then
+  run `docker compose up -d`.
+
+✅ **Checkpoint:** `docker compose ps` says **Up**, `/v1/health` gives `{"ok":true,...,"password":true}`,
+and the log says `Server password is on`.
 
 ---
 
@@ -461,8 +497,8 @@ Before making it public, test it from your phone on your **home Wi-Fi**.
    ```
 
    You should see `{"ok":true,"app":"ski-tracker-friends","v":1}`.
-3. Optional: in the app, enter `http://192.168.1.23:8787` under **Profile → Friends server** and tap
-   **Connect**. It should say **Connected**.
+3. Optional: in the app, enter `http://192.168.1.23:8787` and your **server password** under
+   **Profile → Friends server**, and tap **Connect**. It should say **Connected**.
 
 This home address **only works on your home Wi-Fi**. Part 9 makes it work everywhere.
 
@@ -578,7 +614,8 @@ wait a few minutes and try again.
 2. Under **Your name**, fill in the name your friends should see on leaderboards.
 3. Under **Friends server**, enter your public address, e.g. `https://skipi.tail1a2b.ts.net`, with no
    `/v1/health` at the end.
-4. Tap **Connect**. It should say **Connected**.
+4. Below it, enter your **server password** from Part 7.2.
+5. Tap **Connect**. It should say **Connected**.
 
 ### 10.2 Make a group
 
@@ -586,14 +623,16 @@ wait a few minutes and try again.
 2. Tap **+ New / join**, type a name for the group (e.g. "Ischgl 2026") under **Start a new group**, and tap
    **Create group**.
 3. You're now in the group. At the top is a 6-character **invite code**, e.g. `K7MP2Q`.
-4. Tap the **share** icon to send the code to your friends via WhatsApp or another app.
+4. Tap the **share** icon to send an invite to your friends via WhatsApp or another app. The invite
+   contains the server address, the **server password** and the group code, so only send it to people you
+   want in.
 
 ### 10.3 Your friends
 
-Send them these instructions, with your address and code filled in:
+The invite from the share button tells them what to do. In short:
 
 > 1. Open Ski Tracker → **Profile** → fill in **Your name**.
-> 2. **Friends server**: `https://skipi.tail1a2b.ts.net` → **Connect**.
+> 2. **Friends server**: `https://skipi.tail1a2b.ts.net`, **password** `powder-goggles-fondue-42` → **Connect**.
 > 3. **Challenges** → **+ New / join** → type the code **K7MP2Q** → **Join**.
 
 ### 10.4 How the group works
@@ -792,6 +831,7 @@ Tailscale admin under **Machines**, then rename the new one to `skipi`.
 | Problem | Fix |
 |---|---|
 | "Can't reach the friends server" | Check the address in **Profile** (with `https://`, without `/v1/health`). Open `…/v1/health` in the phone's browser: if that fails too, it's the server or Funnel, not the app. |
+| "Wrong server password" or "This server needs a password" | Enter the password from Part 7.2 under **Profile → Friends server** and tap **Connect**. Forgot it? On the Pi: `cat ~/SKI-APP/server/.env`. |
 | "That address answers, but it isn't a Ski Tracker friends server" | There's a typo in the address, or another program uses port 8787. |
 | After reinstalling the app, my groups are gone | A reinstalled app is a new skier to the server. Connect again and join your groups with their codes. Old days come back on the leaderboard once you restore your app backup (Profile → Restore from a backup). |
 | My day isn't on the leaderboard | Finish the day in the app (it's shared when finished). Demo days are only shared with **Share demo days** switched on in Profile. Pull down in the group to refresh. |

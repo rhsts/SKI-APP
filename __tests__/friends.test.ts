@@ -12,7 +12,7 @@ import { simulateDay } from '../src/lib/sim';
 import { computeStats } from '../src/lib/stats';
 
 // The app's API client, talking to the real server (server/) with two fake phones.
-const mockSettings = { serverUrl: '', playerId: 'p-anna', deviceSecret: 'anna-secret-0123456789abcdef', name: 'Anna' };
+const mockSettings = { serverUrl: '', serverPassword: 'powder-day-42', playerId: 'p-anna', deviceSecret: 'anna-secret-0123456789abcdef', name: 'Anna' };
 jest.mock('../src/settings', () => ({
   getSettings: () => mockSettings,
   displayName: () => mockSettings.name,
@@ -82,13 +82,13 @@ describe('app ↔ server', () => {
   beforeAll(async () => {
     server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'index.js'], {
       cwd: path.join(__dirname, '..', 'server'),
-      env: { ...process.env, PORT: String(port), DB_FILE: ':memory:' },
+      env: { ...process.env, PORT: String(port), DB_FILE: ':memory:', SERVER_PASSWORD: 'powder-day-42' },
       stdio: 'ignore',
     });
     mockSettings.serverUrl = `http://127.0.0.1:${port}`;
     for (let i = 0; i < 30; i++) {
       try {
-        await checkServer(mockSettings.serverUrl);
+        await checkServer(mockSettings.serverUrl, 'powder-day-42');
         return;
       } catch {
         await new Promise((r) => setTimeout(r, 100));
@@ -134,6 +134,12 @@ describe('app ↔ server', () => {
     expect(detail.dates).toEqual([date]);
     const cb = rankChallenge((await api.challengeBoard(g.id, c.id)).rows);
     expect(cb.map((r) => [r.playerName, r.time])).toEqual([['Anna', 61], ['Ben', 63.4]]);
+  });
+
+  it('needs the server password', async () => {
+    as('anna');
+    await expect(checkServer(mockSettings.serverUrl, 'wrong')).rejects.toThrow('Wrong server password');
+    await expect(checkServer(mockSettings.serverUrl, '')).rejects.toThrow('needs a password');
   });
 
   it('a stolen player id is refused', async () => {

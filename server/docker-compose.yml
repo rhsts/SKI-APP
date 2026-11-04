@@ -8,6 +8,9 @@ services:
       - "8787:8787"
     volumes:
       - ./data:/data
+    environment:
+      # Put SERVER_PASSWORD=... in the .env file next to this one (see SETUP-PI.md).
+      - SERVER_PASSWORD=${SERVER_PASSWORD:-}
 
   tunnel:
     image: cloudflare/cloudflared:latest

@@ -20,6 +20,7 @@ export default function ProfileScreen() {
   const [name, setName] = useState(settings.name);
   const [busy, setBusy] = useState<string | null>(null);
   const [server, setServer] = useState(settings.serverUrl);
+  const [password, setPassword] = useState(settings.serverPassword);
 
   const connect = async () => {
     const url = normalizeServerUrl(server);
@@ -29,9 +30,10 @@ export default function ProfileScreen() {
     }
     setBusy('server');
     try {
-      await checkServer(url);
+      const pw = password.trim();
+      await checkServer(url, pw);
       if (url !== settings.serverUrl) await resetFriendsCache();
-      await updateSettings({ serverUrl: url });
+      await updateSettings({ serverUrl: url, serverPassword: pw });
       setServer(url);
       await syncFriends();
       Alert.alert('Connected', 'You can now make or join a friend group under Challenges.');
@@ -80,6 +82,15 @@ export default function ProfileScreen() {
           autoCorrect={false}
           keyboardType="url"
           style={styles.input}
+        />
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Server password (if it has one)"
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          style={styles.input}
           onSubmitEditing={connect}
         />
         <Row label={settings.serverUrl ? 'Reconnect' : 'Connect'} busy={busy === 'server'} onPress={connect} />
@@ -95,9 +106,10 @@ export default function ProfileScreen() {
                     text: 'Disconnect',
                     style: 'destructive',
                     onPress: async () => {
-                      await updateSettings({ serverUrl: '' });
+                      await updateSettings({ serverUrl: '', serverPassword: '' });
                       await resetFriendsCache();
                       setServer('');
+                      setPassword('');
                     },
                   },
                 ])
