@@ -100,13 +100,13 @@ export default function ProfileScreen() {
               label="Disconnect"
               danger
               onPress={() =>
-                Alert.alert('Disconnect from the friends server?', 'Your groups stay on the server; connect again to see them.', [
+                Alert.alert('Disconnect from the friends server?', 'This locks the app: you’ll need the server address and password to get back in. Your days stay on this phone.', [
                   { text: 'Cancel', style: 'cancel' },
                   {
                     text: 'Disconnect',
                     style: 'destructive',
                     onPress: async () => {
-                      await updateSettings({ serverUrl: '', serverPassword: '' });
+                      await updateSettings({ serverUrl: '', serverPassword: '', unlocked: false });
                       await resetFriendsCache();
                       setServer('');
                       setPassword('');

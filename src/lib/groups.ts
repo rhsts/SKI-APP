@@ -152,3 +152,22 @@ export function cleanCode(input: string): string {
 export function segmentUpload(seg: Segment): { id: string; name: string; path: PathPoint[]; gateRadius: number; creatorName: string | null; createdAt: number } {
   return { id: seg.id, name: seg.name, path: seg.path, gateRadius: seg.gateRadius, creatorName: seg.creatorName, createdAt: seg.createdAt };
 }
+
+export interface InviteInfo {
+  server: string | null;
+  password: string | null;
+  code: string | null;
+}
+
+/**
+ * Reads a group invite message (as sent by the app's share button, or typed
+ * by hand): the server address, the server password and the group code.
+ */
+export function parseInvite(text: string): InviteInfo {
+  const servers = [...text.matchAll(/https?:\/\/[^\s"'<>]+/gi)].map((m) => m[0].replace(/[.,;:!?)]+$/, ''));
+  // The app download link isn't the server.
+  const server = servers.map(normalizeServerUrl).find((u) => u && !/github\.com|github\.io/.test(u)) ?? null;
+  const pw = /password\s*[:=]\s*(\S+)/i.exec(text);
+  const code = /\bcode\s*[:=]?\s*([A-Z0-9]{6})\b/i.exec(text);
+  return { server, password: pw ? pw[1] : null, code: code ? code[1].toUpperCase() : null };
+}

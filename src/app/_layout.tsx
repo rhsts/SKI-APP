@@ -7,7 +7,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { getDb } from '../db';
-import { initSettings } from '../settings';
+import { getSettings, initSettings, useSettings } from '../settings';
+import { LockScreen } from '../components/LockScreen';
+import { checkServer } from '../friends/api';
 import { useTheme } from '../theme';
 // Importing this also registers the ski-area reminder (geofence) task.
 import { setupNotifications } from '../tracking/geofence';
@@ -19,13 +21,16 @@ setupNotifications();
 export default function RootLayout() {
   const { colors, dark } = useTheme();
   const [ready, setReady] = useState(false);
+  const { unlocked } = useSettings();
 
   useEffect(() => {
     (async () => {
       getDb();
       await initSettings();
       await recoverActiveDay();
-      // Friend groups: share new days, fetch group challenges (no need to wait for it).
+      // Still allowed in? A changed server password locks the app again (checked when online;
+      // offline it simply stays open). Then: share new days, fetch group challenges.
+      checkServer(getSettings().serverUrl, getSettings().serverPassword).catch(() => undefined);
       syncFriends().catch(() => undefined);
     })()
       .catch((e) => console.warn('Startup failed', e))
@@ -58,6 +63,7 @@ export default function RootLayout() {
         <Stack.Screen name="group/new" options={{ title: 'Friend group' }} />
         <Stack.Screen name="group/[id]" options={{ title: 'Group' }} />
       </Stack>
+      {ready && !unlocked ? <LockScreen /> : null}
       {!ready ? (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }]}>
           <ActivityIndicator color={colors.accent} />

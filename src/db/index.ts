@@ -150,6 +150,8 @@ export interface Settings {
   fallCheck: boolean;
   /** Friends server (your Raspberry Pi), e.g. https://ski.example.com. Empty = friends features off. */
   serverUrl: string;
+  /** The app has been unlocked with a working friends server + password (the app is private). */
+  unlocked: boolean;
   /** The friends server's password (SERVER_PASSWORD on the server); empty if it has none. */
   serverPassword: string;
   /** Random secret that proves to the friends server that you are `playerId`. */
@@ -158,7 +160,7 @@ export interface Settings {
   shareDemoDays: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true, serverUrl: '', serverPassword: '', deviceSecret: '', shareDemoDays: false };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true, serverUrl: '', serverPassword: '', unlocked: false, deviceSecret: '', shareDemoDays: false };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');

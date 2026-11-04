@@ -3,7 +3,7 @@ import type {
 } from '../lib/groups';
 import { segmentUpload } from '../lib/groups';
 import type { Segment } from '../lib/segments';
-import { displayName, getSettings } from '../settings';
+import { displayName, getSettings, updateSettings } from '../settings';
 
 /** Talks to the friends server (server/ in this repo, e.g. on a Raspberry Pi). */
 
@@ -52,6 +52,11 @@ async function call<T>(
   if (!res.ok) {
     const err = (json && typeof json === 'object' ? json : {}) as { error?: unknown; code?: unknown };
     if (err.code === 'password') {
+      // The saved password stopped working (it was changed on the server): lock the app again.
+      const cur = getSettings();
+      if (cur.unlocked && base === cur.serverUrl && password === cur.serverPassword) {
+        updateSettings({ unlocked: false }).catch(() => undefined);
+      }
       throw new FriendsError(
         password ? 'Wrong server password. Ask whoever runs the server for the right one.' : 'This server needs a password. Enter it in Profile → Friends server.',
         res.status, 'password',

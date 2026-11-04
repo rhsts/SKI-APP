@@ -3,6 +3,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { APP_DOWNLOAD_URL } from '../../config';
 import { listSegments } from '../../db';
 import { api } from '../../friends/api';
 import { syncFriends } from '../../friends/sync';
@@ -106,9 +107,11 @@ export default function GroupScreen() {
       message: [
         `Join my ski group “${detail.name}” in Ski Tracker!`,
         '',
-        `1. Profile → Friends server: ${serverUrl}${serverPassword ? `\n   Password: ${serverPassword}` : ''}`,
-        '   Tap Connect.',
-        `2. Challenges → + New / join → code ${detail.code} → Join`,
+        `1. Get the app: ${APP_DOWNLOAD_URL}`,
+        '2. Copy this whole message, open the app and tap “Paste invite”. Or type:',
+        `   Server: ${serverUrl}`,
+        ...(serverPassword ? [`   Password: ${serverPassword}`] : []),
+        `   Group code: ${detail.code}`,
       ].join('\n'),
     });
 

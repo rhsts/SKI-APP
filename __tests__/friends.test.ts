@@ -6,16 +6,18 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import http from 'node:http';
 import path from 'node:path';
 import {
-  cleanCode, dayUpload, localDate, normalizeServerUrl, rankBoard, rankChallenge, type BoardRow,
+  cleanCode, dayUpload, parseInvite, localDate, normalizeServerUrl, rankBoard, rankChallenge, type BoardRow,
 } from '../src/lib/groups';
 import { simulateDay } from '../src/lib/sim';
 import { computeStats } from '../src/lib/stats';
 
 // The app's API client, talking to the real server (server/) with two fake phones.
-const mockSettings = { serverUrl: '', serverPassword: 'powder-day-42', playerId: 'p-anna', deviceSecret: 'anna-secret-0123456789abcdef', name: 'Anna' };
+const mockUpdate = jest.fn(async (patch: object) => { Object.assign(mockSettings, patch); });
+const mockSettings = { unlocked: true, serverUrl: '', serverPassword: 'powder-day-42', playerId: 'p-anna', deviceSecret: 'anna-secret-0123456789abcdef', name: 'Anna' };
 jest.mock('../src/settings', () => ({
   getSettings: () => mockSettings,
   displayName: () => mockSettings.name,
+  updateSettings: (p: object) => mockUpdate(p),
 }));
 // eslint-disable-next-line import/first
 import { api, checkServer } from '../src/friends/api';
@@ -48,6 +50,18 @@ describe('group leaderboards', () => {
     expect(Object.keys(up).sort()).toEqual(['date', 'distance', 'runs', 'skiTime', 'startedAt', 'topSpeed', 'vertical']);
     expect(up.runs).toBe(4);
     expect(localDate(new Date(2026, 11, 31, 23, 59).getTime())).toBe('2026-12-31');
+  });
+
+  it('reads an invite message', () => {
+    const msg = [
+      'Join my ski group “Ischgl 2026” in Ski Tracker!', '',
+      '1. Get the app: https://github.com/rhsts/SKI-APP/releases/latest',
+      '2. Copy this whole message, open the app and tap “Paste invite”. Or type:',
+      '   Server: https://skipi.tail1a2b.ts.net', '   Password: powder-goggles-42', '   Group code: K7MP2Q',
+    ].join('\n');
+    expect(parseInvite(msg)).toEqual({ server: 'https://skipi.tail1a2b.ts.net', password: 'powder-goggles-42', code: 'K7MP2Q' });
+    expect(parseInvite('server http://192.168.1.20:8787, no password')).toEqual({ server: 'http://192.168.1.20:8787', password: null, code: null });
+    expect(parseInvite('hello').server).toBeNull();
   });
 
   it('cleans up typed server addresses and codes', () => {
@@ -140,6 +154,17 @@ describe('app ↔ server', () => {
     as('anna');
     await expect(checkServer(mockSettings.serverUrl, 'wrong')).rejects.toThrow('Wrong server password');
     await expect(checkServer(mockSettings.serverUrl, '')).rejects.toThrow('needs a password');
+  });
+
+  it('locks the app again when the saved password stops working', async () => {
+    as('anna');
+    mockSettings.unlocked = true;
+    const saved = mockSettings.serverPassword;
+    mockSettings.serverPassword = 'old-password';
+    await expect(api.groups()).rejects.toThrow('Wrong server password');
+    expect(mockUpdate).toHaveBeenCalledWith({ unlocked: false });
+    expect(mockSettings.unlocked).toBe(false);
+    mockSettings.serverPassword = saved;
   });
 
   it('a stolen player id is refused', async () => {

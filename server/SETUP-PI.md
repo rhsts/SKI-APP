@@ -60,7 +60,7 @@ Enter. After each part there's a **✅ Checkpoint** telling you what you should 
   of sealed box, so it can't mess up the Pi and is easy to update or remove.
 - **Tailscale Funnel** gives the Pi a public `https://` address. Because the Pi opens the connection itself,
   you don't change anything on your router: no port forwarding, and it works with every internet provider.
-- A **server password** keeps strangers out: without it, the app can't connect.
+- A **server password** keeps strangers out: without it, the app doesn't even open (it shows a lock screen).
 - Only **day totals** (vertical, top speed, runs, distance, ski time) and **challenge times** are stored.
   GPS tracks never leave the phones.
 
@@ -608,14 +608,22 @@ wait a few minutes and try again.
 
 ## Part 10: Connect the app and invite your friends
 
-### 10.1 Your phone
+### 10.1 Your phone: unlock the app
 
-1. Open Ski Tracker and go to **Profile**.
-2. Under **Your name**, fill in the name your friends should see on leaderboards.
-3. Under **Friends server**, enter your public address, e.g. `https://skipi.tail1a2b.ts.net`, with no
-   `/v1/health` at the end.
-4. Below it, enter your **server password** from Part 7.2.
-5. Tap **Connect**. It should say **Connected**.
+The app is **private**: the first time it opens, it shows **"Ski Tracker is private"** and only opens with your
+server's address and password. So someone who finds the app online can't use it.
+
+1. Open Ski Tracker. You see the lock screen.
+2. **Server address:** your public address, e.g. `https://skipi.tail1a2b.ts.net` (no `/v1/health` at the end).
+3. **Password:** your server password from Part 7.2.
+4. **Your name:** the name your friends see on leaderboards.
+5. Tap **Unlock**. The app opens, and stays unlocked, also without signal.
+
+> **Changing the password later locks everyone out** the next time their app is online, until they enter the
+> new one. Use this if the password leaked: change it (Part 7.2) and send the new one only to your friends.
+>
+> **In Expo Go** (testing on your computer) there's a *Skip* link on the lock screen. The installed app
+> doesn't have it.
 
 ### 10.2 Make a group
 
@@ -629,11 +637,12 @@ wait a few minutes and try again.
 
 ### 10.3 Your friends
 
-The invite from the share button tells them what to do. In short:
+The invite from the share button contains everything: a link to download the app, the server address, the
+password and the group code. Your friends:
 
-> 1. Open Ski Tracker → **Profile** → fill in **Your name**.
-> 2. **Friends server**: `https://skipi.tail1a2b.ts.net`, **password** `powder-goggles-fondue-42` → **Connect**.
-> 3. **Challenges** → **+ New / join** → type the code **K7MP2Q** → **Join**.
+> 1. Download and install the app from the link.
+> 2. **Copy the whole invite message**, open the app, and tap **Paste invite** on the lock screen.
+> 3. Fill in their name and tap **Unlock**. They're in, and already in your group.
 
 ### 10.4 How the group works
 
@@ -831,6 +840,7 @@ Tailscale admin under **Machines**, then rename the new one to `skipi`.
 | Problem | Fix |
 |---|---|
 | "Can't reach the friends server" | Check the address in **Profile** (with `https://`, without `/v1/health`). Open `…/v1/health` in the phone's browser: if that fails too, it's the server or Funnel, not the app. |
+| The app shows "Ski Tracker is private" again | The server password was changed, or you tapped Disconnect. Enter the address and the current password. |
 | "Wrong server password" or "This server needs a password" | Enter the password from Part 7.2 under **Profile → Friends server** and tap **Connect**. Forgot it? On the Pi: `cat ~/SKI-APP/server/.env`. |
 | "That address answers, but it isn't a Ski Tracker friends server" | There's a typo in the address, or another program uses port 8787. |
 | After reinstalling the app, my groups are gone | A reinstalled app is a new skier to the server. Connect again and join your groups with their codes. Old days come back on the leaderboard once you restore your app backup (Profile → Restore from a backup). |

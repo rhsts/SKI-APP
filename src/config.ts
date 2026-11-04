@@ -4,3 +4,6 @@
  * so it never reaches the web server. Set to null to share raw app links instead.
  */
 export const INVITE_PAGE_URL: string | null = 'https://rhsts.github.io/SKI-APP/c/';
+
+/** Where friends download the Android app (newest GitHub release). */
+export const APP_DOWNLOAD_URL = 'https://github.com/rhsts/SKI-APP/releases/latest';
