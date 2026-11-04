@@ -6,10 +6,12 @@ import { DifficultyBar } from '../../components/DifficultyBar';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { difficultyBreakdown } from '../../lib/breakdown';
 import { SPORTS } from '../../lib/sport';
-import { listAttempts, listSessions, type SessionRow } from '../../db';
+import { listAttempts, listSessions, motionSummaries, type SessionRow } from '../../db';
+import type { MotionSummary } from '../../lib/motion';
+import { computeStreaks, weeklyChallenges, type WeeklyChallenge } from '../../lib/streaks';
 import { computeBadges, goalProgress, type Badge, type GoalProgress, type Goals } from '../../lib/goals';
 import type { Attempt } from '../../lib/segments';
-import { fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed, speedValue } from '../../lib/format';
+import { fmtAir, fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed, speedValue } from '../../lib/format';
 import type { Units } from '../../lib/types';
 import { ALL_TIME, seasonKeys, seasonOf, summariseSeason, type DaySummary, type SeasonRecord } from '../../lib/season';
 import { updateSettings, useSettings } from '../../settings';
@@ -21,6 +23,7 @@ export default function SeasonScreen() {
   const { units, goals, playerId } = useSettings();
   const [days, setDays] = useState<SessionRow[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [motion, setMotion] = useState<Record<string, MotionSummary>>({});
   const [now, setNow] = useState(0);
   const [editing, setEditing] = useState<keyof Goals | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -32,6 +35,7 @@ export default function SeasonScreen() {
       setNow(Date.now());
       listSessions().then(setDays).catch(() => setDays([]));
       listAttempts().then(setAttempts).catch(() => setAttempts([]));
+      motionSummaries().then(setMotion).catch(() => setMotion({}));
     }, []),
   );
 
@@ -55,7 +59,23 @@ export default function SeasonScreen() {
     [days, key, allTime],
   );
   const progress = useMemo(() => (now ? goalProgress(summaries, goals, now) : []), [summaries, goals, now]);
-  const badges = useMemo(() => computeBadges(summaries, attempts, playerId), [summaries, attempts, playerId]);
+  const badges = useMemo(() => computeBadges(summaries, attempts, playerId, motion), [summaries, attempts, playerId, motion]);
+  const streaks = useMemo(() => (now ? computeStreaks(summaries, now) : null), [summaries, now]);
+  const weekly = useMemo(() => (now ? weeklyChallenges(summaries, motion, now) : []), [summaries, motion, now]);
+  const extra = useMemo(() => {
+    const inSeason = summaries.filter((d) => allTime || seasonOf(d.startedAt).key === key);
+    const out = { turns: 0, jumps: 0, bestAir: 0, totalAir: 0, falls: 0 };
+    for (const d of inSeason) {
+      out.turns += d.stats.turns ?? 0;
+      const m = motion[d.id];
+      if (!m) continue;
+      out.jumps += m.jumps;
+      out.totalAir += m.totalAir;
+      out.bestAir = Math.max(out.bestAir, m.bestAir);
+      out.falls += m.falls;
+    }
+    return out;
+  }, [summaries, motion, key, allTime]);
   const earned = badges.filter((b) => b.earnedAt != null).length;
 
   return (
@@ -90,7 +110,33 @@ export default function SeasonScreen() {
         <StatTile label="Time skiing" value={fmtDuration(season.skiTime)} />
         <StatTile label="In lift lines" value={fmtDuration(season.liftWaitTime)} />
         {season.tourVertical > 0 ? <StatTile label="Climbed on skins" value={fmtAlt(season.tourVertical, units)} /> : null}
+        <StatTile label="Turns" value={extra.turns.toLocaleString('en-US')} />
+        <StatTile label="Jumps" value={String(extra.jumps)} sub={extra.jumps ? `Best ${fmtAir(extra.bestAir)} · total ${fmtAir(extra.totalAir)}` : undefined} />
+        <StatTile label="Falls" value={String(extra.falls)} sub={season.runs ? `${(extra.falls / season.runs).toFixed(2)} per run` : undefined} />
       </StatGrid>
+
+      {streaks ? (
+        <View style={[s.card, styles.streak]}>
+          <Text style={{ fontSize: 30 }}>{streaks.days >= 2 ? '🔥' : '🗓️'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.h2}>
+              {streaks.days >= 2 ? `${streaks.days} days in a row!` : streaks.weeks >= 2 ? `${streaks.weeks} weeks in a row` : 'Start a streak'}
+            </Text>
+            <Text style={s.muted}>
+              {streaks.bestDays > 0
+                ? `Best: ${streaks.bestDays} ${streaks.bestDays === 1 ? 'day' : 'days'} in a row · ${streaks.bestWeeks} ${streaks.bestWeeks === 1 ? 'week' : 'weeks'} in a row`
+                : 'Ski days in a row (and weeks in a row) show up here.'}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.badgeHead}>
+        <Text style={s.h2}>This week’s challenges</Text>
+        <Text style={s.muted}>{weekly.filter((w) => w.done).length} of {weekly.length}</Text>
+      </View>
+      {weekly.map((w) => <WeeklyRow key={w.kind} w={w} units={units} />)}
+      <Text style={[s.muted, { fontSize: 12 }]}>New challenges every Monday, based on your own days. Finish all three for the Weekly hero badge.</Text>
 
       <DifficultyBar shares={shares} units={units} title={allTime ? 'Pistes, all time' : 'Pistes this season'} />
 
@@ -184,6 +230,42 @@ function GoalRow({ g, units, editing, onToggle, onChange }: {
   );
 }
 
+function weeklyText(w: WeeklyChallenge, units: Units): { title: string; value: string; target: string } {
+  const n = (v: number) => Math.round(v).toLocaleString('en-US');
+  switch (w.kind) {
+    case 'vertical': return { title: `Ski ${fmtAlt(w.target, units)} of vertical`, value: fmtAlt(w.value, units), target: fmtAlt(w.target, units) };
+    case 'topSpeed': return { title: `Hit ${fmtSpeed(w.target, units)}`, value: fmtSpeed(w.value, units), target: fmtSpeed(w.target, units) };
+    case 'runs': return { title: `Ski ${n(w.target)} runs`, value: n(w.value), target: n(w.target) };
+    case 'longestRun': return { title: `Ski one run of ${fmtDist(w.target, units)}`, value: fmtDist(w.value, units), target: fmtDist(w.target, units) };
+    case 'days': return { title: `Ski ${n(w.target)} days`, value: n(w.value), target: n(w.target) };
+    case 'turns': return { title: `Make ${n(w.target)} turns`, value: n(w.value), target: n(w.target) };
+    case 'airtime': return { title: `Get ${n(w.target)} s of airtime`, value: fmtAir(w.value), target: `${n(w.target)} s` };
+    case 'jumps': return { title: `Land ${n(w.target)} jumps`, value: n(w.value), target: n(w.target) };
+    case 'earlyBird': return { title: 'Start a run before 9:00', value: n(w.value), target: n(w.target) };
+  }
+}
+
+function WeeklyRow({ w, units }: { w: WeeklyChallenge; units: Units }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
+  const t = weeklyText(w, units);
+  return (
+    <View style={[s.card, { gap: 8 }]}>
+      <View style={styles.goalHead}>
+        <Text style={{ fontSize: 20 }}>{w.done ? '✅' : w.emoji}</Text>
+        <Text style={[s.body, { flex: 1, fontWeight: '700' }]}>{t.title}</Text>
+        <Text style={s.body}>
+          <Text style={{ fontWeight: '800' }}>{t.value}</Text>
+          <Text style={s.muted}> / {t.target}</Text>
+        </Text>
+      </View>
+      <View style={styles.barTrack}>
+        <View style={[styles.barFill, { width: `${Math.round(w.progress * 100)}%`, backgroundColor: w.done ? colors.good : colors.warn }]} />
+      </View>
+    </View>
+  );
+}
+
 function BadgeTile({ b }: { b: Badge }) {
   const { s } = useTheme();
   const styles = useStyles(makeStyles);
@@ -233,6 +315,7 @@ const makeStyles = (colors: Palette) =>
     pillText: { fontWeight: '700', color: colors.text },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
     big: { fontSize: 44, fontWeight: '900', color: colors.text },
+    streak: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     goalHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     barTrack: { height: 8, borderRadius: 4, backgroundColor: colors.faint, overflow: 'hidden' },
     barFill: { height: 8, borderRadius: 4 },

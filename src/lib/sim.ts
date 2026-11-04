@@ -1,5 +1,6 @@
 import { altitudeToPressure } from './altitude';
 import { localProjector, type LatLon } from './geo';
+import type { MotionEvent } from './motion';
 import type { TrackPoint } from './types';
 
 /**
@@ -24,10 +25,14 @@ export interface SimOptions {
   gpsAltNoise?: number;
   /** Indices of fixes to replace with a wild GPS jump. */
   spikes?: number[];
+  /** Ski in big S-turns down the piste instead of straight along it. */
+  turns?: boolean;
 }
 
 export interface SimDay {
   points: TrackPoint[];
+  /** Fake jumps (a few per run) and one fall, as the accelerometer would report them. */
+  motion: MotionEvent[];
   truth: {
     runs: number;
     lifts: number;
@@ -106,6 +111,11 @@ export function simulateDay(opts: SimOptions = {}): SimDay {
   const top = PISTE[0];
   const liftLen = Math.hypot(top[0], top[1]);
   const usedTops: number[] = [];
+  // Separate random stream so adding motion never changes the GPS track.
+  const mrnd = mulberry32((opts.seed ?? 42) + 7919);
+  const motion: MotionEvent[] = [];
+  const TURN_WAVE = 120; // m along the piste per left+right pair
+  const TURN_AMP = 15; // m either side of the piste's centre line
 
   for (let r = 0; r < runCount; r++) {
     if (opts.touring) {
@@ -131,19 +141,35 @@ export function simulateDay(opts: SimOptions = {}): SimDay {
     const vmax = tops[r % tops.length];
     let runTop = 0;
     let s = 0;
+    const runStart = t;
     while (s < L) {
       const u = s / L;
       const envelope = Math.min(1, u * 12, (1 - u) * 10); // ramp in / out
       const carve = 0.85 + 0.15 * Math.sin(u * Math.PI * 14);
       const v = Math.max(2.5, vmax * envelope * carve);
       if (v > runTop) runTop = v;
-      const [x, y] = polylineAt(PISTE, pisteLen, s);
+      let [x, y] = polylineAt(PISTE, pisteLen, s);
+      if (opts.turns) {
+        const [x2, y2] = polylineAt(PISTE, pisteLen, Math.min(L, s + 5));
+        const len = Math.hypot(x2 - x, y2 - y) || 1;
+        const side = TURN_AMP * Math.sin((2 * Math.PI * s) / TURN_WAVE) * Math.min(1, u * 20, (1 - u) * 20);
+        const nx = -(y2 - y) / len, ny = (x2 - x) / len; // left of the direction of travel
+        x += nx * side;
+        y += ny * side;
+      }
       // Smooth, strictly descending altitude profile.
       const f = u + 0.06 * Math.sin(2 * Math.PI * u);
       emit(x, y, TOP_ALT - (TOP_ALT - BASE_ALT) * f, v);
       s += v;
     }
     usedTops.push(runTop);
+    const runSecs = (t - runStart) / 1000;
+    const jumps = 1 + Math.floor(mrnd() * 3);
+    for (let k = 0; k < jumps; k++) {
+      const at = runStart + Math.round(runSecs * (0.2 + 0.6 * mrnd())) * 1000;
+      motion.push({ t: at, kind: 'jump', value: Math.round((0.3 + mrnd() * 0.9) * 100) / 100 });
+    }
+    if (r === 2) motion.push({ t: runStart + Math.round(runSecs * 0.5) * 1000, kind: 'fall', value: Math.round((3.5 + mrnd() * 2) * 10) / 10 });
     if (r === 1) wait(25 * 60, 0, 0, BASE_ALT); // lunch
   }
   wait(90, 0, 0, BASE_ALT);
@@ -156,8 +182,10 @@ export function simulateDay(opts: SimOptions = {}): SimDay {
     }
   }
 
+  motion.sort((a, b) => a.t - b.t);
   return {
     points,
+    motion,
     truth: {
       runs: runCount,
       lifts: runCount,

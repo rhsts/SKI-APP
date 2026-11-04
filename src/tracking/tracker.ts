@@ -4,8 +4,11 @@ import * as Location from 'expo-location';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSyncExternalStore } from 'react';
 import {
-  createSession, deleteSession, finishSession, getPoints, insertPoints, kvGet, kvSet, listAttempts, listSegments, upsertAttempts,
+  createSession, deleteMotionEvent, deleteSession, finishSession, getPoints, insertMotionEvents, insertPoints, kvGet, kvSet,
+  listAttempts, listMotionEvents, listSegments, upsertAttempts,
 } from '../db';
+import { EMPTY_MOTION, summariseMotion, type MotionEvent, type MotionSummary } from '../lib/motion';
+import { startMotion, stopMotion } from './motion';
 import { simulateDay } from '../lib/sim';
 import { cleanTrack, completedRuns, computeStats, smoothedSpeeds } from '../lib/stats';
 import type { DayStats, TrackPoint } from '../lib/types';
@@ -54,6 +57,14 @@ export interface TrackerState {
   autoPaused: boolean;
   /** Battery level (0..1) and estimated hours of tracking left. */
   battery: { level: number; hoursLeft: number | null } | null;
+  /** Jumps and falls so far today. */
+  motion: MotionSummary;
+  /** The motion sensor is listening (app open, setting on). */
+  motionLive: boolean;
+  /** A jump you just landed, shown for a few seconds. */
+  jump: { airtime: number; at: number } | null;
+  /** A fall was detected: ask if you're OK. */
+  fallAlert: { t: number; peak: number } | null;
 }
 
 export interface RunSummary {
@@ -95,6 +106,7 @@ const initial: TrackerState = {
   status: 'idle', active: null, points: [], stats: null, currentSpeed: 0, lastFixAt: null,
   foregroundOnly: false, recovered: false, error: null, race: null, finish: null,
   lastRun: null, newTop: null, battery: null, autoPaused: false,
+  motion: EMPTY_MOTION, motionLive: false, jump: null, fallAlert: null,
 };
 
 let state = initial;
@@ -171,12 +183,92 @@ function resetMoments(stats: DayStats | null) {
 }
 
 
-function buzz(kind: 'success' | 'tap') {
-  if (!getSettings().vibrate) return;
+function buzz(kind: 'success' | 'tap' | 'warning') {
+  // A fall warning always buzzes: it's a safety check, not a gimmick.
+  if (!getSettings().vibrate && kind !== 'warning') return;
   const p = kind === 'success'
     ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    : kind === 'warning'
+      ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
+      : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   p.catch(() => undefined);
+}
+
+// ---------- jumps and falls ----------
+
+let jumpTimer: ReturnType<typeof setTimeout> | null = null;
+const MIN_MOVING_SPEED = 3; // m/s: jumps and falls only count while you're skiing
+
+/** Fastest speed recorded between two times, from the fixes we have. */
+function speedAround(from: number, to: number): number {
+  let top = 0;
+  const pts = state.points;
+  for (let i = pts.length - 1; i >= 1 && pts[i].t >= from; i--) {
+    const p = pts[i];
+    if (p.t > to) continue;
+    const q = pts[i - 1];
+    const v = p.spd ?? (p.t > q.t ? Math.hypot(p.lat - q.lat, (p.lon - q.lon) * Math.cos((p.lat * Math.PI) / 180)) * 111320 / ((p.t - q.t) / 1000) : 0);
+    if (v > top && v < 45) top = v;
+  }
+  return top;
+}
+
+function positionAt(t: number): { lat: number | null; lon: number | null } {
+  const pts = state.points;
+  let best = pts[pts.length - 1];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    if (Math.abs(pts[i].t - t) < Math.abs(best.t - t)) best = pts[i];
+    if (pts[i].t < t - 5000) break;
+  }
+  return best ? { lat: best.lat, lon: best.lon } : { lat: null, lon: null };
+}
+
+async function onMotion(e: MotionEvent, sessionId: string, pos?: { lat: number; lon: number }) {
+  if (state.active?.sessionId !== sessionId) return;
+  // Phone dropped at the lift, sat down hard on a bench: only count it while skiing.
+  if (!pos && speedAround(e.t - 8000, e.t + 3000) < MIN_MOVING_SPEED) return;
+  const where = pos ?? positionAt(e.t);
+  await insertMotionEvents(sessionId, [{ ...e, ...where }]);
+  const m = { ...state.motion };
+  if (e.kind === 'jump') {
+    m.jumps++;
+    m.totalAir += e.value;
+    m.bestAir = Math.max(m.bestAir, e.value);
+    set({ motion: m, jump: { airtime: e.value, at: e.t } });
+    buzz('tap');
+    if (jumpTimer) clearTimeout(jumpTimer);
+    jumpTimer = setTimeout(() => set({ jump: null }), 6000);
+  } else {
+    m.falls++;
+    set({ motion: m, fallAlert: getSettings().fallCheck ? { t: e.t, peak: e.value } : state.fallAlert });
+    buzz('warning');
+  }
+}
+
+async function startMotionSensor(a: ActiveSession) {
+  if (!getSettings().motion) return;
+  const ok = await startMotion((e) => { onMotion(e, a.sessionId).catch((err) => set({ error: String(err) })); });
+  set({ motionLive: ok });
+}
+
+async function loadMotion(sessionId: string) {
+  const events = await listMotionEvents(sessionId).catch(() => []);
+  set({ motion: summariseMotion(events) });
+}
+
+/** "I'm OK": close the fall check. The fall stays in your stats. */
+export function dismissFall() {
+  set({ fallAlert: null });
+}
+
+/** It wasn't a fall: close the check and take it out of the stats. */
+export async function notAFall(): Promise<void> {
+  const f = state.fallAlert;
+  const a = state.active;
+  set({ fallAlert: null });
+  if (!f || !a) return;
+  await deleteMotionEvent(a.sessionId, f.t, 'fall');
+  set({ motion: { ...state.motion, falls: Math.max(0, state.motion.falls - 1) } });
 }
 
 function checkMoments(stats: DayStats) {
@@ -245,13 +337,23 @@ async function startSource(a: ActiveSession): Promise<void> {
   if (a.source === 'sim') {
     // Continue the fake day from where it was, or start a new one.
     const already = state.points.length;
-    const day = simulateDay({ start: a.startedAt, runs: 4, seed: a.startedAt % 1000, barometer: true }).points;
+    const sim = simulateDay({ start: a.startedAt, runs: 4, seed: a.startedAt % 1000, barometer: true, turns: true });
+    const day = sim.points;
     let i = already;
     simTimer = setInterval(() => {
       if (i >= day.length) return;
       const chunk = day.slice(i, i + SIM_POINTS_PER_TICK);
       i += chunk.length;
-      insertPoints(a.sessionId, chunk).catch((e) => set({ error: String(e) }));
+      const from = chunk[0].t, to = chunk[chunk.length - 1].t;
+      insertPoints(a.sessionId, chunk)
+        .then(async () => {
+          // The fake day's jumps and falls, as if the motion sensor had felt them.
+          for (const e of sim.motion.filter((m) => m.t >= from && m.t <= to)) {
+            const p = chunk.reduce((b, q) => (Math.abs(q.t - e.t) < Math.abs(b.t - e.t) ? q : b), chunk[0]);
+            await onMotion(e, a.sessionId, { lat: p.lat, lon: p.lon });
+          }
+        })
+        .catch((e) => set({ error: String(e) }));
     }, 1000);
     return;
   }
@@ -264,6 +366,7 @@ async function startSource(a: ActiveSession): Promise<void> {
     distanceInterval: 2,
   };
   await startBarometer();
+  await startMotionSensor(a);
   try {
     const bg = await Location.requestBackgroundPermissionsAsync();
     if (bg.status !== 'granted') throw new Error('no background permission');
@@ -289,6 +392,8 @@ async function stopSource(): Promise<void> {
   watchSub?.remove();
   watchSub = null;
   stopBarometer();
+  stopMotion();
+  set({ motionLive: false, jump: null });
   deactivateKeepAwake('ski-tracking');
   try {
     if (await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK)) {
@@ -493,11 +598,14 @@ export async function recoverActiveDay(): Promise<void> {
     // The background service kept recording while the UI was gone: just reattach.
     set({ ...initial, status: 'recording', active: a, points, stats });
     resetMoments(stats);
+    await loadMotion(a.sessionId);
     await refreshRacers();
     startPolling();
+    if (getSettings().motion) await startMotionSensor(a);
     return;
   }
   const paused = { ...a, paused: true };
   await saveActive(paused);
   set({ ...initial, status: 'paused', active: paused, points, stats, recovered: !a.paused });
+  await loadMotion(a.sessionId);
 }

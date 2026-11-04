@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { fmtAlt, fmtDist, fmtDuration, fmtSpeed, fmtTimeOfDay } from '../lib/format';
+import { fmtAir, fmtAlt, fmtDist, fmtDuration, fmtSpeed, fmtTimeOfDay } from '../lib/format';
+import type { MotionSummary } from '../lib/motion';
 import { difficultyColor, difficultyLabel, type PisteMatch } from '../lib/pistes';
 import type { Activity, Units } from '../lib/types';
 import { useTheme, useStyles, type Palette } from '../theme';
@@ -17,10 +18,12 @@ interface Props {
   piste?: PisteMatch | null;
   /** Runs: open the run detail screen. */
   onDetails?: () => void;
+  /** Runs: jumps and falls during this run. */
+  motion?: MotionSummary;
 }
 
 /** One entry in the day's timeline: a run or a lift ride. */
-export function TimelineCard({ activity: a, number, units, selected, onPress, onChallenge, piste, onDetails }: Props) {
+export function TimelineCard({ activity: a, number, units, selected, onPress, onChallenge, piste, onDetails, motion }: Props) {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const isRun = a.kind === 'run';
@@ -68,7 +71,17 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
             <Metric label="Vertical" value={fmtAlt(a.verticalDown, units)} />
             <Metric label="Dist" value={fmtDist(a.distance, units)} />
           </View>
-        ) : isTour ? (
+        ) : null}
+        {isRun && (a.turns || motion?.jumps || motion?.falls) ? (
+          <Text style={s.muted}>
+            {[
+              a.turns ? `🌀 ${a.turns} turns` : null,
+              motion?.jumps ? `🦘 ${motion.jumps} · best ${fmtAir(motion.bestAir)}` : null,
+              motion?.falls ? `💥 ${motion.falls} ${motion.falls === 1 ? 'fall' : 'falls'}` : null,
+            ].filter(Boolean).join('   ')}
+          </Text>
+        ) : null}
+        {isRun ? null : isTour ? (
           <View style={styles.row}>
             <Metric label="Climbed" value={fmtAlt(a.verticalUp, units)} />
             <Metric label="Dist" value={fmtDist(a.distance, units)} />

@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { badgesEarnedBy } from '../../days/badges';
-import { fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
+import { fmtAir, fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtG, fmtJumpHeight, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
+import { jumpHeight } from '../../lib/motion';
 import { liveStatus } from '../../lib/stats';
 import { updateSettings, useSettings } from '../../settings';
 import { MountainCard } from '../../components/MountainCard';
 import { SportPicker } from '../../components/SportPicker';
 import { useTheme, useStyles, type Palette } from '../../theme';
-import { dismissFinish, dismissLastRun, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish, type RunSummary } from '../../tracking/tracker';
+import { dismissFall, dismissFinish, dismissLastRun, notAFall, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish, type RunSummary } from '../../tracking/tracker';
 
 const statusLabels = (colors: Palette) => ({
   skiing: { text: 'Skiing', icon: 'trending-down', color: colors.run },
@@ -74,12 +75,21 @@ export default function RecordScreen() {
         </View>
       ) : null}
 
+      {t.fallAlert ? <FallCard key={t.fallAlert.t} /> : null}
       {t.finish ? <FinishCard f={t.finish} /> : null}
       {t.race && t.status === 'recording' ? <RaceCard r={t.race} /> : null}
       {t.newTop && t.status === 'recording' ? (
         <View style={[s.card, styles.topFlash]}>
           <Text style={{ fontSize: 26 }}>⚡</Text>
           <Text style={styles.topFlashText}>New top speed: {fmtSpeed(t.newTop.speed, units)}</Text>
+        </View>
+      ) : null}
+      {t.jump && t.status === 'recording' ? (
+        <View style={[s.card, styles.topFlash, { borderLeftColor: colors.good, backgroundColor: colors.accentSoft }]}>
+          <Text style={{ fontSize: 26 }}>🦘</Text>
+          <Text style={styles.topFlashText}>
+            Jump! {fmtAir(t.jump.airtime)} airtime · {fmtJumpHeight(jumpHeight(t.jump.airtime), units)} high
+          </Text>
         </View>
       ) : null}
       {t.lastRun && t.status !== 'idle' && !t.race ? <RunCard r={t.lastRun} /> : null}
@@ -140,6 +150,12 @@ export default function RecordScreen() {
           <StatTile label="Ski time" value={fmtDuration(st?.skiTime ?? 0)} sub={`Lifts ${fmtDuration(st?.liftTime ?? 0)} · line ${fmtDuration(st?.liftWaitTime ?? 0)}`} />
           <StatTile label="Distance" value={fmtDist(st?.distance ?? 0, units)} sub={`Skied ${fmtDist(st?.skiDistance ?? 0, units)}`} />
           <StatTile label="Altitude" value={fmtAlt(t.points.length ? t.points[t.points.length - 1].alt : null, units)} sub={st?.maxAlt != null ? `Max ${fmtAlt(st.maxAlt, units)}` : undefined} />
+          <StatTile label="Turns" value={String(st?.turns ?? 0)} sub={st?.maxG ? `Strongest ${fmtG(st.maxG)}` : undefined} />
+          <StatTile
+            label="Jumps"
+            value={String(t.motion.jumps)}
+            sub={`${t.motion.bestAir ? `Best ${fmtAir(t.motion.bestAir)} · ` : ''}${t.motion.falls} ${t.motion.falls === 1 ? 'fall' : 'falls'}`}
+          />
         </StatGrid>
       ) : (
         <View style={[s.card, { gap: 8 }]}>
@@ -157,6 +173,11 @@ export default function RecordScreen() {
       {t.foregroundOnly && t.status === 'recording' ? (
         <Text style={[s.muted, { textAlign: 'center' }]}>
           Background location isn’t allowed, so keep the app open. Allow location “All the time” to track with the screen off.
+        </Text>
+      ) : null}
+      {t.motionLive && t.status === 'recording' && !t.foregroundOnly ? (
+        <Text style={[s.muted, { textAlign: 'center' }]}>
+          Jumps and falls are picked up while the app is open on screen.
         </Text>
       ) : null}
       {t.error ? <Text style={[s.body, { color: colors.danger, textAlign: 'center' }]}>{t.error}</Text> : null}
@@ -245,6 +266,42 @@ function FinishCard({ f }: { f: RaceFinish }) {
       </View>
       <Pressable onPress={dismissFinish} hitSlop={10} accessibilityLabel="Dismiss">
         <Ionicons name="close" size={20} color={colors.muted} />
+      </Pressable>
+    </View>
+  );
+}
+
+const FALL_CHECK_SECONDS = 60;
+
+/** After a fall: are you OK? No answer opens the SOS screen. */
+function FallCard() {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
+  const [left, setLeft] = useState(FALL_CHECK_SECONDS);
+
+  useEffect(() => {
+    const timer = setInterval(() => setLeft((v) => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    if (left > 0) return;
+    dismissFall();
+    router.push('/sos');
+  }, [left]);
+
+  return (
+    <View style={[s.card, styles.fall]}>
+      <View style={styles.runHead}>
+        <Text style={styles.fallTitle}>Are you OK?</Text>
+        <Text style={styles.fallCount}>{left}s</Text>
+      </View>
+      <Text style={s.body}>That looked like a hard fall. If you don’t answer, the SOS screen opens with your position.</Text>
+      <View style={styles.buttons}>
+        <Button label="I’m OK" icon="checkmark" color={colors.good} onPress={dismissFall} />
+        <Button label="Get help" icon="medkit" color={colors.danger} onPress={() => { dismissFall(); router.push('/sos'); }} />
+      </View>
+      <Pressable onPress={() => { notAFall().catch(() => undefined); }} hitSlop={8}>
+        <Text style={{ color: colors.accent, fontWeight: '700', textAlign: 'center' }}>That wasn’t a fall</Text>
       </Pressable>
     </View>
   );
@@ -342,6 +399,9 @@ const makeStyles = (colors: Palette) =>
     batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
     topFlash: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.warnSoft, borderLeftWidth: 4, borderLeftColor: colors.warn },
     topFlashText: { fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 },
+    fall: { gap: 10, borderWidth: 3, borderColor: colors.danger },
+    fallTitle: { fontSize: 26, fontWeight: '900', color: colors.danger },
+    fallCount: { fontSize: 22, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
     runCard: { gap: 8, borderLeftWidth: 4, borderLeftColor: colors.run },
     runHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     runStats: { flexDirection: 'row' },

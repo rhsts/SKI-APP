@@ -18,12 +18,13 @@ import { PhotoStrip } from '../../components/PhotoStrip';
 import { addPhotos, removePhoto } from '../../days/photos';
 import { SportPicker } from '../../components/SportPicker';
 import {
-  deleteSession, getPoints, getSession, kvGet, kvSet, listPhotos, listSegments, listSessionAttempts, listTrailMaps,
-  renameSession, setSessionSport, type PhotoRow, type SessionRow,
+  deleteMotionEvent, deleteSession, getPoints, getSession, kvGet, kvSet, listMotionEvents, listPhotos, listSegments, listSessionAttempts, listTrailMaps,
+  renameSession, setSessionSport, type MotionRow, type PhotoRow, type SessionRow,
 } from '../../db';
+import { eventsBetween, jumpHeight, summariseMotion } from '../../lib/motion';
 import type { Attempt, Segment } from '../../lib/segments';
 import {
-  fmtAlt, fmtDate, fmtDist, fmtDuration, fmtRaceTime, fmtSpeed, fmtTimeOfDay,
+  fmtAir, fmtAlt, fmtDate, fmtDist, fmtDuration, fmtG, fmtJumpHeight, fmtRaceTime, fmtSpeed, fmtTimeOfDay,
 } from '../../lib/format';
 import { activityAt } from '../../lib/scrub';
 import { cleanTrack, computeStats, smoothedAltitudes, smoothedSpeeds } from '../../lib/stats';
@@ -52,6 +53,7 @@ export default function DayScreen() {
   const [photos, setPhotos] = useState<PhotoRow[]>([]);
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const [addingPhotos, setAddingPhotos] = useState(false);
+  const [motion, setMotion] = useState<MotionRow[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -67,6 +69,7 @@ export default function DayScreen() {
     });
     getPoints(id).then(setRaw);
     listPhotos(id).then(setPhotos).catch(() => setPhotos([]));
+    listMotionEvents(id).then(setMotion).catch(() => setMotion([]));
   }, [id]);
 
   // Challenge times set on this day (refreshed when coming back from creating one).
@@ -169,6 +172,32 @@ export default function DayScreen() {
     : 'Press play, or drag on the graph';
   const localCursor = range && cursor != null && cursor >= range.a && cursor <= range.b ? cursor - range.a : null;
   const selNo = selected != null ? numbers[selected] : 0;
+  const motionDay = summariseMotion(motion);
+  const runMotion = (a: { startTime: number; endTime: number }) => summariseMotion(eventsBetween(motion, a.startTime, a.endTime));
+  const selMotion = selRun ? runMotion(selRun) : null;
+  const runOfEvent = (t: number) => {
+    const i = timeline.findIndex((a) => a.kind === 'run' && t >= a.startTime - 5000 && t <= a.endTime + 5000);
+    return i >= 0 ? i : null;
+  };
+  const showEvent = (t: number) => {
+    const i = runOfEvent(t);
+    if (i != null) selectRun(i);
+    let k = 0;
+    while (k < pts.length - 1 && pts[k].t < t) k++;
+    setCursor(k);
+  };
+  const removeEvent = (e: MotionRow) =>
+    Alert.alert(e.kind === 'jump' ? 'Remove this jump?' : 'Remove this fall?', 'It will no longer count in your stats.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteMotionEvent(session.id, e.t, e.kind);
+          setMotion((cur) => cur.filter((x) => !(x.t === e.t && x.kind === e.kind)));
+        },
+      },
+    ]);
 
   const remove = () =>
     Alert.alert('Delete this day?', 'This can’t be undone.', [
@@ -281,6 +310,15 @@ export default function DayScreen() {
                   Run {selNo}{selRun ? ` · ${fmtSpeed(selRun.topSpeed, units)} top · ${fmtAlt(selRun.verticalDown, units)} ↓` : ''}
                 </Text>
                 <Text style={s.body}>{readout}</Text>
+                {selRun ? (
+                  <Text style={s.muted}>
+                    {[
+                      selRun.turns != null ? `🌀 ${selRun.turns} turns${selRun.maxG ? ` · max ${fmtG(selRun.maxG)}` : ''}` : null,
+                      selMotion?.jumps ? `🦘 ${selMotion.jumps} ${selMotion.jumps === 1 ? 'jump' : 'jumps'}` : null,
+                      selMotion?.falls ? `💥 ${selMotion.falls} ${selMotion.falls === 1 ? 'fall' : 'falls'}` : null,
+                    ].filter(Boolean).join('   ')}
+                  </Text>
+                ) : null}
               </View>
               <Pressable
                 onPress={() => selected != null && router.push({ pathname: '/run', params: { session: session.id, i: String(selected) } })}
@@ -323,9 +361,38 @@ export default function DayScreen() {
         ) : null}
         <StatTile label="Distance skied" value={fmtDist(stats.skiDistance, units)} sub={`Total ${fmtDist(stats.distance, units)}`} />
         <StatTile label="Avg ski speed" value={fmtSpeed(stats.avgSkiSpeed, units)} />
+        <StatTile label="Turns" value={String(stats.turns ?? 0)} sub={stats.maxG ? `Strongest ${fmtG(stats.maxG)}` : undefined} />
+        <StatTile
+          label="Jumps"
+          value={String(motionDay.jumps)}
+          sub={motionDay.jumps ? `Best ${fmtAir(motionDay.bestAir)} · total ${fmtAir(motionDay.totalAir)}` : undefined}
+        />
+        <StatTile label="Falls" value={String(motionDay.falls)} sub={stats.runCount ? `${stats.runCount - new Set(motion.filter((e) => e.kind === 'fall').map((e) => runOfEvent(e.t)).filter((i) => i != null)).size} without a fall` : undefined} />
         <StatTile label="Peak altitude" value={fmtAlt(stats.maxAlt, units)} />
         <StatTile label="Lowest point" value={fmtAlt(stats.minAlt, units)} />
       </StatGrid>
+
+      {motion.length ? (
+        <View style={[s.card, { gap: 4 }]}>
+          <Text style={s.label}>Jumps and falls</Text>
+          {motion.map((e) => {
+            const r = runOfEvent(e.t);
+            return (
+              <Pressable key={`${e.kind}-${e.t}`} onPress={() => showEvent(e.t)} onLongPress={() => removeEvent(e)} style={styles.timedRow}>
+                <Text style={{ fontSize: 18 }}>{e.kind === 'jump' ? '🦘' : '💥'}</Text>
+                <Text style={[s.body, { flex: 1, fontWeight: '700' }]}>
+                  {e.kind === 'jump' ? `${fmtAir(e.value)} airtime` : 'Fall'}
+                  <Text style={s.muted}>
+                    {e.kind === 'jump' ? `  ${fmtJumpHeight(jumpHeight(e.value), units)} high` : `  ${fmtG(e.value)} impact`}
+                  </Text>
+                </Text>
+                <Text style={s.muted}>{r != null ? `Run ${numbers[r]} · ` : ''}{fmtTimeOfDay(e.t)}</Text>
+              </Pressable>
+            );
+          })}
+          <Text style={[s.muted, { fontSize: 12 }]}>Tap to see where it was. Press and hold to remove one that wasn’t real.</Text>
+        </View>
+      ) : null}
 
       <DifficultyBar shares={shares} units={units} />
 
@@ -406,6 +473,7 @@ export default function DayScreen() {
             units={units}
             selected={focus === i}
             piste={session.pistes?.[String(a.startTime)] ?? null}
+            motion={a.kind === 'run' ? runMotion(a) : undefined}
             onDetails={() => router.push({ pathname: '/run', params: { session: session.id, i: String(i) } })}
             onChallenge={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(i) } })}
             onPress={() => {

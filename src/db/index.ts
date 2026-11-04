@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import { DEFAULT_GOALS, type Goals } from '../lib/goals';
 import { isSport, type Sport } from '../lib/sport';
+import type { MotionEvent, MotionKind, MotionSummary } from '../lib/motion';
 import type { PisteMatch } from '../lib/pistes';
 import type { TrailMap } from '../lib/trailmap';
 import type { Attempt, PathPoint, Segment } from '../lib/segments';
@@ -12,7 +13,7 @@ import type { DayStats, TrackPoint, Units } from '../lib/types';
  * killed app never loses a day.
  */
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
@@ -53,6 +54,17 @@ function migrate(d: SQLite.SQLiteDatabase) {
       lon REAL NOT NULL
     );
     CREATE INDEX IF NOT EXISTS photos_session ON photos(session_id, t);`);
+  }
+  if (version < 8) {
+    d.execSync(`CREATE TABLE IF NOT EXISTS motion_events (
+      session_id TEXT NOT NULL,
+      t INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      value REAL NOT NULL,
+      lat REAL,
+      lon REAL,
+      PRIMARY KEY (session_id, t, kind)
+    )`);
   }
   d.execSync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
@@ -132,9 +144,13 @@ export interface Settings {
   sport: Sport;
   /** Notify me when I arrive at a ski area I've skied before. */
   remindStart: boolean;
+  /** Use the motion sensor for jumps and falls while recording. */
+  motion: boolean;
+  /** After a fall, ask "Are you OK?" and open the SOS screen if there's no answer. */
+  fallCheck: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');
@@ -250,6 +266,7 @@ export async function deleteSession(id: string) {
     await d.runAsync('DELETE FROM points WHERE session_id = ?', id);
     await d.runAsync('DELETE FROM attempts WHERE session_id = ?', id);
     await d.runAsync('DELETE FROM photos WHERE session_id = ?', id);
+    await d.runAsync('DELETE FROM motion_events WHERE session_id = ?', id);
     await d.runAsync('DELETE FROM sessions WHERE id = ?', id);
   });
 }
@@ -257,7 +274,7 @@ export async function deleteSession(id: string) {
 export async function deleteAllData() {
   const d = getDb();
   await d.withTransactionAsync(async () => {
-    for (const t of ['points', 'sessions', 'attempts', 'segments', 'photos']) await d.runAsync(`DELETE FROM ${t}`);
+    for (const t of ['points', 'sessions', 'attempts', 'segments', 'photos', 'motion_events']) await d.runAsync(`DELETE FROM ${t}`);
     await d.runAsync("DELETE FROM kv WHERE key != 'settings'");
   });
 }
@@ -267,6 +284,7 @@ export async function deleteDemoData() {
   await d.withTransactionAsync(async () => {
     await d.runAsync('DELETE FROM points WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
     await d.runAsync('DELETE FROM attempts WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
+    await d.runAsync('DELETE FROM motion_events WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
     await d.runAsync('DELETE FROM sessions WHERE is_demo = 1');
   });
 }
@@ -471,4 +489,54 @@ export async function sessionStarts(): Promise<{ id: string; place: string | nul
      AND p.t = (SELECT MIN(t) FROM points WHERE session_id = s.id)
      WHERE s.ended_at IS NOT NULL`,
   );
+}
+
+// ---------- jumps and falls ----------
+
+export interface MotionRow extends MotionEvent {
+  lat: number | null;
+  lon: number | null;
+}
+
+export async function insertMotionEvents(sessionId: string, events: MotionRow[]): Promise<void> {
+  if (!events.length) return;
+  const d = getDb();
+  await d.withTransactionAsync(async () => {
+    for (const e of events) {
+      await d.runAsync(
+        'INSERT OR REPLACE INTO motion_events (session_id, t, kind, value, lat, lon) VALUES (?, ?, ?, ?, ?, ?)',
+        sessionId, e.t, e.kind, e.value, e.lat, e.lon,
+      );
+    }
+  });
+}
+
+export async function listMotionEvents(sessionId: string): Promise<MotionRow[]> {
+  const rows = await getDb().getAllAsync<{ t: number; kind: string; value: number; lat: number | null; lon: number | null }>(
+    'SELECT t, kind, value, lat, lon FROM motion_events WHERE session_id = ? ORDER BY t', sessionId,
+  );
+  return rows.filter((r) => r.kind === 'jump' || r.kind === 'fall').map((r) => ({ ...r, kind: r.kind as MotionKind }));
+}
+
+/** Jumps and falls per day, for season totals, badges and weekly challenges. */
+export async function motionSummaries(): Promise<Record<string, MotionSummary>> {
+  const rows = await getDb().getAllAsync<{ id: string; kind: string; n: number; best: number; total: number }>(
+    'SELECT session_id AS id, kind, COUNT(*) AS n, MAX(value) AS best, SUM(value) AS total FROM motion_events GROUP BY session_id, kind',
+  );
+  const out: Record<string, MotionSummary> = {};
+  for (const r of rows) {
+    const m = (out[r.id] ??= { jumps: 0, bestAir: 0, totalAir: 0, falls: 0 });
+    if (r.kind === 'jump') {
+      m.jumps = r.n;
+      m.bestAir = r.best;
+      m.totalAir = r.total;
+    } else if (r.kind === 'fall') {
+      m.falls = r.n;
+    }
+  }
+  return out;
+}
+
+export async function deleteMotionEvent(sessionId: string, t: number, kind: MotionKind): Promise<void> {
+  await getDb().runAsync('DELETE FROM motion_events WHERE session_id = ? AND t = ? AND kind = ?', sessionId, t, kind);
 }

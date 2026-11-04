@@ -1,5 +1,6 @@
 import { fuseAltitude } from './altitude';
 import { distance } from './geo';
+import { analyseTurns } from './turns';
 import type { Activity, ActivityKind, DayStats, TrackPoint } from './types';
 
 /** Tunables, exported so tests and future settings can reason about them. */
@@ -309,7 +310,9 @@ export function computeStats(rawPoints: TrackPoint[]): DayStats {
 
   const hasAlt = alts[0] != null;
   const vert = hasAlt ? verticalTotals(alts as number[]) : { down: 0, up: 0 };
-  const activities = segmentActivities(pts, cum, spd, alts);
+  const activities = segmentActivities(pts, cum, spd, alts).map((a) =>
+    a.kind === 'run' ? { ...a, ...analyseTurns(pts, a.startIndex, a.endIndex, spd) } : a,
+  );
   const runs = activities.filter((x) => x.kind === 'run');
   const lifts = activities.filter((x) => x.kind === 'lift');
   const tours = activities.filter((x) => x.kind === 'tour');
@@ -336,6 +339,8 @@ export function computeStats(rawPoints: TrackPoint[]): DayStats {
     runCount: runs.length,
     liftCount: lifts.length,
     longestRun: runs.reduce((m, r) => Math.max(m, r.distance), 0),
+    turns: runs.reduce((s, r) => s + (r.turns ?? 0), 0),
+    maxG: runs.reduce((m, r) => Math.max(m, r.maxG ?? 0), 0),
     activities,
   };
 }

@@ -1,5 +1,7 @@
 import { seasonOf, type DaySummary } from './season';
+import type { MotionSummary } from './motion';
 import { leaderboard, type Attempt } from './segments';
+import { computeStreaks, heroWeeks } from './streaks';
 
 // ---------- goals ----------
 
@@ -63,6 +65,8 @@ interface BadgeDef {
   day?: (d: DaySummary) => boolean;
   /** Earned by the running totals as of this day (days are fed oldest first). */
   cumulative?: (sofar: DaySummary[]) => boolean;
+  /** Earned from this day's jumps and falls. */
+  motion?: (m: MotionSummary) => boolean;
 }
 
 const KMH = 1 / 3.6;
@@ -89,11 +93,18 @@ const DEFS: BadgeDef[] = [
       const key = seasonOf(sofar[sofar.length - 1].startedAt).key;
       return sofar.filter((d) => seasonOf(d.startedAt).key === key).reduce((s, d) => s + d.stats.verticalDown, 0) >= 50000;
     } },
+  { id: 'turns-300', emoji: '🌀', title: 'Turn machine', description: 'Make 300 turns in one day.', day: (d) => (d.stats.turns ?? 0) >= 300 },
+  { id: 'carver', emoji: '🔪', title: 'Carver', description: 'Pull 1 g in a turn.', day: (d) => (d.stats.maxG ?? 0) >= 1 },
+  { id: 'air-half', emoji: '🦘', title: 'Airborne', description: 'Half a second of airtime on a jump.', motion: (m) => m.bestAir >= 0.5 },
+  { id: 'air-1', emoji: '🛫', title: 'Big air', description: 'A full second of airtime on a jump.', motion: (m) => m.bestAir >= 1 },
+  { id: 'streak-3', emoji: '🔥', title: 'On fire', description: 'Ski 3 days in a row.', cumulative: (sofar) => computeStreaks(sofar).bestDays >= 3 },
+  { id: 'streak-5', emoji: '☄️', title: 'Unstoppable', description: 'Ski 5 days in a row.', cumulative: (sofar) => computeStreaks(sofar).bestDays >= 5 },
   { id: 'explorer', emoji: '🧭', title: 'Explorer', description: 'Ski at 3 different places.',
     cumulative: (sofar) => new Set(sofar.map((d) => d.place).filter(Boolean)).size >= 3 },
 ];
 
 const CHALLENGE_BADGES = [
+  { id: 'weekly-hero', emoji: '🗓️', title: 'Weekly hero', description: 'Finish all 3 weekly challenges in one week.' },
   { id: 'challenger', emoji: '🏁', title: 'Challenger', description: 'Set a time on a challenge.' },
   { id: 'champion', emoji: '🏆', title: 'Champion', description: 'Lead a challenge with at least 2 skiers.' },
 ];
@@ -102,7 +113,9 @@ const CHALLENGE_BADGES = [
  * All badges, each with the day that earned it (or null). Days are scanned
  * oldest first, so a badge belongs to the first day that qualified.
  */
-export function computeBadges(days: DaySummary[], attempts: Attempt[], playerId: string): Badge[] {
+export function computeBadges(
+  days: DaySummary[], attempts: Attempt[], playerId: string, motion: Record<string, MotionSummary> = {},
+): Badge[] {
   const sorted = days.slice().sort((a, b) => a.startedAt - b.startedAt);
   const earned = new Map<string, { dayId: string | null; at: number }>();
   const sofar: DaySummary[] = [];
@@ -110,8 +123,17 @@ export function computeBadges(days: DaySummary[], attempts: Attempt[], playerId:
     sofar.push(d);
     for (const def of DEFS) {
       if (earned.has(def.id)) continue;
-      if ((def.day && def.day(d)) || (def.cumulative && def.cumulative(sofar))) earned.set(def.id, { dayId: d.id, at: d.startedAt });
+      const m = motion[d.id];
+      if ((def.day && def.day(d)) || (def.cumulative && def.cumulative(sofar)) || (def.motion && m && def.motion(m))) {
+        earned.set(def.id, { dayId: d.id, at: d.startedAt });
+      }
     }
+  }
+
+  const hero = heroWeeks(sorted, motion)[0];
+  if (hero != null) {
+    const last = sorted.filter((d) => d.startedAt >= hero && d.startedAt < hero + 7 * 86400000).pop();
+    if (last) earned.set('weekly-hero', { dayId: last.id, at: last.startedAt });
   }
 
   const mine = attempts.filter((a) => a.playerId === playerId).sort((a, b) => a.at - b.at);

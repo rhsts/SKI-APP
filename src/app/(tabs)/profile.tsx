@@ -100,6 +100,25 @@ export default function ProfileScreen() {
           </View>
           <Switch value={settings.vibrate} onValueChange={(v) => updateSettings({ vibrate: v })} trackColor={{ true: colors.accent }} />
         </View>
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.body}>Jumps and falls</Text>
+            <Text style={s.muted}>Use the motion sensor to log your airtime and falls. Works while the app is open on screen.</Text>
+          </View>
+          <Switch value={settings.motion} onValueChange={(v) => updateSettings({ motion: v })} trackColor={{ true: colors.accent }} />
+        </View>
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.body}>Check on me after a fall</Text>
+            <Text style={s.muted}>After a hard fall, ask if you’re OK. No answer within a minute opens the SOS screen.</Text>
+          </View>
+          <Switch
+            value={settings.fallCheck}
+            disabled={!settings.motion}
+            onValueChange={(v) => updateSettings({ fallCheck: v })}
+            trackColor={{ true: colors.accent }}
+          />
+        </View>
       </View>
 
       <View style={[s.card, styles.section]}>

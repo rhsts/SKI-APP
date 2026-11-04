@@ -79,3 +79,18 @@ export function fmtTimeOfDay(ms: number): string {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
+
+/** Airtime of a jump: "0.82 s". */
+export function fmtAir(seconds: number): string {
+  return `${seconds.toFixed(2)} s`;
+}
+
+/** Jump height with one decimal: "0.8 m" / "2.6 ft". */
+export function fmtJumpHeight(m: number, units: Units): string {
+  return units === 'metric' ? `${m.toFixed(1)} m` : `${(m * FT).toFixed(1)} ft`;
+}
+
+/** Sideways force of a turn: "0.9 g". */
+export function fmtG(g: number): string {
+  return `${g.toFixed(1)} g`;
+}

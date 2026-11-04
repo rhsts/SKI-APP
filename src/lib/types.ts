@@ -28,6 +28,9 @@ export interface Activity {
   avgSpeed: number; // m/s
   /** Lifts only: seconds spent in the lift line before boarding. */
   wait?: number;
+  /** Runs only: turns counted from the GPS track, and the strongest turn in g. */
+  turns?: number;
+  maxG?: number;
 }
 
 export interface DayStats {
@@ -52,6 +55,9 @@ export interface DayStats {
   runCount: number;
   liftCount: number;
   longestRun: number; // m
+  /** Turns over all runs, and the strongest turn of the day in g (absent on days saved by older versions). */
+  turns?: number;
+  maxG?: number;
   activities: Activity[];
 }
 

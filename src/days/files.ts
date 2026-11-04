@@ -3,7 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { matchSession } from '../challenges/service';
 import {
-  getPoints, getSession, insertPoints, insertSessionRaw, listAttempts, listSegments, listSessions, newId, saveSegment,
+  getPoints, insertMotionEvents, listMotionEvents, getSession, insertPoints, insertSessionRaw, listAttempts, listSegments, listSessions, newId, saveSegment,
   upsertAttempts,
 } from '../db';
 import { lookupPlace } from '../tracking/place';
@@ -39,6 +39,7 @@ export async function createBackup(): Promise<{ days: number }> {
     days.push({
       id: s.id, startedAt: s.startedAt, endedAt: s.endedAt, place: s.place, isDemo: s.isDemo, sport: s.sport,
       points: packPoints(await getPoints(s.id)),
+      motion: (await listMotionEvents(s.id)).map((e) => [e.t, e.kind, e.value, e.lat, e.lon] as [number, 'jump' | 'fall', number, number | null, number | null]),
     });
   }
   const backup = buildBackup(days, await listSegments(), await listAttempts());
@@ -68,6 +69,7 @@ export async function restoreBackup(): Promise<{ days: number; challenges: numbe
     });
     if (added) {
       await insertPoints(d.id, points);
+      await insertMotionEvents(d.id, (d.motion ?? []).map(([t, kind, value, lat, lon]) => ({ t, kind, value, lat, lon })));
       days++;
     }
   }

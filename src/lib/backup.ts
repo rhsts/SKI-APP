@@ -1,3 +1,4 @@
+import type { MotionKind } from './motion';
 import type { Attempt, PathPoint, Segment } from './segments';
 import type { TrackPoint } from './types';
 
@@ -19,6 +20,8 @@ export interface BackupDay {
   sport?: string;
   /** [t, lat, lon, alt, acc, spd, pres] */
   points: (number | null)[][];
+  /** Jumps and falls: [t, kind, value, lat, lon] */
+  motion?: [number, MotionKind, number, number | null, number | null][];
 }
 
 export interface Backup {
@@ -52,6 +55,17 @@ export function buildBackup(days: BackupDay[], segments: Segment[], attempts: At
   return { app: BACKUP_APP, v: BACKUP_VERSION, exportedAt: now, days, segments, attempts };
 }
 
+function unpackMotion(rows: unknown): BackupDay['motion'] {
+  if (!Array.isArray(rows)) return undefined;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const out: NonNullable<BackupDay['motion']> = [];
+  for (const r of rows) {
+    if (!Array.isArray(r) || typeof r[0] !== 'number' || (r[1] !== 'jump' && r[1] !== 'fall') || num(r[2]) == null) continue;
+    out.push([r[0], r[1], r[2], num(r[3]), num(r[4])]);
+  }
+  return out;
+}
+
 const str = (v: unknown, max = 200): string | null => (typeof v === 'string' ? v.slice(0, max) : null);
 const ID_RE = /^[A-Za-z0-9._:-]{1,80}$/;
 
@@ -77,6 +91,7 @@ export function parseBackup(text: string): Backup {
       isDemo: !!d.isDemo,
       sport: str(d.sport, 20) ?? undefined,
       points: Array.isArray(d.points) ? d.points : [],
+      motion: unpackMotion(d.motion),
     });
   }
 

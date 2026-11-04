@@ -32,6 +32,10 @@ the phone in your pocket, and the app logs your day:
 - **SOS**: one-tap emergency call, your coordinates, nearest piste/lift and send-location
 - **Auto-pause** during long breaks and **reminders to start** when you arrive at a ski area you know
 - **Import GPX** from other apps (Ski Tracks, Strava, watches)
+- **Turns**: turns per run and per day, and your strongest turn in g, from the GPS track
+- **Jumps and falls** from the motion sensor (while the app is open on screen): airtime and height per jump,
+  falls per run, and an **"Are you OK?"** check after a hard fall that opens SOS if you don't answer
+- **Streaks** (days and weeks in a row) and **3 weekly challenges** every Monday, with targets based on your own days
 - Works offline. Everything is stored on the phone (SQLite).
 
 ## Challenges
