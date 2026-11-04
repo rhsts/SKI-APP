@@ -9,6 +9,7 @@ import { RouteMap } from '../../components/RouteMap';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { BreakRow, TimelineCard } from '../../components/TimelineCard';
 import { exportGpx } from '../../days/files';
+import { api, friendsEnabled } from '../../friends/api';
 import { lookupPistes, pistesUpToDate } from '../../mountain/pistes';
 import { mapFor, type TrailMap } from '../../lib/trailmap';
 import { suggestChallenges } from '../../lib/suggest';
@@ -202,7 +203,12 @@ export default function DayScreen() {
   const remove = () =>
     Alert.alert('Delete this day?', 'This can’t be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteSession(session.id); router.back(); } },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+          await deleteSession(session.id);
+          // Off your groups' leaderboards too (if it was shared and there's signal).
+          if (friendsEnabled()) api.deleteDay(session.id).catch(() => undefined);
+          router.back();
+        } },
     ]);
 
   const gpx = () =>

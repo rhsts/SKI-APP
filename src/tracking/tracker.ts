@@ -9,6 +9,7 @@ import {
 } from '../db';
 import { EMPTY_MOTION, summariseMotion, type MotionEvent, type MotionSummary } from '../lib/motion';
 import { startMotion, stopMotion } from './motion';
+import { setNewSegmentsHandler, syncFriends } from '../friends/sync';
 import { simulateDay } from '../lib/sim';
 import { cleanTrack, completedRuns, computeStats, smoothedSpeeds } from '../lib/stats';
 import type { DayStats, TrackPoint } from '../lib/types';
@@ -455,7 +456,13 @@ async function onFinish(lr: LiveRacer, sessionId: string, ev: { startT: number; 
     },
   });
   lr.target = pickTarget([...before, attempt], me);
+  // A group challenge time goes to your friends straight away (if there's signal).
+  syncFriends().catch(() => undefined);
 }
+
+setNewSegmentsHandler(async () => {
+  if (state.status === 'recording') await refreshRacers();
+});
 
 function feedRacers(fresh: TrackPoint[], sessionId: string) {
   if (!racers.length) return;
@@ -579,6 +586,7 @@ export async function stopDay(): Promise<string | null> {
   }
   racers = [];
   set({ ...initial });
+  syncFriends().catch(() => undefined);
   return a.sessionId;
 }
 

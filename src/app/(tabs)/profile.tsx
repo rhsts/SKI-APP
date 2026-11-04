@@ -6,6 +6,9 @@ import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
 import { addDemoDay } from '../../tracking/demo';
+import { checkServer } from '../../friends/api';
+import { resetFriendsCache, syncFriends } from '../../friends/sync';
+import { normalizeServerUrl } from '../../lib/groups';
 import { refreshGeofences, requestReminderPermissions } from '../../tracking/geofence';
 import { useTracker } from '../../tracking/tracker';
 
@@ -16,6 +19,28 @@ export default function ProfileScreen() {
   const { status } = useTracker();
   const [name, setName] = useState(settings.name);
   const [busy, setBusy] = useState<string | null>(null);
+  const [server, setServer] = useState(settings.serverUrl);
+
+  const connect = async () => {
+    const url = normalizeServerUrl(server);
+    if (!url) {
+      Alert.alert('That’s not a web address', 'Type the address of your friends server, e.g. https://ski.example.com or http://192.168.1.20:8787');
+      return;
+    }
+    setBusy('server');
+    try {
+      await checkServer(url);
+      if (url !== settings.serverUrl) await resetFriendsCache();
+      await updateSettings({ serverUrl: url });
+      setServer(url);
+      await syncFriends();
+      Alert.alert('Connected', 'You can now make or join a friend group under Challenges.');
+    } catch (e) {
+      Alert.alert('Couldn’t connect', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const act = async (key: string, fn: () => Promise<unknown>, done: string) => {
     setBusy(key);
@@ -39,6 +64,61 @@ export default function ProfileScreen() {
           style={styles.input}
           maxLength={30}
         />
+      </View>
+
+      <View style={[s.card, styles.section]}>
+        <Text style={s.label}>Friends server</Text>
+        <Text style={s.muted}>
+          For friend groups and group challenges. Your friends use the same address. Only day totals and challenge
+          times are shared, never your GPS tracks.
+        </Text>
+        <TextInput
+          value={server}
+          onChangeText={setServer}
+          placeholder="https://ski.example.com"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          style={styles.input}
+          onSubmitEditing={connect}
+        />
+        <Row label={settings.serverUrl ? 'Reconnect' : 'Connect'} busy={busy === 'server'} onPress={connect} />
+        {settings.serverUrl ? (
+          <>
+            <Row
+              label="Disconnect"
+              danger
+              onPress={() =>
+                Alert.alert('Disconnect from the friends server?', 'Your groups stay on the server; connect again to see them.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Disconnect',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await updateSettings({ serverUrl: '' });
+                      await resetFriendsCache();
+                      setServer('');
+                    },
+                  },
+                ])
+              }
+            />
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.body}>Share demo days</Text>
+                <Text style={s.muted}>Also put demo and simulated days on group leaderboards, to try it out.</Text>
+              </View>
+              <Switch
+                value={settings.shareDemoDays}
+                onValueChange={async (v) => {
+                  await updateSettings({ shareDemoDays: v });
+                  syncFriends().catch(() => undefined);
+                }}
+                trackColor={{ true: colors.accent }}
+              />
+            </View>
+          </>
+        ) : null}
       </View>
 
       <View style={[s.card, styles.section]}>

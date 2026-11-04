@@ -35,6 +35,9 @@ the phone in your pocket, and the app logs your day:
 - **Turns**: turns per run and per day, and your strongest turn in g, from the GPS track
 - **Jumps and falls** from the motion sensor (while the app is open on screen): airtime and height per jump,
   falls per run, and an **"Are you OK?"** check after a hard fall that opens SOS if you don't answer
+- **Friend groups** (needs the friends server in [`server/`](server/README.md), e.g. on a Raspberry Pi): a group
+  per ski trip with a **daily leaderboard** (vertical, top speed, runs) and **group challenges**: everyone who
+  skis the stretch on that day is timed automatically and ranked
 - **Streaks** (days and weeks in a row) and **3 weekly challenges** every Monday, with targets based on your own days
 - Works offline. Everything is stored on the phone (SQLite).
 

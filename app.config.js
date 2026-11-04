@@ -27,6 +27,9 @@ module.exports = ({ config }) => {
             // safety net in case shrinking is turned back on.
             enableMinifyInReleaseBuilds: false,
             enableShrinkResourcesInReleaseBuilds: false,
+            // Lets the app talk to a friends server on your home network over plain http
+            // (e.g. http://192.168.1.20:8787). Over the internet, use https (Cloudflare Tunnel).
+            usesCleartextTraffic: true,
             extraProguardRules: [
               '-keep class * extends androidx.room.RoomDatabase { <init>(); }',
               '-keep class androidx.work.impl.** { *; }',

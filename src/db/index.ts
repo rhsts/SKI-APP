@@ -148,9 +148,15 @@ export interface Settings {
   motion: boolean;
   /** After a fall, ask "Are you OK?" and open the SOS screen if there's no answer. */
   fallCheck: boolean;
+  /** Friends server (your Raspberry Pi), e.g. https://ski.example.com. Empty = friends features off. */
+  serverUrl: string;
+  /** Random secret that proves to the friends server that you are `playerId`. */
+  deviceSecret: string;
+  /** Also share demo/simulated days with your groups (for trying it out). */
+  shareDemoDays: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true, serverUrl: '', deviceSecret: '', shareDemoDays: false };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');

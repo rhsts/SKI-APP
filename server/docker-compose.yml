@@ -1,0 +1,20 @@
+# docker compose up -d            -> server only, on http://<pi-ip>:8787 (home network)
+# docker compose --profile tunnel up -d   -> also a Cloudflare Tunnel, so phones reach it from the mountain
+services:
+  friends:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./data:/data
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - friends

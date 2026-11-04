@@ -12,6 +12,7 @@ import { useTheme } from '../theme';
 // Importing this also registers the ski-area reminder (geofence) task.
 import { setupNotifications } from '../tracking/geofence';
 import { recoverActiveDay } from '../tracking/tracker';
+import { syncFriends } from '../friends/sync';
 
 setupNotifications();
 
@@ -24,6 +25,8 @@ export default function RootLayout() {
       getDb();
       await initSettings();
       await recoverActiveDay();
+      // Friend groups: share new days, fetch group challenges (no need to wait for it).
+      syncFriends().catch(() => undefined);
     })()
       .catch((e) => console.warn('Startup failed', e))
       .finally(() => setReady(true));
@@ -52,6 +55,8 @@ export default function RootLayout() {
         <Stack.Screen name="segment/new" options={{ title: 'New challenge' }} />
         <Stack.Screen name="segment/[id]" options={{ title: 'Challenge' }} />
         <Stack.Screen name="c" options={{ title: 'Challenge invite' }} />
+        <Stack.Screen name="group/new" options={{ title: 'Friend group' }} />
+        <Stack.Screen name="group/[id]" options={{ title: 'Group' }} />
       </Stack>
       {!ready ? (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }]}>

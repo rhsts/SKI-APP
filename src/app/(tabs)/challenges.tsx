@@ -8,6 +8,9 @@ import { fmtAlt, fmtDist, fmtRaceTime } from '../../lib/format';
 import { leaderboard, pathInfo, type LeaderboardEntry, type Segment } from '../../lib/segments';
 import { extractCode } from '../../lib/share';
 import { useSettings } from '../../settings';
+import { cachedChallenges, cachedGroups, syncFriends, type CachedChallenge } from '../../friends/sync';
+import type { Group } from '../../lib/groups';
+import { localDate } from '../../lib/groups';
 import { useTheme, useStyles, type Palette } from '../../theme';
 
 interface Row {
@@ -21,8 +24,31 @@ interface Row {
 export default function ChallengesScreen() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
-  const { units, playerId } = useSettings();
+  const { units, playerId, serverUrl } = useSettings();
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [groupChallenges, setGroupChallenges] = useState<CachedChallenge[]>([]);
+  const [today, setToday] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      let live = true;
+      setToday(localDate(Date.now()));
+      if (!serverUrl) {
+        setGroups([]);
+        setGroupChallenges([]);
+        return;
+      }
+      const fromCache = () =>
+        Promise.all([cachedGroups(), cachedChallenges()]).then(([g, c]) => {
+          if (!live) return;
+          setGroups(g);
+          setGroupChallenges(c);
+        });
+      fromCache().then(() => syncFriends()).then(fromCache).catch(() => undefined);
+      return () => { live = false; };
+    }, [serverUrl]),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -57,10 +83,51 @@ export default function ChallengesScreen() {
       data={rows}
       keyExtractor={(r) => r.segment.id}
       ListHeaderComponent={
-        <Pressable style={({ pressed }) => [styles.paste, pressed && { opacity: 0.8 }]} onPress={paste}>
-          <Ionicons name="clipboard-outline" size={18} color={colors.accent} />
-          <Text style={styles.pasteText}>Paste invite from a friend</Text>
-        </Pressable>
+        <View style={{ gap: 10, marginBottom: 4 }}>
+          <View style={styles.groupsHead}>
+            <Text style={s.h2}>Friend groups</Text>
+            <Pressable onPress={() => router.push('/group/new')} hitSlop={8}>
+              <Text style={styles.link}>{serverUrl ? '+ New / join' : 'Set up'}</Text>
+            </Pressable>
+          </View>
+          {!serverUrl ? (
+            <Pressable style={[s.card, styles.row]} onPress={() => router.push('/group/new')}>
+              <Ionicons name="people-outline" size={24} color={colors.accent} />
+              <Text style={[s.muted, { flex: 1 }]}>
+                Make a group for your ski trip: a daily leaderboard and group challenges. Needs a friends server (Profile).
+              </Text>
+            </Pressable>
+          ) : !groups.length ? (
+            <Pressable style={[s.card, styles.row]} onPress={() => router.push('/group/new')}>
+              <Ionicons name="people-outline" size={24} color={colors.accent} />
+              <Text style={[s.muted, { flex: 1 }]}>No groups yet. Start one for your trip, or join with a friend’s code.</Text>
+            </Pressable>
+          ) : (
+            groups.map((g) => {
+              const todays = groupChallenges.filter((c) => c.groupId === g.id && c.date === today);
+              return (
+                <Pressable key={g.id} style={({ pressed }) => [s.card, styles.row, pressed && { opacity: 0.85 }]} onPress={() => router.push(`/group/${g.id}`)}>
+                  <View style={[styles.badge, { backgroundColor: colors.accentSoft }]}>
+                    <Ionicons name="people" size={20} color={colors.accent} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.h2} numberOfLines={1}>{g.name}</Text>
+                    <Text style={s.muted} numberOfLines={1}>
+                      {g.members} {g.members === 1 ? 'skier' : 'skiers'}
+                      {todays.length ? ` · 🏁 today: ${todays.map((c) => c.name).join(', ')}` : ''}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+                </Pressable>
+              );
+            })
+          )}
+          <Text style={[s.h2, { marginTop: 6 }]}>Challenges</Text>
+          <Pressable style={({ pressed }) => [styles.paste, pressed && { opacity: 0.8 }]} onPress={paste}>
+            <Ionicons name="clipboard-outline" size={18} color={colors.accent} />
+            <Text style={styles.pasteText}>Paste invite from a friend</Text>
+          </Pressable>
+        </View>
       }
       ListEmptyComponent={
         <View style={[s.card, styles.empty]}>
@@ -89,6 +156,11 @@ export default function ChallengesScreen() {
                 {fmtDist(item.length, units)}{item.drop != null ? ` · ↓ ${fmtAlt(item.drop, units)}` : ''}
                 {item.board.length > 1 ? ` · ${item.board.length} skiers` : ''}
               </Text>
+              {groupChallenges.some((c) => c.segmentId === item.segment.id) ? (
+                <Text style={[s.muted, { color: colors.accent, fontWeight: '700' }]} numberOfLines={1}>
+                  👥 {[...new Set(groupChallenges.filter((c) => c.segmentId === item.segment.id).map((c) => c.groupName))].join(', ')}
+                </Text>
+              ) : null}
               <View style={styles.times}>
                 <Text style={styles.time}>You: {item.mine ? fmtRaceTime(item.mine.time) : '–'}</Text>
                 {leader && !iLead ? (
@@ -114,6 +186,8 @@ const makeStyles = (colors: Palette) =>
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
       borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
     },
+    groupsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+    link: { color: colors.accent, fontWeight: '800', fontSize: 15 },
     pasteText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
     empty: { alignItems: 'center', gap: 10, paddingVertical: 32 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12 },

@@ -1,0 +1,12 @@
+{
+  "name": "ski-tracker-friends-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Friend groups, daily leaderboards and group challenges for Ski Tracker. No dependencies: Node's built-in HTTP and SQLite.",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}
