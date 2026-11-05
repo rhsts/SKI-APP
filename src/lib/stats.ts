@@ -405,3 +405,22 @@ export function completedRuns(stats: DayStats): Activity[] {
     return after.some((x) => x.kind === 'lift') || after.reduce((s, x) => s + (x.kind === 'other' ? x.duration : 0), 0) >= 90;
   });
 }
+
+/**
+ * Slow climbs look like ski touring (climbing on skins), but on a normal ski
+ * day they're lifts with a patchy GPS track (a slow T-bar, a gondola in fog,
+ * a sparse import). Only a day marked as ski touring keeps them as climbs.
+ */
+export function statsForSport(stats: DayStats, sport: string | null | undefined): DayStats {
+  if (sport === 'touring' || !stats.activities.some((a) => a.kind === 'tour')) return stats;
+  const activities = stats.activities.map((a) => (a.kind === 'tour' ? { ...a, kind: 'lift' as const, wait: a.wait ?? 0 } : a));
+  const lifts = activities.filter((a) => a.kind === 'lift');
+  return {
+    ...stats,
+    activities,
+    liftCount: lifts.length,
+    liftTime: lifts.reduce((s, a) => s + a.duration, 0),
+    tourTime: 0,
+    tourVertical: 0,
+  };
+}

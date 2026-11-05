@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps } from 'expo-router';
 import Stack from 'expo-router/stack';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ElevationChart } from '../../components/ElevationChart';
 import { SpeedChart } from '../../components/SpeedChart';
@@ -28,8 +28,10 @@ import {
   fmtAir, fmtAlt, fmtDate, fmtDist, fmtDuration, fmtG, fmtJumpHeight, fmtRaceTime, fmtSpeed, fmtTimeOfDay,
 } from '../../lib/format';
 import { activityAt } from '../../lib/scrub';
-import { cleanTrack, computeStats, smoothedAltitudes, smoothedSpeeds } from '../../lib/stats';
-import type { TrackPoint } from '../../lib/types';
+import { cleanTrack, computeStats, smoothedAltitudes, smoothedSpeeds, statsForSport } from '../../lib/stats';
+import type { Activity, TrackPoint, Units } from '../../lib/types';
+import type { MotionSummary } from '../../lib/motion';
+import type { PisteMatch } from '../../lib/pistes';
 import { useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
 
@@ -94,11 +96,15 @@ export default function DayScreen() {
   }, [raw, session?.pistes]);
 
   // Recompute from raw points so indices always match the cleaned track.
+  const sport = session?.sport;
   const day = useMemo(() => {
     if (!raw) return null;
     const pts = cleanTrack(raw);
-    return { pts, times: pts.map((p) => p.t), speeds: smoothedSpeeds(pts), alts: smoothedAltitudes(pts), stats: computeStats(raw) };
-  }, [raw]);
+    return {
+      pts, times: pts.map((p) => p.t), speeds: smoothedSpeeds(pts), alts: smoothedAltitudes(pts),
+      stats: statsForSport(computeStats(raw), sport),
+    };
+  }, [raw, sport]);
 
   // The run shown in the graph: the one you tapped, otherwise the first run of the day.
   const runIdxs = useMemo(
@@ -140,25 +146,78 @@ export default function DayScreen() {
       times: day.times.slice(a, b),
       alts: day.alts.slice(a, b),
       speeds: day.speeds.slice(a, b),
-      activity: { ...selRun, startIndex: 0, endIndex: b - a - 1 },
+      activities: [{ ...selRun, startIndex: 0, endIndex: b - a - 1 }],
     };
   }, [day, selRun]);
 
-  const selectRun = (i: number | null) => {
+  const selectRun = useCallback((i: number | null) => {
     setPlaying(false);
     setFocus(i);
     const a = i != null ? day?.stats.activities[i] : null;
     setCursor(a ? a.startIndex : null);
-  };
+  }, [day]);
+
+  // While a finger is on the graph the page must not scroll: on Android the scroll view
+  // would otherwise take the gesture over and the replay stops mid-drag.
+  const [scrubbing, setScrubbing] = useState(false);
+  const onScrubStart = useCallback(() => {
+    setPlaying(false);
+    setScrubbing(true);
+  }, []);
+  const onScrubEnd = useCallback(() => setScrubbing(false), []);
+  // Touch moves can come in faster than the screen redraws: apply at most one per frame.
+  const pendingScrub = useRef<number | null>(null);
+  const onScrub = useCallback((i: number) => {
+    const r = rangeRef.current;
+    if (!r) return;
+    const first = pendingScrub.current == null;
+    pendingScrub.current = r.a + i;
+    if (first) {
+      requestAnimationFrame(() => {
+        const next = pendingScrub.current;
+        pendingScrub.current = null;
+        if (next != null) setCursor(next);
+      });
+    }
+  }, []);
+
+  // Tapping a card in the timeline: a run becomes the graphed run; a lift is just highlighted.
+  const focusRef = useRef(focus);
+  useEffect(() => {
+    focusRef.current = focus;
+  });
+  const onTimelinePress = useCallback((i: number) => {
+    const a = day?.stats.activities[i];
+    if (!a) return;
+    const next = focusRef.current === i ? null : i;
+    if (a.kind === 'run' && next != null) {
+      selectRun(next);
+      return;
+    }
+    setFocus(next);
+    setPlaying(false);
+    setCursor(next == null ? null : a.startIndex);
+  }, [day, selectRun]);
+
+  // Heavy bits that don't depend on the replay position: computed once, not on every drag.
+  const suggestion = useMemo(
+    () => (day && segments && !hideSuggest ? suggestChallenges(day.pts, day.stats.activities, segments)[0] ?? null : null),
+    [day, segments, hideSuggest],
+  );
+  const numbers = useMemo(() => {
+    let runNo = 0, liftNo = 0, tourNo = 0;
+    return (day?.stats.activities ?? []).map((a) => (a.kind === 'run' ? ++runNo : a.kind === 'lift' ? ++liftNo : a.kind === 'tour' ? ++tourNo : 0));
+  }, [day]);
+  const motionByRun = useMemo(
+    () => (day?.stats.activities ?? []).map((a) => (a.kind === 'run' ? summariseMotion(eventsBetween(motion, a.startTime, a.endTime)) : undefined)),
+    [day, motion],
+  );
 
   if (!session || !day) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
 
   const { pts, speeds, stats } = day;
-  const suggestion = segments && !hideSuggest ? suggestChallenges(pts, stats.activities, segments)[0] ?? null : null;
   const suggestedRunNo = suggestion ? stats.activities.slice(0, suggestion.activityIndex + 1).filter((a) => a.kind === 'run').length : 0;
   const timeline = stats.activities;
-  let runNo = 0, liftNo = 0, tourNo = 0;
-  const numbers = timeline.map((a) => (a.kind === 'run' ? ++runNo : a.kind === 'lift' ? ++liftNo : a.kind === 'tour' ? ++tourNo : 0));
   const shares = session.pistes && Object.keys(session.pistes).length ? difficultyBreakdown([{ activities: timeline, pistes: session.pistes }]) : [];
   const cur = cursor != null ? pts[cursor] : null;
   const curActivity = cursor != null ? activityAt(timeline, cursor) : null;
@@ -174,8 +233,7 @@ export default function DayScreen() {
   const localCursor = range && cursor != null && cursor >= range.a && cursor <= range.b ? cursor - range.a : null;
   const selNo = selected != null ? numbers[selected] : 0;
   const motionDay = summariseMotion(motion);
-  const runMotion = (a: { startTime: number; endTime: number }) => summariseMotion(eventsBetween(motion, a.startTime, a.endTime));
-  const selMotion = selRun ? runMotion(selRun) : null;
+  const selMotion = selected != null ? motionByRun[selected] ?? null : null;
   const runOfEvent = (t: number) => {
     const i = timeline.findIndex((a) => a.kind === 'run' && t >= a.startTime - 5000 && t <= a.endTime + 5000);
     return i >= 0 ? i : null;
@@ -229,7 +287,7 @@ export default function DayScreen() {
   };
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={s.screen} contentContainerStyle={styles.content} scrollEnabled={!scrubbing} testID="day-scroll">
       <Stack.Screen
         options={{
           title: fmtDate(session.startedAt),
@@ -340,11 +398,12 @@ export default function DayScreen() {
                   times={runGraph.times}
                   alts={runGraph.alts}
                   speeds={runGraph.speeds}
-                  activities={[runGraph.activity]}
+                  activities={runGraph.activities}
                   cursor={localCursor}
                   units={units}
-                  onScrubStart={() => setPlaying(false)}
-                  onScrub={(i) => range && setCursor(range.a + i)}
+                  onScrubStart={onScrubStart}
+                  onScrub={onScrub}
+                  onScrubEnd={onScrubEnd}
                 />
                 <SpeedChart times={runGraph.times} speeds={runGraph.speeds} cursor={localCursor} units={units} height={90} />
               </>
@@ -468,6 +527,36 @@ export default function DayScreen() {
       <Text style={[s.h2, { marginTop: 8 }]}>Timeline</Text>
       <Text style={s.muted}>Tap 🏳 on a run to turn it into a challenge for your friends.</Text>
       {timeline.length === 0 ? <Text style={s.muted}>No runs or lifts detected.</Text> : null}
+      <DayTimeline
+        timeline={timeline}
+        numbers={numbers}
+        units={units}
+        focus={focus}
+        pistes={session.pistes}
+        motionByRun={motionByRun}
+        sessionId={session.id}
+        onPress={onTimelinePress}
+      />
+    </ScrollView>
+  );
+}
+
+/**
+ * The day's runs and lifts. Memoised: it doesn't change while you drag along
+ * the graph, so it isn't redrawn on every move.
+ */
+const DayTimeline = memo(function DayTimeline({ timeline, numbers, units, focus, pistes, motionByRun, sessionId, onPress }: {
+  timeline: Activity[];
+  numbers: number[];
+  units: Units;
+  focus: number | null;
+  pistes: Record<string, PisteMatch> | null;
+  motionByRun: (MotionSummary | undefined)[];
+  sessionId: string;
+  onPress: (i: number) => void;
+}) {
+  return (
+    <>
       {timeline.map((a, i) =>
         a.kind === 'other' ? (
           a.duration >= 120 ? <BreakRow key={i} activity={a} /> : null
@@ -478,26 +567,17 @@ export default function DayScreen() {
             number={numbers[i]}
             units={units}
             selected={focus === i}
-            piste={session.pistes?.[String(a.startTime)] ?? null}
-            motion={a.kind === 'run' ? runMotion(a) : undefined}
-            onDetails={() => router.push({ pathname: '/run', params: { session: session.id, i: String(i) } })}
-            onChallenge={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(i) } })}
-            onPress={() => {
-              const next = focus === i ? null : i;
-              if (a.kind === 'run' && next != null) {
-                selectRun(next);
-                return;
-              }
-              setFocus(next);
-              setPlaying(false);
-              setCursor(next == null ? null : a.startIndex);
-            }}
+            piste={pistes?.[String(a.startTime)] ?? null}
+            motion={motionByRun[i]}
+            onDetails={() => router.push({ pathname: '/run', params: { session: sessionId, i: String(i) } })}
+            onChallenge={() => router.push({ pathname: '/segment/new', params: { session: sessionId, run: String(i) } })}
+            onPress={() => onPress(i)}
           />
         ),
       )}
-    </ScrollView>
+    </>
   );
-}
+});
 
 /** Shown instead of closing the app if something on this screen throws. */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle, Text } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { simplify } from '../lib/geo';
@@ -37,7 +37,7 @@ interface Line {
 const DIM_RUN = 'rgba(11,107,203,0.25)';
 
 /** Your day on a terrain map: runs coloured by speed, lifts dashed. */
-export function RouteMap({ points, speeds, activities, cursor, focus, style, trail, photos, onPhotoPress }: Props) {
+export const RouteMap = memo(function RouteMap({ points, speeds, activities, cursor, focus, style, trail, photos, onPhotoPress }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
   const ref = useRef<MapView>(null);
@@ -144,7 +144,7 @@ export function RouteMap({ points, speeds, activities, cursor, focus, style, tra
       </MapView>
     </View>
   );
-}
+});
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { fmtAlt, fmtSpeed, fmtTimeOfDay } from '../lib/format';
@@ -18,6 +18,8 @@ interface Props {
   onScrubStart?: () => void;
   /** Finger moved to this track index. */
   onScrub?: (index: number) => void;
+  /** Finger lifted (or the gesture was taken away). */
+  onScrubEnd?: () => void;
 }
 
 const LABEL_H = 22;
@@ -26,8 +28,8 @@ const LABEL_H = 22;
  * Altitude over the day, runs shaded. It doubles as the replay control:
  * drag along it to move through the day.
  */
-export function ElevationChart({
-  times, alts, speeds, activities, cursor, units, height = 140, onScrubStart, onScrub,
+export const ElevationChart = memo(function ElevationChart({
+  times, alts, speeds, activities, cursor, units, height = 140, onScrubStart, onScrub, onScrubEnd,
 }: Props) {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
@@ -36,9 +38,16 @@ export function ElevationChart({
   const plotTop = LABEL_H;
   const plotH = height - LABEL_H;
 
+  // locationX is relative to whatever is under the finger (the bubble, the line…), so it
+  // jumps around. Work from pageX instead, against where the graph's left edge was at touch-down.
+  const originX = useRef(0);
+  const lastIndex = useRef(-1);
   const scrubTo = (e: GestureResponderEvent) => {
-    const i = indexAtX(times, e.nativeEvent.locationX, width);
-    if (i >= 0) onScrub?.(i);
+    const i = indexAtX(times, e.nativeEvent.pageX - originX.current, width);
+    if (i >= 0 && i !== lastIndex.current) {
+      lastIndex.current = i;
+      onScrub?.(i);
+    }
   };
 
   const model = useMemo(() => {
@@ -89,10 +98,14 @@ export function ElevationChart({
         // Keep the gesture: otherwise the page's ScrollView takes over mid-drag.
         onResponderTerminationRequest={() => false}
         onResponderGrant={(e) => {
+          originX.current = e.nativeEvent.pageX - e.nativeEvent.locationX;
+          lastIndex.current = -1;
           onScrubStart?.();
           scrubTo(e);
         }}
         onResponderMove={scrubTo}
+        onResponderRelease={() => onScrubEnd?.()}
+        onResponderTerminate={() => onScrubEnd?.()}
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel="Replay position. Drag along the graph to move through the day."
@@ -133,7 +146,7 @@ export function ElevationChart({
       </View>
     </View>
   );
-}
+});
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({

@@ -5,6 +5,7 @@ import type { MotionEvent, MotionKind, MotionSummary } from '../lib/motion';
 import type { PisteMatch } from '../lib/pistes';
 import type { TrailMap } from '../lib/trailmap';
 import type { Attempt, PathPoint, Segment } from '../lib/segments';
+import { statsForSport } from '../lib/stats';
 import type { DayStats, TrackPoint, Units } from '../lib/types';
 
 /**
@@ -215,7 +216,11 @@ function toSession(r: RawSession): SessionRow {
   } catch {
     pistes = null;
   }
-  return { id: r.id, startedAt: r.started_at, endedAt: r.ended_at, place: r.place, stats, isDemo: !!r.is_demo, pistes, sport: isSport(r.sport) ? r.sport : 'ski' };
+  const sport = isSport(r.sport) ? r.sport : 'ski';
+  return {
+    id: r.id, startedAt: r.started_at, endedAt: r.ended_at, place: r.place,
+    stats: stats ? statsForSport(stats, sport) : null, isDemo: !!r.is_demo, pistes, sport,
+  };
 }
 
 export async function createSession(startedAt: number, isDemo = false, sport: Sport = 'ski'): Promise<string> {

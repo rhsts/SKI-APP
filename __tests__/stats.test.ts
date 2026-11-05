@@ -1,5 +1,6 @@
 import { distance, simplify } from '../src/lib/geo';
 import { cleanTrack, computeStats, trendLegs } from '../src/lib/stats';
+import { statsForSport } from '../src/lib/stats';
 import { simulateDay } from '../src/lib/sim';
 import type { TrackPoint } from '../src/lib/types';
 
@@ -119,6 +120,16 @@ describe('lift lines and ski touring', () => {
     expect(lifts[2].wait).toBe(0);
     expect(s.liftWaitTime).toBeGreaterThan(3 * 55);
     expect(s.liftWaitTime).toBeLessThan(3 * 200);
+  });
+
+  it('on a normal ski day, slow climbs are lifts, not skinning', () => {
+    const s = computeStats(simulateDay({ touring: true, runs: 2 }).points);
+    const ski = statsForSport(s, 'ski');
+    expect(ski.activities.filter((a) => a.kind === 'tour')).toHaveLength(0);
+    expect(ski.liftCount).toBe(s.liftCount + 2);
+    expect(ski.tourVertical).toBe(0);
+    expect(ski.activities).toHaveLength(s.activities.length);
+    expect(statsForSport(s, 'touring')).toBe(s);
   });
 
   it('recognises climbing on skins as touring, not a lift', () => {

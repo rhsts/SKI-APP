@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ElevationChart } from '../components/ElevationChart';
 import { RouteMap } from '../components/RouteMap';
@@ -24,7 +24,14 @@ export default function RunScreen() {
   const { units } = useSettings();
   const [session, setSession] = useState<SessionRow | null>(null);
   const [raw, setRaw] = useState<TrackPoint[] | null>(null);
-  const [cursor, setCursor] = useState<number | null>(null);
+  // The cursor belongs to one run: after Previous / Next it starts empty again.
+  const [cursorAt, setCursorAt] = useState<{ run: string; at: number } | null>(null);
+  const cursor = cursorAt?.run === i ? cursorAt.at : null;
+  const setCursor = useCallback((at: number) => setCursorAt({ run: i, at }), [i]);
+  // No page scrolling while a finger is on the graph (Android would take the gesture over).
+  const [scrubbing, setScrubbing] = useState(false);
+  const onScrubStart = useCallback(() => setScrubbing(true), []);
+  const onScrubEnd = useCallback(() => setScrubbing(false), []);
 
   useEffect(() => {
     getSession(sessionId).then(setSession);
@@ -54,7 +61,8 @@ export default function RunScreen() {
       times: pts.map((p) => p.t),
       speeds: day.speeds.slice(a, b),
       alts: day.alts.slice(a, b),
-      activity: { ...run, startIndex: 0, endIndex: pts.length - 1 },
+      // One array object per run, so the map and graph don't redraw on every drag.
+      activities: [{ ...run, startIndex: 0, endIndex: pts.length - 1 }],
       detail: runDetail(day.pts, day.alts, day.speeds, run),
     };
   }, [day, run]);
@@ -69,7 +77,7 @@ export default function RunScreen() {
   const cur = cursor != null ? slice.pts[cursor] : null;
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={s.screen} contentContainerStyle={styles.content} scrollEnabled={!scrubbing}>
       <Stack.Screen options={{ title: `Run ${number} of ${runIndices.length}` }} />
 
       {piste ? (
@@ -81,7 +89,7 @@ export default function RunScreen() {
       ) : null}
       <Text style={s.muted}>{fmtTimeOfDay(run.startTime)} – {fmtTimeOfDay(run.endTime)} · {fmtClock(run.duration)}</Text>
 
-      <RouteMap points={slice.pts} speeds={slice.speeds} activities={[slice.activity]} cursor={cursor} />
+      <RouteMap points={slice.pts} speeds={slice.speeds} activities={slice.activities} cursor={cursor} />
 
       <View style={[s.card, { gap: 10 }]}>
         <Text style={s.body}>
@@ -91,10 +99,12 @@ export default function RunScreen() {
           times={slice.times}
           alts={slice.alts}
           speeds={slice.speeds}
-          activities={[slice.activity]}
+          activities={slice.activities}
           cursor={cursor}
           units={units}
+          onScrubStart={onScrubStart}
           onScrub={setCursor}
+          onScrubEnd={onScrubEnd}
         />
         <SpeedChart times={slice.times} speeds={slice.speeds} cursor={cursor} units={units} />
       </View>
