@@ -23,9 +23,47 @@ export const CONFIG = {
   queueMaxSeconds: 20 * 60, // longer stops before a lift are breaks, not lift lines
   queueMaxSpread: 150, // m: you stay put in a lift line
   maxGapForMoving: 30, // s: longer gaps (tunnel, signal lost) don't count as moving
+  maxVertRate: 25, // m/s: faster altitude changes are GPS altitude glitches (a straight schuss is ~15)
+  altResyncMs: 60000, // a new altitude level that holds this long is real (e.g. after a bad first fix)
+  altResyncSpread: 20, // m: "holds" = stays within this
 };
 
-/** Drops inaccurate, duplicate and teleporting fixes. */
+/**
+ * Phones' GPS altitude sometimes jumps hundreds of metres for a few seconds.
+ * Those fixes keep their position but lose their altitude (null), so the
+ * gap is bridged from the neighbouring fixes.
+ */
+export function despikeAltitude(points: TrackPoint[]): TrackPoint[] {
+  let ref: { alt: number; t: number } | null = null;
+  let pending: TrackPoint[] = [];
+  const out = points.slice();
+  for (let i = 0; i < out.length; i++) {
+    const p = out[i];
+    if (p.alt == null || !Number.isFinite(p.alt)) continue;
+    if (!ref) {
+      ref = { alt: p.alt, t: p.t };
+      continue;
+    }
+    const dt = Math.max(1, (p.t - ref.t) / 1000);
+    if (Math.abs(p.alt - ref.alt) / dt <= CONFIG.maxVertRate) {
+      ref = { alt: p.alt, t: p.t };
+      pending = [];
+      continue;
+    }
+    // Suspicious. If the new level holds for a minute, it was the old one that was wrong.
+    if (pending.length && Math.abs(p.alt - pending[0].alt!) > CONFIG.altResyncSpread) pending = [];
+    pending.push(p);
+    if (p.t - pending[0].t >= CONFIG.altResyncMs) {
+      ref = { alt: p.alt, t: p.t };
+      pending = [];
+      continue;
+    }
+    out[i] = { ...p, alt: null };
+  }
+  return out;
+}
+
+/** Drops inaccurate, duplicate and teleporting fixes, and blanks out glitched altitudes. */
 export function cleanTrack(points: TrackPoint[]): TrackPoint[] {
   const out: TrackPoint[] = [];
   let rejects = 0;
@@ -44,7 +82,7 @@ export function cleanTrack(points: TrackPoint[]): TrackPoint[] {
     rejects = 0;
     out.push(p);
   }
-  return out;
+  return despikeAltitude(out);
 }
 
 /** Cumulative path distance in metres for each index. */

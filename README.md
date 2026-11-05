@@ -31,7 +31,7 @@ the phone in your pocket, and the app logs your day:
 - **Photos** pinned on the map where you took them
 - **SOS**: one-tap emergency call, your coordinates, nearest piste/lift and send-location
 - **Auto-pause** during long breaks and **reminders to start** when you arrive at a ski area you know
-- **Import GPX** from other apps (Ski Tracks, Strava, watches)
+- **Import** ski days from **Slopes** (.slopes files) and GPX from other apps (Ski Tracks, Strava, watches)
 - **Turns**: turns per run and per day, and your strongest turn in g, from the GPS track
 - **Jumps and falls** from the motion sensor (while the app is open on screen): airtime and height per jump,
   falls per run, and an **"Are you OK?"** check after a hard fall that opens SOS if you don't answer

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { createBackup, importGpx, restoreBackup } from '../../days/files';
+import { createBackup, importTracks, restoreBackup } from '../../days/files';
 import { deleteAllData, deleteDemoData, deleteTrailMaps } from '../../db';
 import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
@@ -251,13 +251,20 @@ export default function ProfileScreen() {
           }}
         />
         <Row
-          label="Import GPX files (Ski Tracks, Strava, watch…)"
+          label="Import ski days (Slopes, GPX from Strava, watch…)"
           busy={busy === 'gpx'}
           onPress={async () => {
             setBusy('gpx');
             try {
-              const r = await importGpx();
-              if (r) Alert.alert('Import finished', `Added ${r.added} ${r.added === 1 ? 'day' : 'days'}${r.skipped ? `, skipped ${r.skipped} already in the app` : ''}.`);
+              const r = await importTracks();
+              if (r) {
+                Alert.alert(
+                  'Import finished',
+                  `Added ${r.added} ${r.added === 1 ? 'day' : 'days'}` +
+                    `${r.skipped ? `, skipped ${r.skipped} already in the app` : ''}` +
+                    `${r.failed ? `, ${r.failed} ${r.failed === 1 ? 'file' : 'files'} couldn’t be read` : ''}.`,
+                );
+              }
             } catch (e) {
               Alert.alert('Couldn’t import', e instanceof Error ? e.message : String(e));
             } finally {

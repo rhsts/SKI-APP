@@ -10,6 +10,9 @@ import { lookupPlace } from '../tracking/place';
 import { lookupPistes } from '../mountain/pistes';
 import { buildBackup, packPoints, parseBackup, unpackPoints } from '../lib/backup';
 import { fileNameFor, parseGpx, splitDays, toGpx } from '../lib/gpx';
+import { strFromU8 } from 'fflate';
+import { isZip, parseSlopes } from '../lib/slopes';
+import type { TrackPoint } from '../lib/types';
 import { isSport } from '../lib/sport';
 import { computeStats } from '../lib/stats';
 
@@ -90,22 +93,40 @@ export async function restoreBackup(): Promise<{ days: number; challenges: numbe
  * several days is split at overnight gaps; days you already have (same start
  * time) are skipped.
  */
-export async function importGpx(): Promise<{ added: number; skipped: number; files: number } | null> {
+/**
+ * Imports ski days from other apps: GPX (Strava, watches, Ski Tracks…) and
+ * .slopes files from the Slopes app. Days already in the app are skipped.
+ */
+export async function importTracks(): Promise<{ added: number; skipped: number; files: number; failed: number } | null> {
   const res = await DocumentPicker.getDocumentAsync({
-    type: ['application/gpx+xml', 'application/xml', 'text/xml', 'application/octet-stream', '*/*'],
+    type: ['application/gpx+xml', 'application/xml', 'text/xml', 'application/zip', 'application/octet-stream', '*/*'],
     copyToCacheDirectory: true,
     multiple: true,
   });
   if (res.canceled || !res.assets?.length) return null;
   const existing = (await listSessions()).map((s) => s.startedAt);
-  let added = 0, skipped = 0;
+  let added = 0, skipped = 0, failed = 0;
   for (const asset of res.assets) {
-    const points = parseGpx(await new File(asset.uri).text());
-    if (!points.length) {
-      skipped++;
+    // Each file gives one or more days, each with a place name if the file knows it.
+    let days: { points: TrackPoint[]; place: string | null }[];
+    try {
+      const file = new File(asset.uri);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (isZip(bytes)) {
+        const d = parseSlopes(bytes);
+        days = splitDays(d.points).map((points) => ({ points, place: d.place }));
+      } else {
+        days = splitDays(parseGpx(strFromU8(bytes))).map((points) => ({ points, place: null }));
+      }
+    } catch {
+      failed++;
       continue;
     }
-    for (const day of splitDays(points)) {
+    if (!days.length) {
+      failed++;
+      continue;
+    }
+    for (const { points: day, place } of days) {
       if (day.length < 20) continue;
       const startedAt = day[0].t;
       if (existing.some((t) => Math.abs(t - startedAt) < 60000)) {
@@ -115,7 +136,7 @@ export async function importGpx(): Promise<{ added: number; skipped: number; fil
       const id = newId();
       const stats = computeStats(day);
       await insertSessionRaw({
-        id, startedAt, endedAt: day[day.length - 1].t, place: await lookupPlace(day), isDemo: false, stats,
+        id, startedAt, endedAt: day[day.length - 1].t, place: place ?? (await lookupPlace(day)), isDemo: false, stats,
       });
       await insertPoints(id, day);
       existing.push(startedAt);
@@ -124,9 +145,8 @@ export async function importGpx(): Promise<{ added: number; skipped: number; fil
       added++;
     }
   }
-  if (!added && skipped && res.assets.length) {
-    // Nothing usable: most likely the files had no timestamps.
-    throw new Error('No new ski days found. The file may be missing timestamps, or these days are already in the app.');
+  if (!added && !skipped && failed) {
+    throw new Error('None of these files could be read. Pick .gpx or .slopes files.');
   }
-  return { added, skipped, files: res.assets.length };
+  return { added, skipped, files: res.assets.length, failed };
 }
