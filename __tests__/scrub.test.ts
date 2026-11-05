@@ -1,4 +1,6 @@
 import { activityAt, indexAtX } from '../src/lib/scrub';
+import { simulateDay } from '../src/lib/sim';
+import { computeStats } from '../src/lib/stats';
 import type { Activity } from '../src/lib/types';
 
 describe('indexAtX (dragging on the elevation graph)', () => {
@@ -32,5 +34,14 @@ describe('activityAt', () => {
     expect(activityAt(acts, 5)?.kind).toBe('lift');
     expect(activityAt(acts, 15)?.kind).toBe('run');
     expect(activityAt(acts, 99)).toBeNull();
+  });
+
+  it('gives a shared boundary index to the later activity (tapping a run starts on that run)', () => {
+    expect(activityAt(acts, 10)?.kind).toBe('run');
+    expect(activityAt(acts, 20)?.kind).toBe('other');
+    const all = computeStats(simulateDay().points).activities;
+    const runs = all.filter((r) => r.kind === 'run');
+    expect(runs.length).toBeGreaterThan(0);
+    for (const r of runs) expect(activityAt(all, r.startIndex)?.kind).toBe('run');
   });
 });

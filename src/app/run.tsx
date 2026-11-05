@@ -93,7 +93,7 @@ export default function RunScreen() {
 
       <View style={[s.card, { gap: 10 }]}>
         <Text style={s.body}>
-          {cur ? `${fmtTimeOfDay(cur.t)} · ${fmtSpeed(slice.speeds[cursor!] ?? 0, units)} · ${fmtAlt(cur.alt, units)}` : 'Drag on the graph to follow the run'}
+          {cur ? `${fmtTimeOfDay(cur.t)} · ${fmtSpeed(slice.speeds[cursor!] ?? 0, units)} · ${fmtAlt(slice.alts[cursor!], units)}` : 'Drag on the graph to follow the run'}
         </Text>
         <ElevationChart
           times={slice.times}

@@ -16,7 +16,14 @@ export function indexAtX(times: number[], x: number, width: number): number {
   return lo > 0 && t - times[lo - 1] < times[lo] - t ? lo - 1 : lo;
 }
 
-/** The run, lift or break that a track index falls in. */
+/**
+ * The run, lift or break that a track index falls in. Neighbours share their boundary index,
+ * so the later one wins there: the first point of a run belongs to that run.
+ */
 export function activityAt(activities: Activity[], index: number): Activity | null {
-  return activities.find((a) => index >= a.startIndex && index <= a.endIndex) ?? null;
+  for (let k = activities.length - 1; k >= 0; k--) {
+    const a = activities[k];
+    if (index >= a.startIndex && index <= a.endIndex) return a;
+  }
+  return null;
 }

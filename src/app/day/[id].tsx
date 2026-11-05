@@ -226,7 +226,7 @@ export default function DayScreen() {
     ? [
         fmtTimeOfDay(cur.t),
         curActivity?.kind === 'run' ? fmtSpeed(speeds[cursor!], units) : null,
-        fmtAlt(cur.alt, units),
+        fmtAlt(day.alts[cursor!], units), // smoothed, like the graph
         curActivity?.kind === 'run' ? 'Run' : curActivity?.kind === 'lift' ? 'On lift' : null,
       ].filter(Boolean).join(' · ')
     : 'Press play, or drag on the graph';
