@@ -5,7 +5,7 @@ import type { MotionEvent, MotionKind, MotionSummary } from '../lib/motion';
 import type { PisteMatch } from '../lib/pistes';
 import type { TrailMap } from '../lib/trailmap';
 import type { Attempt, PathPoint, Segment } from '../lib/segments';
-import { statsForSport } from '../lib/stats';
+import { computeStats, STATS_VERSION, statsForSport } from '../lib/stats';
 import type { DayStats, TrackPoint, Units } from '../lib/types';
 
 /**
@@ -270,13 +270,52 @@ export async function renameSession(id: string, place: string) {
   await getDb().runAsync('UPDATE sessions SET place = ? WHERE id = ?', place.trim() || null, id);
 }
 
+/**
+ * Days saved before the latest detection logic (see STATS_VERSION) get their
+ * stats recomputed from their points and saved again, once per app start, so
+ * lists, the season, goals and badges agree with the day screen. Piste names
+ * are keyed by run start time, so they're carried over to the recomputed runs.
+ */
+async function refreshStaleStats(): Promise<void> {
+  const d = getDb();
+  const rows = await d.getAllAsync<RawSession>('SELECT * FROM sessions WHERE ended_at IS NOT NULL AND stats_json IS NOT NULL');
+  for (const r of rows) {
+    try {
+      const old: DayStats = JSON.parse(r.stats_json!);
+      if ((old.statsVersion ?? 0) >= STATS_VERSION) continue;
+      const pts = await getPoints(r.id);
+      const stats = pts.length ? computeStats(pts) : { ...old, statsVersion: STATS_VERSION };
+      const pistes: Record<string, PisteMatch> | null = r.pistes_json ? JSON.parse(r.pistes_json) : null;
+      if (pistes) {
+        for (const a of stats.activities) {
+          const o = old.activities?.find((x) => x.kind === a.kind && x.startTime < a.endTime && a.startTime < x.endTime && pistes[String(x.startTime)]);
+          if (o && !pistes[String(a.startTime)]) pistes[String(a.startTime)] = pistes[String(o.startTime)];
+        }
+      }
+      await d.runAsync(
+        'UPDATE sessions SET stats_json = ?, pistes_json = ? WHERE id = ?',
+        JSON.stringify(stats), pistes ? JSON.stringify(pistes) : r.pistes_json, r.id,
+      );
+    } catch {
+      // Unreadable row: leave it as it is.
+    }
+  }
+}
+
+let statsFresh: Promise<void> | null = null;
+function ensureStatsFresh(): Promise<void> {
+  return (statsFresh ??= refreshStaleStats().catch(() => undefined));
+}
+
 export async function getSession(id: string): Promise<SessionRow | null> {
+  await ensureStatsFresh();
   const r = await getDb().getFirstAsync<RawSession>('SELECT * FROM sessions WHERE id = ?', id);
   return r ? toSession(r) : null;
 }
 
 /** Finished days, newest first. */
 export async function listSessions(): Promise<SessionRow[]> {
+  await ensureStatsFresh();
   const rows = await getDb().getAllAsync<RawSession>(
     'SELECT * FROM sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC',
   );

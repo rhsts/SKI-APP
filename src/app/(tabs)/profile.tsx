@@ -67,6 +67,7 @@ export default function ProfileScreen() {
           onEndEditing={() => updateSettings({ name: name.trim() })}
           placeholder="Shown to friends on challenge leaderboards"
           style={styles.input}
+          placeholderTextColor={colors.muted}
           maxLength={30}
         />
       </View>
@@ -85,6 +86,7 @@ export default function ProfileScreen() {
           autoCorrect={false}
           keyboardType="url"
           style={styles.input}
+          placeholderTextColor={colors.muted}
         />
         <TextInput
           value={password}
@@ -94,6 +96,7 @@ export default function ProfileScreen() {
           autoCorrect={false}
           secureTextEntry
           style={styles.input}
+          placeholderTextColor={colors.muted}
           onSubmitEditing={connect}
         />
         <Row label={settings.serverUrl ? 'Reconnect' : 'Connect'} busy={busy === 'server'} onPress={connect} />

@@ -1,5 +1,6 @@
 import { fuseAltitude } from './altitude';
 import { distance } from './geo';
+import { dropImpossibleSpeeds } from './slopes';
 import { analyseTurns } from './turns';
 import type { Activity, ActivityKind, DayStats, TrackPoint } from './types';
 
@@ -24,14 +25,19 @@ export const CONFIG = {
   queueMaxSpread: 150, // m: you stay put in a lift line
   maxGapForMoving: 30, // s: longer gaps (tunnel, signal lost) don't count as moving
   maxVertRate: 25, // m/s: faster altitude changes are GPS altitude glitches (a straight schuss is ~15)
-  altResyncMs: 60000, // a new altitude level that holds this long is real (e.g. after a bad first fix)
-  altResyncSpread: 20, // m: "holds" = stays within this
+  altResyncMs: 60000, // a jump to a new altitude level that holds (changes smoothly) this long is real (e.g. after a bad first fix)
   altMedianMs: 15000, // ± this window: a running median removes short altitude wobbles
   mergeGapS: 90, // s: a "lift" or stop shorter than this between two runs is noise inside one run
   mergeGapClimb: 50, // m: …and it may not climb more than this
   noiseRunS: 40, // s: a "run" shorter than this between two lifts is noise inside one ride
   noiseRunDrop: 50, // m: …and it may not drop more than this
+  downLiftMinS: 60, // s: riding a gondola/chair down lasts at least this…
+  downLiftMaxWinding: 1.05, // …its path is this close to a straight line (path / straight-line distance)…
+  downLiftMaxSpeedCv: 0.2, // …and its speed this steady (std dev / mean). Real runs turn and vary.
 };
+
+/** Bump whenever detection logic changes, so days saved by older versions get their stats recomputed. */
+export const STATS_VERSION = 2;
 
 /**
  * Phones' GPS altitude sometimes jumps hundreds of metres for a few seconds.
@@ -39,30 +45,40 @@ export const CONFIG = {
  * gap is bridged from the neighbouring fixes.
  */
 export function despikeAltitude(points: TrackPoint[]): TrackPoint[] {
-  let ref: { alt: number; t: number } | null = null;
-  let pending: TrackPoint[] = [];
+  // ref: last trusted fix; lone = nothing has confirmed it yet (the very first fix).
+  let ref: { alt: number; t: number; i: number; lone: boolean } | null = null;
+  let pending: number[] = []; // indexes of rejected fixes that follow each other smoothly
   const out = points.slice();
+  const plausible = (alt: number, t: number, from: { alt: number; t: number }) =>
+    Math.abs(alt - from.alt) / Math.max(1, (t - from.t) / 1000) <= CONFIG.maxVertRate;
   for (let i = 0; i < out.length; i++) {
     const p = out[i];
     if (p.alt == null || !Number.isFinite(p.alt)) continue;
     if (!ref) {
-      ref = { alt: p.alt, t: p.t };
+      ref = { alt: p.alt, t: p.t, i, lone: true };
       continue;
     }
-    const dt = Math.max(1, (p.t - ref.t) / 1000);
-    if (Math.abs(p.alt - ref.alt) / dt <= CONFIG.maxVertRate) {
-      ref = { alt: p.alt, t: p.t };
+    const last = pending.length ? points[pending[pending.length - 1]] : null;
+    // Still on the suspicious new level: it must hold for altResyncMs, however far it jumped.
+    if (last && plausible(p.alt, p.t, last as { alt: number; t: number })) {
+      pending.push(i);
+      if (p.t - points[pending[0]].t >= CONFIG.altResyncMs) {
+        // It held, so the old level was wrong: give the pending fixes their altitudes back.
+        for (const k of pending) out[k] = points[k];
+        if (ref.lone) out[ref.i] = { ...points[ref.i], alt: null };
+        ref = { alt: p.alt, t: p.t, i, lone: false };
+        pending = [];
+      } else {
+        out[i] = { ...p, alt: null };
+      }
+      continue;
+    }
+    if (plausible(p.alt, p.t, ref)) {
+      ref = { alt: p.alt, t: p.t, i, lone: false };
       pending = [];
       continue;
     }
-    // Suspicious. If the new level holds for a minute, it was the old one that was wrong.
-    if (pending.length && Math.abs(p.alt - pending[0].alt!) > CONFIG.altResyncSpread) pending = [];
-    pending.push(p);
-    if (p.t - pending[0].t >= CONFIG.altResyncMs) {
-      ref = { alt: p.alt, t: p.t };
-      pending = [];
-      continue;
-    }
+    pending = [i];
     out[i] = { ...p, alt: null };
   }
   return out;
@@ -87,7 +103,7 @@ export function cleanTrack(points: TrackPoint[]): TrackPoint[] {
     rejects = 0;
     out.push(p);
   }
-  return despikeAltitude(out);
+  return despikeAltitude(dropImpossibleSpeeds(out));
 }
 
 /** Cumulative path distance in metres for each index. */
@@ -284,7 +300,7 @@ export function segmentActivities(
       const run = summarise('run', s, e, pts, cum, spd, a);
       const isRun = run.avgSpeed >= CONFIG.runMinAvgSpeed && a[s] - a[e] >= CONFIG.trendThreshold * 0.6;
       push('other', start, s);
-      push(isRun ? 'run' : 'other', s, e);
+      push(isRun ? (isDownLift(run, s, e, pts, spd, a) ? 'lift' : 'run') : 'other', s, e);
       push('other', e, end);
     } else if (dir === 1) {
       // Trim the queue at the bottom and standing around at the top.
@@ -314,6 +330,24 @@ export function segmentActivities(
     }
   }
   return markLiftLines(mergeNoise(out, pts, cum, spd, a), pts);
+}
+
+/**
+ * Riding a gondola or chair back down: a dead-straight descent at a steady
+ * speed and a steady sink rate. Deliberately strict, so a real run is never
+ * taken for one: runs turn, and their speed varies.
+ */
+function isDownLift(run: Activity, s: number, e: number, pts: TrackPoint[], spd: number[], a: number[]): boolean {
+  if (run.duration < CONFIG.downLiftMinS || run.avgSpeed > CONFIG.liftMaxSpeed) return false;
+  const straight = distance(pts[s], pts[e]);
+  if (straight <= 0 || run.distance / straight > CONFIG.downLiftMaxWinding) return false;
+  let sum = 0, sq = 0;
+  for (let i = s; i <= e; i++) { sum += spd[i]; sq += spd[i] * spd[i]; }
+  const n = e - s + 1, mean = sum / n;
+  if (mean <= 0 || Math.sqrt(Math.max(0, sq / n - mean * mean)) / mean > CONFIG.downLiftMaxSpeedCv) return false;
+  // Steady descent: each half drops at least a quarter of the total.
+  const mid = (s + e) >> 1, drop = a[s] - a[e];
+  return a[s] - a[mid] >= drop / 4 && a[mid] - a[e] >= drop / 4;
 }
 
 /**
@@ -368,7 +402,7 @@ export function computeStats(rawPoints: TrackPoint[]): DayStats {
   const empty: DayStats = {
     duration: 0, movingTime: 0, skiTime: 0, liftTime: 0, distance: 0, skiDistance: 0,
     topSpeed: 0, topSpeedTime: null, avgSkiSpeed: 0, verticalDown: 0, verticalUp: 0,
-    maxAlt: null, minAlt: null, runCount: 0, liftCount: 0, longestRun: 0, activities: [],
+    maxAlt: null, minAlt: null, runCount: 0, liftCount: 0, longestRun: 0, activities: [], statsVersion: STATS_VERSION,
   };
   if (n === 0) return empty;
 
@@ -426,6 +460,7 @@ export function computeStats(rawPoints: TrackPoint[]): DayStats {
     turns: runs.reduce((s, r) => s + (r.turns ?? 0), 0),
     maxG: runs.reduce((m, r) => Math.max(m, r.maxG ?? 0), 0),
     activities,
+    statsVersion: STATS_VERSION,
   };
 }
 

@@ -116,6 +116,27 @@ test('log out, change password, and too many wrong passwords', async () => {
   assert.equal((await call(guesser, 'POST', '/v1/account/login', { username: 'eve-x', password: 'guess9xx' })).status, 429);
 });
 
+test('changing the password logs out the other phones, not this one', async () => {
+  const other = phone('d-raf-3');
+  assert.equal((await call(other, 'POST', '/v1/account/login', { username: 'rafha', password: 'newpass1' })).status, 200);
+  assert.equal((await call(other, 'GET', '/v1/me')).json.username, 'rafha');
+  assert.equal((await call(rafPhone1, 'PUT', '/v1/account/password', { old: 'newpass1', password: 'newpass2' })).status, 200);
+  assert.equal((await call(rafPhone1, 'GET', '/v1/me')).json.username, 'rafha');
+  // Someone else using that phone's id isn't told (and can't take the id)...
+  const fake = await call({ auth: 'Bearer d-raf-3:not-the-secret-0123456789' }, 'GET', '/v1/me');
+  assert.equal(fake.status, 401);
+  assert.notEqual(fake.json.code, 'logged_out');
+  // ...the other phones are told once that they were logged out...
+  for (const p of [other, phone('d-raf-2b')]) {
+    const r = await call(p, 'GET', '/v1/me');
+    assert.equal(r.status, 401);
+    assert.equal(r.json.code, 'logged_out');
+  }
+  // ...then their tokens no longer reach the account, and a fresh id works.
+  assert.equal((await call(other, 'GET', '/v1/me')).json.username, null);
+  assert.equal((await call(phone('d-raf-3-new'), 'GET', '/v1/me')).status, 200);
+});
+
 test('an old database upgrades: existing players keep working', async () => {
   const { DatabaseSync } = await import('node:sqlite');
   const { createHash } = await import('node:crypto');

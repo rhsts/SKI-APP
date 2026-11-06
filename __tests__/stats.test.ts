@@ -141,3 +141,84 @@ describe('lift lines and ski touring', () => {
     expect(s.runCount).toBe(2);
   });
 });
+
+describe('altitude glitches that hold a while', () => {
+  const base = simulateDay().points;
+  const good = computeStats(base);
+
+  it('a single bad first fix 300 m up adds no vertical', () => {
+    const pts = base.map((p, i) => (i === 0 ? { ...p, alt: p.alt! + 300 } : p));
+    const s = computeStats(pts);
+    expect(Math.abs(s.verticalDown - good.verticalDown)).toBeLessThan(30);
+    expect(s.runCount).toBe(good.runCount);
+  });
+
+  it('a 20 s glitch 300 m up mid-run adds no run and no vertical', () => {
+    const run = good.activities.find((a) => a.kind === 'run')!;
+    const from = Math.round((run.startIndex + run.endIndex) / 2);
+    const pts = base.map((p, i) => (i >= from && i < from + 20 ? { ...p, alt: p.alt! + 300 } : p));
+    const s = computeStats(pts);
+    expect(s.runCount).toBe(good.runCount);
+    expect(s.liftCount).toBe(good.liftCount);
+    expect(Math.abs(s.verticalDown - good.verticalDown)).toBeLessThan(30);
+  });
+
+  it('a new level that holds a minute is accepted, with its fixes restored', () => {
+    const pts: TrackPoint[] = [{ t: 0, lat: 47, lon: 10, alt: 2300, acc: 5, spd: 0 }];
+    for (let k = 1; k <= 90; k++) pts.push({ t: k * 1000, lat: 47, lon: 10, alt: 2000 - k, acc: 5, spd: 0 });
+    const out = cleanTrack(pts);
+    expect(out[0].alt).toBeNull(); // the bad first fix
+    expect(out.slice(1).every((p, k) => p.alt === 2000 - (k + 1))).toBe(true);
+  });
+});
+
+describe('Doppler speed spikes', () => {
+  it('ignores a two-fix 38 m/s spike on a lift', () => {
+    const pts: TrackPoint[] = [];
+    for (let k = 0; k < 200; k++) {
+      pts.push({ t: k * 1000, lat: 47 + k * 4.5e-5, lon: 10, alt: 1800 + k * 2, acc: 5, spd: k === 100 || k === 101 ? 38 : 5 });
+    }
+    expect(computeStats(pts).topSpeed).toBeLessThan(10);
+  });
+});
+
+describe('riding a lift down', () => {
+  // Small seeded GPS position noise (±1 m) so paths aren't unrealistically clean.
+  let seed = 7;
+  const jitter = () => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5) * 2e-5;
+  const M = 1 / 111195; // degrees latitude per metre
+  const track = (move: (k: number) => { x: number; y: number; alt: number; spd: number }, seconds: number) => {
+    const pts: TrackPoint[] = [];
+    const at = (k: number, x: number, y: number, alt: number, spd: number) =>
+      pts.push({ t: k * 1000, lat: 47 + y * M + jitter(), lon: 10 + (x * M) / Math.cos((47 * Math.PI) / 180) + jitter(), alt, acc: 5, spd });
+    const s0 = move(0), end = move(seconds);
+    for (let k = 0; k < 30; k++) at(k, s0.x, s0.y, s0.alt, 0);
+    for (let k = 0; k <= seconds; k++) { const m = move(k); at(30 + k, m.x, m.y, m.alt, m.spd); }
+    for (let k = 1; k <= 30; k++) at(30 + seconds + k, end.x, end.y, end.alt, 0);
+    return pts;
+  };
+
+  it('a gondola going down at a steady 5 m/s is a lift, not a run', () => {
+    const s = computeStats(track((k) => ({ x: 0, y: 5 * k, alt: 2400 - 2.5 * k, spd: 5 + Math.sin(k) * 0.2 }), 160));
+    expect(s.runCount).toBe(0);
+    expect(s.liftCount).toBe(1);
+  });
+
+  it('a normal turning run stays a run', () => {
+    const s = computeStats(track((k) => ({
+      x: 15 * Math.sin((2 * Math.PI * k) / 8), y: 5 * k, alt: 2400 - 2.5 * k, spd: 7 + 2 * Math.cos((2 * Math.PI * k) / 4),
+    }), 160));
+    expect(s.runCount).toBe(1);
+    expect(s.liftCount).toBe(0);
+  });
+
+  it('a straight schuss at varying speed stays a run', () => {
+    let y = 0;
+    const s = computeStats(track((k) => {
+      const spd = 8 + 5 * Math.sin(k / 10);
+      if (k > 0) y += spd;
+      return { x: 0, y, alt: 2400 - y / 2, spd };
+    }, 120));
+    expect(s.runCount).toBe(1);
+  });
+});

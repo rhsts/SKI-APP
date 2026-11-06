@@ -208,12 +208,13 @@ export function matchRunsToPistes(points: TrackPoint[], runs: Activity[], pistes
 }
 
 /** Colour for a piste difficulty (European convention, green for beginner areas). */
-export function difficultyColor(d: Difficulty): string {
+/** `dark`: drawn on a dark UI surface (black runs become light). Maps stay light, so leave it off there. */
+export function difficultyColor(d: Difficulty, dark = false): string {
   switch (d) {
     case 'novice': return '#2E9E4F';
     case 'easy': return '#2F6FDE';
     case 'intermediate': return '#D33A2F';
-    case 'advanced': case 'expert': return '#111111';
+    case 'advanced': case 'expert': return dark ? '#E8ECF1' : '#111111';
     case 'freeride': return '#E8892B';
     default: return '#8F9CAD';
   }

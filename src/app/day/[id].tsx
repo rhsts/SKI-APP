@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { ElevationChart } from '../../components/ElevationChart';
 import { SpeedChart } from '../../components/SpeedChart';
 import { RouteMap } from '../../components/RouteMap';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { BreakRow, TimelineCard } from '../../components/TimelineCard';
 import { exportGpx } from '../../days/files';
-import { api, friendsEnabled } from '../../friends/api';
+import { deleteDayOnline } from '../../friends/sync';
 import { lookupPistes, pistesUpToDate } from '../../mountain/pistes';
 import { mapFor, type TrailMap } from '../../lib/trailmap';
 import { suggestChallenges } from '../../lib/suggest';
@@ -57,6 +57,9 @@ export default function DayScreen() {
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const [addingPhotos, setAddingPhotos] = useState(false);
   const [motion, setMotion] = useState<MotionRow[]>([]);
+  // Replay readout keeps the tallest height it has had (2 lines minimum) so the graph below never moves.
+  const { fontScale } = useWindowDimensions();
+  const [readoutH, setReadoutH] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -220,7 +223,8 @@ export default function DayScreen() {
   const timeline = stats.activities;
   const shares = session.pistes && Object.keys(session.pistes).length ? difficultyBreakdown([{ activities: timeline, pistes: session.pistes }]) : [];
   const cur = cursor != null ? pts[cursor] : null;
-  const curActivity = cursor != null ? activityAt(timeline, cursor) : null;
+  // A run's last point is shared with the next activity; inside the graphed run it still belongs to that run.
+  const curActivity = cursor == null ? null : selRun && range && (focus == null || focus === selected) && cursor >= range.a && cursor <= range.b ? selRun : activityAt(timeline, cursor);
   // Speed is only shown on runs; a lift's speed isn't interesting.
   const readout = cur
     ? [
@@ -263,8 +267,8 @@ export default function DayScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
           await deleteSession(session.id);
-          // Off your groups' leaderboards too (if it was shared and there's signal).
-          if (friendsEnabled()) api.deleteDay(session.id).catch(() => undefined);
+          // Off your groups' leaderboards and out of your online backup too (retried later if there's no signal).
+          deleteDayOnline(session.id).catch(() => undefined);
           router.back();
         } },
     ]);
@@ -306,7 +310,7 @@ export default function DayScreen() {
 
       {editing ? (
         <View style={styles.titleRow}>
-          <TextInput value={name} onChangeText={setName} style={styles.input} autoFocus placeholder="Resort or place" onSubmitEditing={saveName} />
+          <TextInput value={name} onChangeText={setName} style={styles.input} placeholderTextColor={colors.muted} autoFocus placeholder="Resort or place" onSubmitEditing={saveName} />
           <Pressable onPress={saveName} hitSlop={10}><Ionicons name="checkmark-circle" size={30} color={colors.accent} /></Pressable>
         </View>
       ) : (
@@ -379,7 +383,12 @@ export default function DayScreen() {
               </Pressable>
               <View style={{ flex: 1 }}>
                 {selRun ? <Text style={s.label}>{fmtSpeed(selRun.topSpeed, units)} top · {fmtAlt(selRun.verticalDown, units)} ↓</Text> : null}
-                <Text style={s.body}>{readout}</Text>
+                <Text
+                  style={[s.body, { lineHeight: 20, minHeight: Math.max(40 * fontScale, readoutH) }]}
+                  onLayout={(e) => { const h = e.nativeEvent.layout.height; if (h > readoutH) setReadoutH(h); }}
+                >
+                  {readout}
+                </Text>
                 {selRun ? (
                   <Text style={s.muted}>
                     {[

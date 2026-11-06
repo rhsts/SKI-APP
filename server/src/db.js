@@ -105,6 +105,9 @@ function migrateAccounts(db) {
     -- Phones of skiers an admin removed: they can't come back as a new skier.
     CREATE TABLE IF NOT EXISTS removed_devices (id TEXT PRIMARY KEY NOT NULL, removed_at INTEGER NOT NULL);
 
+    -- Phones logged out by a password change elsewhere: told once, then they start afresh.
+    CREATE TABLE IF NOT EXISTS logged_out_devices (id TEXT PRIMARY KEY NOT NULL, secret_hash TEXT NOT NULL);
+
     -- Online backup of whole days (GPS track included), only for accounts. The track is
     -- stored as the app sent it (gzip + base64): the server never needs to read it.
     CREATE TABLE IF NOT EXISTS tracks (

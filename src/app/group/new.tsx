@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { api } from '../../friends/api';
 import { syncFriends } from '../../friends/sync';
 import { cleanCode } from '../../lib/groups';
@@ -11,6 +12,7 @@ import { useStyles, useTheme, type Palette } from '../../theme';
 /** Start a friend group for your trip, or join one with the code a friend sent you. */
 export default function NewGroupScreen() {
   const { colors, s } = useTheme();
+  const headerHeight = useHeaderHeight();
   const styles = useStyles(makeStyles);
   const { serverUrl } = useSettings();
   const params = useLocalSearchParams<{ code?: string }>();
@@ -49,31 +51,35 @@ export default function NewGroupScreen() {
   }
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View style={[s.card, { gap: 10 }]}>
-        <Text style={s.h2}>Join a group</Text>
-        <Text style={s.muted}>Type the 6-letter code a friend sent you.</Text>
-        <TextInput
-          value={code}
-          onChangeText={(t) => setCode(cleanCode(t))}
-          placeholder="ABC123"
-          autoCapitalize="characters"
-          autoCorrect={false}
-          style={[styles.input, styles.code]}
-          maxLength={8}
-        />
-        <Btn label="Join" icon="enter-outline" disabled={code.length !== 6} busy={busy === 'join'} onPress={() => go('join')} />
-      </View>
+    // Edge-to-edge Android doesn't resize the window for the keyboard, so pad for it on both platforms.
+    <KeyboardAvoidingView style={s.screen} behavior="padding" keyboardVerticalOffset={headerHeight}>
+      <ScrollView style={s.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={[s.card, { gap: 10 }]}>
+          <Text style={s.h2}>Join a group</Text>
+          <Text style={s.muted}>Type the 6-letter code a friend sent you.</Text>
+          <TextInput
+            value={code}
+            onChangeText={(t) => setCode(cleanCode(t))}
+            placeholder="ABC123"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            style={[styles.input, styles.code]}
+            placeholderTextColor={colors.muted}
+            maxLength={8}
+          />
+          <Btn label="Join" icon="enter-outline" disabled={code.length !== 6} busy={busy === 'join'} onPress={() => go('join')} />
+        </View>
 
-      <Text style={[s.muted, { textAlign: 'center' }]}>or</Text>
+        <Text style={[s.muted, { textAlign: 'center' }]}>or</Text>
 
-      <View style={[s.card, { gap: 10 }]}>
-        <Text style={s.h2}>Start a new group</Text>
-        <Text style={s.muted}>One group per trip works well, e.g. “Ischgl 2026”. You get a code to send to your friends.</Text>
-        <TextInput value={name} onChangeText={setName} placeholder="Group name" style={styles.input} maxLength={40} />
-        <Btn label="Create group" icon="people-outline" disabled={!name.trim()} busy={busy === 'create'} onPress={() => go('create')} />
-      </View>
-    </ScrollView>
+        <View style={[s.card, { gap: 10 }]}>
+          <Text style={s.h2}>Start a new group</Text>
+          <Text style={s.muted}>One group per trip works well, e.g. “Ischgl 2026”. You get a code to send to your friends.</Text>
+          <TextInput value={name} onChangeText={setName} placeholder="Group name" placeholderTextColor={colors.muted} style={styles.input} maxLength={40} />
+          <Btn label="Create group" icon="people-outline" disabled={!name.trim()} busy={busy === 'create'} onPress={() => go('create')} />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

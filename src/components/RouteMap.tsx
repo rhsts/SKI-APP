@@ -1,6 +1,6 @@
 import { memo, useMemo, useRef } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle, Text } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { simplify } from '../lib/geo';
 import type { TrailMap } from '../lib/trailmap';
 import type { Activity, TrackPoint } from '../lib/types';
@@ -8,6 +8,7 @@ import { TrailOverlay } from './TrailOverlay';
 import { useTheme, useStyles, type Palette, speedColor } from '../theme';
 import { mapsAvailable } from '../lib/mapsAvailable';
 import { MapPlaceholder } from './MapPlaceholder';
+import { ViewMarker } from './ViewMarker';
 
 interface Props {
   /** Cleaned track (indices must match `activities`). */
@@ -125,21 +126,20 @@ export const RouteMap = memo(function RouteMap({ points, speeds, activities, cur
           );
         })}
         {photos?.map((p) => (
-          <Marker
+          <ViewMarker
             key={p.id}
             coordinate={{ latitude: p.lat, longitude: p.lon }}
             anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
             onPress={() => onPhotoPress?.(p.id)}
             zIndex={4}
           >
             <View style={styles.photoPin}><Text style={{ fontSize: 13 }}>📷</Text></View>
-          </Marker>
+          </ViewMarker>
         ))}
         {c ? (
-          <Marker coordinate={{ latitude: c.lat, longitude: c.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+          <ViewMarker coordinate={{ latitude: c.lat, longitude: c.lon }} anchor={{ x: 0.5, y: 0.5 }}>
             <View style={styles.dot} />
-          </Marker>
+          </ViewMarker>
         ) : null}
       </MapView>
     </View>

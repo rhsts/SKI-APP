@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ElevationChart } from '../components/ElevationChart';
 import { RouteMap } from '../components/RouteMap';
 import { SpeedChart } from '../components/SpeedChart';
@@ -19,9 +19,12 @@ import { useStyles, useTheme, type Palette } from '../theme';
 /** One run up close: map, speed and elevation over the run, steepness, and prev/next. */
 export default function RunScreen() {
   const { session: sessionId, i } = useLocalSearchParams<{ session: string; i: string }>();
-  const { colors, s } = useTheme();
+  const { colors, s, dark } = useTheme();
   const styles = useStyles(makeStyles);
   const { units } = useSettings();
+  // Hint and readout share one box that keeps its tallest height, so the graph below never moves.
+  const { fontScale } = useWindowDimensions();
+  const [readoutH, setReadoutH] = useState(0);
   const [session, setSession] = useState<SessionRow | null>(null);
   const [raw, setRaw] = useState<TrackPoint[] | null>(null);
   // The cursor belongs to one run: after Previous / Next it starts empty again.
@@ -82,8 +85,8 @@ export default function RunScreen() {
 
       {piste ? (
         <View style={styles.pisteRow}>
-          <View style={[styles.dot, { backgroundColor: difficultyColor(piste.difficulty) }]} />
-          <Text style={s.h2}>{piste.name ?? difficultyLabel(piste.difficulty)}</Text>
+          <View style={[styles.dot, { backgroundColor: difficultyColor(piste.difficulty, dark) }]} />
+          <Text style={[s.h2, { flexShrink: 1 }]} numberOfLines={1}>{piste.name ?? difficultyLabel(piste.difficulty)}</Text>
           {piste.name && difficultyLabel(piste.difficulty) ? <Text style={s.muted}>{difficultyLabel(piste.difficulty)}</Text> : null}
         </View>
       ) : null}
@@ -92,7 +95,10 @@ export default function RunScreen() {
       <RouteMap points={slice.pts} speeds={slice.speeds} activities={slice.activities} cursor={cursor} />
 
       <View style={[s.card, { gap: 10 }]}>
-        <Text style={s.body}>
+        <Text
+          style={[s.body, { lineHeight: 20, minHeight: Math.max(20 * fontScale, readoutH) }]}
+          onLayout={(e) => { const h = e.nativeEvent.layout.height; if (h > readoutH) setReadoutH(h); }}
+        >
           {cur ? `${fmtTimeOfDay(cur.t)} · ${fmtSpeed(slice.speeds[cursor!] ?? 0, units)} · ${fmtAlt(slice.alts[cursor!], units)}` : 'Drag on the graph to follow the run'}
         </Text>
         <ElevationChart

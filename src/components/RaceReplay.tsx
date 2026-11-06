@@ -134,7 +134,7 @@ export function RaceReplay({ segment, attempts, playerId }: Props) {
             <View style={styles.splits}>
               <View style={styles.splitRow}>
                 <Text style={[s.label, styles.splitName]}>Section</Text>
-                <Text style={[s.label, styles.splitVal, { color: ME }]}>You</Text>
+                <Text style={[s.label, styles.splitVal, { color: colors.accent }]}>You</Text>
                 <Text style={[s.label, styles.splitVal, { color: RIVAL }]} numberOfLines={1}>{rival!.label === 'You' ? 'Old you' : rival!.label}</Text>
                 <Text style={[s.label, styles.splitVal]}>Gap</Text>
               </View>

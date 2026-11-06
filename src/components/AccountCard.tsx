@@ -53,9 +53,20 @@ export function AccountCard() {
     ]);
 
   const out = () =>
-    Alert.alert('Log out?', 'Your days stay on this phone. Log in again with your username and password.', [
+    Alert.alert('Log out?', 'Your days are saved to your account, then removed from this phone. Log in again to get them back.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => run('out', logOut) },
+      { text: 'Log out', style: 'destructive', onPress: () => run('out', async () => {
+        const { unsaved } = await logOut();
+        if (!unsaved) return;
+        Alert.alert(
+          `${unsaved} ${unsaved === 1 ? 'day' : 'days'} can’t be saved`,
+          `${unsaved === 1 ? 'This day is' : 'These days are'} too big to back up to your account. Logging out removes ${unsaved === 1 ? 'it' : 'them'} from this phone for good.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Log out anyway', style: 'destructive', onPress: () => run('out', () => logOut(true)) },
+          ],
+        );
+      }) },
     ]);
 
   return (
@@ -96,8 +107,12 @@ export function AccountCard() {
       </View>
       {settings.backupDays ? (
         <Row label="Back up now" busy={busy === 'backup'} onPress={() => run('backup', async () => {
-          const n = await backupDays();
-          Alert.alert('Backup', n ? `${n} ${n === 1 ? 'day' : 'days'} backed up.` : 'Everything was already backed up.');
+          const { uploaded: n, failed, tooBig } = await backupDays();
+          const bad = failed + tooBig;
+          Alert.alert('Backup', [
+            n ? `${n} ${n === 1 ? 'day' : 'days'} backed up.` : bad ? '' : 'Everything was already backed up.',
+            bad ? `${bad} ${bad === 1 ? 'day' : 'days'} couldn’t be backed up${tooBig ? ' (too big)' : ''}.` : '',
+          ].filter(Boolean).join(' '));
         })} />
       ) : null}
       {status?.missing ? (

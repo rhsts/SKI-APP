@@ -3,7 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { api, checkServer, FriendsError } from '../friends/api';
 import { createAccount, logIn, restoreDays } from '../friends/account';
@@ -66,7 +66,7 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
   };
 
   return (
-    <KeyboardAvoidingView style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} behavior="padding">
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.logo}>
           <Ionicons name="lock-closed" size={36} color={colors.onAccent} />
@@ -207,7 +207,7 @@ function AccountStep({ code }: { code: string | null }) {
 
   const ready = username.trim().length >= 3 && password.length >= 6;
   return (
-    <KeyboardAvoidingView style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} behavior="padding">
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.logo}>
           <Ionicons name="person" size={36} color={colors.onAccent} />

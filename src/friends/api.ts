@@ -15,6 +15,12 @@ export class FriendsError extends Error {
 
 const TIMEOUT_MS = 12000;
 
+let onLoggedOut: ((message: string) => Promise<void>) | null = null;
+/** Called when the server says this phone was logged out (password changed on another phone). */
+export function setLoggedOutHandler(fn: (message: string) => Promise<void>) {
+  onLoggedOut = fn;
+}
+
 export function friendsEnabled(): boolean {
   return !!getSettings().serverUrl;
 }
@@ -61,6 +67,10 @@ async function call<T>(
         password ? 'Wrong server password. Ask whoever runs the server for the right one.' : 'This server needs a password. Enter it in Profile → Friends server.',
         res.status, 'password',
       );
+    }
+    if (res.status === 401 && err.code === 'logged_out') {
+      // Password changed on another phone: back to the log in screen (account.ts registers this).
+      await onLoggedOut?.(String(err.error)).catch(() => undefined);
     }
     if (res.status === 401 && String(err.error ?? '').includes('removed')) {
       // An admin removed this skier: back to the lock screen.

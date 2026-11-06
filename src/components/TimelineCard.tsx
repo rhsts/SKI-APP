@@ -24,7 +24,7 @@ interface Props {
 
 /** One entry in the day's timeline: a run or a lift ride. */
 export function TimelineCard({ activity: a, number, units, selected, onPress, onChallenge, piste, onDetails, motion }: Props) {
-  const { colors, s } = useTheme();
+  const { colors, s, dark } = useTheme();
   const styles = useStyles(makeStyles);
   const isRun = a.kind === 'run';
   const isTour = a.kind === 'tour';
@@ -38,8 +38,8 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
       <View style={{ flex: 1, gap: 4 }}>
         <View style={styles.row}>
           <Text style={s.h2}>{title}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Text style={s.muted}>{fmtTimeOfDay(a.startTime)} · {fmtDuration(a.duration)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
+            <Text style={[s.muted, { flexShrink: 1 }]} numberOfLines={1}>{fmtTimeOfDay(a.startTime)} · {fmtDuration(a.duration)}</Text>
             {isRun && onChallenge ? (
               <Pressable onPress={onChallenge} hitSlop={10} accessibilityLabel={`Make run ${number} a challenge`}>
                 <Ionicons name="flag-outline" size={20} color={colors.accent} />
@@ -57,7 +57,7 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
         ) : null}
         {isRun && piste ? (
           <View style={styles.pisteRow}>
-            <View style={[styles.dot, { backgroundColor: difficultyColor(piste.difficulty) }]} />
+            <View style={[styles.dot, { backgroundColor: difficultyColor(piste.difficulty, dark) }]} />
             <Text style={[s.body, { fontWeight: '700', flex: 1 }]} numberOfLines={1}>
               {piste.name ?? difficultyLabel(piste.difficulty) ?? 'Piste'}
               {piste.name && difficultyLabel(piste.difficulty) ? <Text style={s.muted}>  {difficultyLabel(piste.difficulty)}</Text> : null}
@@ -65,7 +65,7 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
           </View>
         ) : null}
         {isRun ? (
-          <View style={styles.row}>
+          <View style={styles.metrics}>
             <Metric label="Top" value={fmtSpeed(a.topSpeed, units)} />
             <Metric label="Avg" value={fmtSpeed(a.avgSpeed, units)} />
             <Metric label="Vertical" value={fmtAlt(a.verticalDown, units)} />
@@ -82,13 +82,13 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
           </Text>
         ) : null}
         {isRun ? null : isTour ? (
-          <View style={styles.row}>
+          <View style={styles.metrics}>
             <Metric label="Climbed" value={fmtAlt(a.verticalUp, units)} />
             <Metric label="Dist" value={fmtDist(a.distance, units)} />
             <Metric label="Rate" value={`${fmtAlt((a.verticalUp / Math.max(1, a.duration)) * 3600, units)}/h`} />
           </View>
         ) : (
-          <View style={styles.row}>
+          <View style={styles.metrics}>
             <Metric label="Up" value={fmtAlt(a.verticalUp, units)} />
             <Metric label="Dist" value={fmtDist(a.distance, units)} />
             <Metric label="Speed" value={fmtSpeed(a.avgSpeed, units)} />
@@ -128,6 +128,8 @@ const makeStyles = (colors: Palette) =>
     card: { flexDirection: 'row', gap: 12, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
     icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
+    // Wraps to a second line on narrow screens / big fonts instead of spilling past the card.
+    metrics: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12, rowGap: 6 },
     metric: { fontSize: 14, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
     pisteRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },

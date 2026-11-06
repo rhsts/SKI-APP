@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSyncExternalStore } from 'react';
 import {
-  createSession, deleteMotionEvent, deleteSession, finishSession, getPoints, insertMotionEvents, insertPoints, kvGet, kvSet,
+  createSession, deleteMotionEvent, deleteSession, finishSession, getPoints, getSession, insertMotionEvents, insertPoints, kvGet, kvSet,
   listAttempts, listMotionEvents, listSegments, upsertAttempts,
 } from '../db';
 import { EMPTY_MOTION, summariseMotion, type MotionEvent, type MotionSummary } from '../lib/motion';
@@ -274,6 +274,8 @@ export async function notAFall(): Promise<void> {
 
 function checkMoments(stats: DayStats) {
   const done = completedRuns(stats);
+  // Two pieces merged into one run: count down so the run's real end gets announced.
+  if (done.length < announcedRuns) announcedRuns = done.length;
   if (done.length > announcedRuns) {
     const r = done[done.length - 1];
     announcedRuns = done.length;
@@ -508,6 +510,12 @@ export function dismissFinish() {
 
 // ---------- actions ----------
 
+/** Undo a half-started source so the next start binds GPS and the motion sensor afresh. */
+async function cleanUpFailedStart() {
+  stopPolling();
+  await stopSource().catch(() => undefined);
+}
+
 export async function startDay(simulate: boolean, sport: Sport = 'ski'): Promise<void> {
   if (state.status !== 'idle') return;
   set({ error: null });
@@ -524,6 +532,7 @@ export async function startDay(simulate: boolean, sport: Sport = 'ski'): Promise
     await startSource(active);
     startPolling();
   } catch (e) {
+    await cleanUpFailedStart();
     await saveActive(null);
     await deleteSession(sessionId);
     set({ ...initial, error: e instanceof Error ? e.message : String(e) });
@@ -551,6 +560,7 @@ export async function resumeDay(): Promise<void> {
     await startSource(active);
     startPolling();
   } catch (e) {
+    await cleanUpFailedStart();
     await saveActive({ ...active, paused: true });
     set({ status: 'paused', active: { ...active, paused: true }, error: e instanceof Error ? e.message : String(e) });
   }
@@ -565,17 +575,28 @@ export async function stopDay(): Promise<string | null> {
   if (!a) return null;
   await stopSource();
   stopPolling();
-  const points = await getPoints(a.sessionId);
-  await saveActive(null);
-  const stats = computeStats(points);
-  if (points.length < 20 || stats.duration < 60) {
-    await deleteSession(a.sessionId);
-    racers = [];
-    set({ ...initial });
-    return null;
+  // "active" keeps pointing at the day until it is saved, so a crash in here never loses it.
+  let points: TrackPoint[];
+  try {
+    points = await getPoints(a.sessionId);
+    const stats = computeStats(points);
+    if (points.length < 20 || stats.duration < 60) {
+      await deleteSession(a.sessionId);
+      await saveActive(null);
+      racers = [];
+      set({ ...initial });
+      return null;
+    }
+    const place = a.source === 'sim' ? 'Demo Mountain' : await lookupPlace(points).catch(() => null);
+    await finishSession(a.sessionId, points[points.length - 1].t, stats, place);
+    await saveActive(null);
+  } catch (e) {
+    // Leave the day paused so Finish can be tried again.
+    const paused = { ...a, paused: true };
+    await saveActive(paused).catch(() => undefined);
+    set({ status: 'paused', active: paused, currentSpeed: 0 });
+    throw e;
   }
-  const place = a.source === 'sim' ? 'Demo Mountain' : await lookupPlace(points);
-  await finishSession(a.sessionId, points[points.length - 1].t, stats, place);
   // Re-time all challenges on the complete day (catches anything missed live).
   await matchSession(a.sessionId, points);
   // Piste names in the background; the day screen retries if this fails (e.g. no signal).
@@ -594,6 +615,12 @@ export async function stopDay(): Promise<string | null> {
 export async function recoverActiveDay(): Promise<void> {
   const a = await readActive();
   if (!a) return;
+  // Killed while finishing: the day was already saved (or deleted as too short).
+  const s = await getSession(a.sessionId);
+  if (!s || s.endedAt != null) {
+    await saveActive(null);
+    return;
+  }
   const points = await getPoints(a.sessionId);
   const stats = points.length ? computeStats(points) : null;
   let bgRunning = false;

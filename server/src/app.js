@@ -23,6 +23,32 @@ const MAX_AVATAR = 200 * 1000; // base64 characters (~150 KB JPEG)
 const MAX_TRACK = 6 * 1000 * 1000; // base64 characters
 const LOGIN_FAILS = 8; // wrong passwords per username…
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // …within this window lock it for the rest of the window
+const SERVER_PW_FAILS_PER_IP = 10; // wrong server passwords per client IP per window…
+const SERVER_PW_FAILS_TOTAL = 100; // …and from everyone together (so faking IPs doesn't help)
+
+/** Counts failures per key; once a key has `max` within `windowMs` of its first, check() throws 429. */
+function failLimit(max, windowMs, clock, message) {
+  const m = new Map(); // key -> { n, first }
+  let swept = clock();
+  return {
+    check(key) {
+      const f = m.get(key);
+      if (f && clock() - f.first > windowMs) m.delete(key);
+      else if (f && f.n >= max) throw new HttpError(429, message);
+    },
+    fail(key) {
+      const t = clock();
+      if (t - swept > windowMs) { // drop old entries now and then so the map can't grow forever
+        swept = t;
+        for (const [k, f] of m) if (t - f.first > windowMs) m.delete(k);
+      }
+      const f = m.get(key);
+      if (f && t - f.first <= windowMs) f.n++;
+      else m.set(key, { n: 1, first: t });
+    },
+    clear: (key) => m.delete(key),
+  };
+}
 
 function hashPassword(pw) {
   const salt = randomBytes(16);
@@ -92,12 +118,24 @@ function validPath(path) {
  * `password`: the server password (SERVER_PASSWORD). When set, every request
  * except /v1/health must send it in the "X-Server-Password" header.
  */
-export function createApi(db, { password = '' } = {}) {
+export function createApi(db, { password = '', clock = Date.now } = {}) {
   const passwordHash = password ? createHash('sha256').update(password).digest() : null;
-  function checkPassword(given) {
+  const tooMany = 'Too many wrong passwords. Try again in 15 minutes.';
+  const ipFails = failLimit(SERVER_PW_FAILS_PER_IP, LOGIN_WINDOW_MS, clock, tooMany);
+  const allFails = failLimit(SERVER_PW_FAILS_TOTAL, LOGIN_WINDOW_MS, clock, tooMany);
+  function checkPassword(given, ip, authHeader) {
     if (!passwordHash) return;
+    // Phones already set up on this server aren't locked out by someone else's guessing.
+    if (!knownDevice(authHeader)) {
+      ipFails.check(ip);
+      allFails.check('');
+    }
     const h = createHash('sha256').update(typeof given === 'string' ? given : '').digest();
-    if (!timingSafeEqual(h, passwordHash)) throw new HttpError(401, 'Wrong server password', 'password');
+    if (!timingSafeEqual(h, passwordHash)) {
+      ipFails.fail(ip);
+      allFails.fail('');
+      throw new HttpError(401, 'Wrong server password', 'password');
+    }
   }
 
   const q = (sql) => db.prepare(sql);
@@ -109,7 +147,11 @@ export function createApi(db, { password = '' } = {}) {
     addDevice: q('INSERT INTO devices (id, secret_hash, player_id, created_at) VALUES (?, ?, ?, ?)'),
     moveDevice: q('UPDATE devices SET player_id = ? WHERE id = ?'),
     deleteDevice: q('DELETE FROM devices WHERE id = ?'),
+    deleteOtherDevices: q('DELETE FROM devices WHERE player_id = ? AND id != ?'),
     removedDevice: q('SELECT 1 AS ok FROM removed_devices WHERE id = ?'),
+    logOutOtherDevices: q('INSERT OR REPLACE INTO logged_out_devices (id, secret_hash) SELECT id, secret_hash FROM devices WHERE player_id = ? AND id != ?'),
+    loggedOutDevice: q('SELECT secret_hash FROM logged_out_devices WHERE id = ?'),
+    forgetLoggedOut: q('DELETE FROM logged_out_devices WHERE id = ?'),
     deviceCount: q('SELECT COUNT(*) AS n FROM devices WHERE player_id = ?'),
     touch: q('UPDATE players SET last_seen = ? WHERE id = ?'),
     register: q('UPDATE players SET username = ?, pass_hash = ?, name = ?, is_admin = ? WHERE id = ?'),
@@ -195,6 +237,15 @@ export function createApi(db, { password = '' } = {}) {
                        WHERE a.segment_id = ? AND a.date = ? ORDER BY a.time`),
   };
 
+  /** True when the header names an existing phone with its right secret. */
+  function knownDevice(header) {
+    const m = /^Bearer ([A-Za-z0-9._-]{1,80}):([A-Za-z0-9_-]{16,128})$/.exec(header ?? '');
+    const dev = m && stmt.device.get(m[1]);
+    if (!dev) return false;
+    const a = Buffer.from(dev.secret_hash, 'hex'), b = Buffer.from(sha(m[2]), 'hex');
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
   function auth(header) {
     const m = /^Bearer ([A-Za-z0-9._-]{1,80}):([A-Za-z0-9_-]{16,128})$/.exec(header ?? '');
     if (!m) throw new HttpError(401, 'Missing or invalid Authorization header');
@@ -203,6 +254,14 @@ export function createApi(db, { password = '' } = {}) {
     const dev = stmt.device.get(deviceId);
     if (!dev) {
       if (stmt.removedDevice.get(deviceId)) throw new HttpError(401, 'This phone was removed from the server');
+      const out = stmt.loggedOutDevice.get(deviceId);
+      if (out) {
+        const a = Buffer.from(out.secret_hash, 'hex'), b = Buffer.from(hash, 'hex');
+        if (a.length !== b.length || !timingSafeEqual(a, b)) throw new HttpError(401, 'This player id belongs to another phone');
+        // Told once; the app then starts again with a fresh id.
+        stmt.forgetLoggedOut.run(deviceId);
+        throw new HttpError(401, 'Your password was changed on another phone. Log in again.', 'logged_out');
+      }
       // A new phone: it starts as its own, anonymous player.
       if (stmt.player.get(deviceId)) throw new HttpError(401, 'This player id belongs to another phone');
       tx(() => {
@@ -224,16 +283,10 @@ export function createApi(db, { password = '' } = {}) {
     return { id: p.id, name: p.name, username: p.username, isAdmin: !!p.is_admin, hasAvatar: !!p.hasAvatar };
   };
 
-  const fails = new Map(); // username -> { n, first }
-  function loginAllowed(username) {
-    const f = fails.get(username);
-    if (f && now() - f.first > LOGIN_WINDOW_MS) fails.delete(username);
-    else if (f && f.n >= LOGIN_FAILS) throw new HttpError(429, 'Too many wrong passwords. Try again in 15 minutes.');
-  }
+  const fails = failLimit(LOGIN_FAILS, LOGIN_WINDOW_MS, clock, tooMany); // per username
+  const loginAllowed = (username) => fails.check(username);
   function loginFailed(username) {
-    const f = fails.get(username);
-    if (f) f.n++;
-    else fails.set(username, { n: 1, first: now() });
+    fails.fail(username);
     throw new HttpError(401, 'Wrong username or password', 'login');
   }
 
@@ -348,7 +401,7 @@ export function createApi(db, { password = '' } = {}) {
       loginAllowed(username);
       const acct = username ? stmt.byUsername.get(username) : null;
       if (!acct || typeof body?.password !== 'string' || !checkPasswordHash(body.password, acct.pass_hash)) loginFailed(username);
-      fails.delete(username);
+      fails.clear(username);
       if (acct.id !== me.id) {
         tx(() => {
           stmt.moveDevice.run(acct.id, me.deviceId);
@@ -368,7 +421,13 @@ export function createApi(db, { password = '' } = {}) {
       needAccount(me);
       const acct = stmt.player.get(me.id);
       if (typeof body?.old !== 'string' || !checkPasswordHash(body.old, acct.pass_hash)) throw new HttpError(401, 'Your current password is wrong', 'login');
-      stmt.setPassword.run(hashPassword(validPassword(body?.password)), me.id);
+      const hash = hashPassword(validPassword(body?.password));
+      tx(() => {
+        stmt.setPassword.run(hash, me.id);
+        // Log out every other phone on this account; this one stays logged in.
+        stmt.logOutOtherDevices.run(me.id, me.deviceId);
+        stmt.deleteOtherDevices.run(me.id, me.deviceId);
+      });
       return { ok: true };
     }],
 
@@ -592,7 +651,7 @@ export function createApi(db, { password = '' } = {}) {
   ];
 
   /** Handles one request; returns [status, json]. */
-  function handle(method, url, headers, body) {
+  function handle(method, url, headers, body, ip = '') {
     const u = new URL(url, 'http://x');
     if (method === 'GET' && u.pathname === '/v1/health') {
       return [200, { ok: true, app: 'ski-tracker-friends', v: 2, accounts: true, password: !!passwordHash }];
@@ -601,7 +660,8 @@ export function createApi(db, { password = '' } = {}) {
       if (m !== method) continue;
       const match = re.exec(u.pathname);
       if (!match) continue;
-      checkPassword(headers['x-server-password']);
+      // Behind Cloudflare Tunnel the socket is always cloudflared, so use the real client IP it passes on.
+      checkPassword(headers['x-server-password'], String(headers['cf-connecting-ip'] || ip), headers.authorization);
       const me = auth(headers.authorization);
       return [200, fn(me, match.slice(1).map(decodeURIComponent), body, u.searchParams)];
     }
@@ -637,7 +697,7 @@ export function listener(api, log = () => undefined) {
             throw new HttpError(400, 'Body must be JSON');
           }
         }
-        [status, out] = api.handle(req.method, req.url, req.headers, body);
+        [status, out] = api.handle(req.method, req.url, req.headers, body, req.socket.remoteAddress);
       } catch (e) {
         status = e instanceof HttpError ? e.status : 500;
         out = { error: e instanceof HttpError ? e.message : 'Server error', ...(e?.code ? { code: e.code } : {}) };

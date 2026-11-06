@@ -21,7 +21,9 @@ jest.mock('../src/settings', () => ({
   updateSettings: (p: object) => mockUpdate(p),
 }));
 // eslint-disable-next-line import/first
-import { api, checkServer } from '../src/friends/api';
+import { api, checkServer, setLoggedOutHandler } from '../src/friends/api';
+const mockLoggedOut = jest.fn(async (_msg: string) => undefined);
+setLoggedOutHandler(mockLoggedOut);
 
 const row = (name: string, vertical: number, topSpeed: number, runs: number, days = 1): BoardRow => ({
   playerId: name, name, vertical, topSpeed, runs, distance: 0, skiTime: 0, days,
@@ -204,5 +206,17 @@ describe('app ↔ server', () => {
     mockSettings.deviceId = 'p-anna';
     mockSettings.deviceSecret = 'not-annas-secret-0123456789';
     await expect(api.groups()).rejects.toThrow('another phone');
+  });
+
+  it('a password change on another phone logs this phone out', async () => {
+    // The new phone (logged in above) changes the password...
+    mockSettings.deviceId = 'p-anna-new-phone';
+    mockSettings.deviceSecret = 'anna-new-phone-0123456789abcdef';
+    await api.changePassword('snowfall9', 'snowfall10');
+    // ...so Anna's first phone is sent to the log in screen.
+    mockSettings.deviceId = 'p-anna';
+    mockSettings.deviceSecret = 'anna-secret-0123456789abcdef';
+    await expect(api.hello()).rejects.toThrow('Log in again');
+    expect(mockLoggedOut).toHaveBeenCalledWith('Your password was changed on another phone. Log in again.');
   });
 });

@@ -1,6 +1,6 @@
 import { useMemo, type ComponentRef, type Ref } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Polyline, Rect, Stop } from 'react-native-svg';
+import Svg, { ClipPath, Defs, G, LinearGradient, Polyline, Rect, Stop } from 'react-native-svg';
 import { fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed } from '../lib/format';
 import { localProjector } from '../lib/geo';
 import type { Activity, DayStats, TrackPoint, Units } from '../lib/types';
@@ -21,6 +21,7 @@ export const CARD_W = 360;
 export const CARD_H = 450; // 4:5, the shape Instagram and WhatsApp status like
 
 const MAP_H = 220;
+const MAP_Y = 64;
 const PAD = 22;
 
 /**
@@ -39,28 +40,34 @@ export function DayShareCard({ points, speeds, stats, place, startedAt, units, r
             <Stop offset="0" stopColor="#0B2545" />
             <Stop offset="1" stopColor="#081421" />
           </LinearGradient>
+          <ClipPath id="map">
+            <Rect x={PAD} y={MAP_Y} width={CARD_W - 2 * PAD} height={MAP_H} />
+          </ClipPath>
         </Defs>
         <Rect x={0} y={0} width={CARD_W} height={CARD_H} fill="url(#bg)" />
-        <Svg x={PAD} y={64} width={CARD_W - 2 * PAD} height={MAP_H}>
-          {lines.map((l, i) => (
-            <Polyline
-              key={i}
-              points={l.points}
-              fill="none"
-              stroke={l.color}
-              strokeWidth={l.lift ? 1.5 : 3.5}
-              strokeDasharray={l.lift ? '5,4' : undefined}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={l.lift ? 0.6 : 1}
-            />
-          ))}
-        </Svg>
+        {/* A G, not a nested Svg: Android's react-native-svg ignores x/y on nested Svg. */}
+        <G clipPath="url(#map)">
+          <G transform={`translate(${PAD}, ${MAP_Y})`}>
+            {lines.map((l, i) => (
+              <Polyline
+                key={i}
+                points={l.points}
+                fill="none"
+                stroke={l.color}
+                strokeWidth={l.lift ? 1.5 : 3.5}
+                strokeDasharray={l.lift ? '5,4' : undefined}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={l.lift ? 0.6 : 1}
+              />
+            ))}
+          </G>
+        </G>
       </Svg>
 
-      <Text style={styles.brand}>⛷️  SKI TRACKER</Text>
-      <Text style={styles.title} numberOfLines={1}>{place ?? 'Ski day'}</Text>
-      <Text style={styles.date}>{fmtDate(startedAt)}</Text>
+      <Text allowFontScaling={false} style={styles.brand}>⛷️  SKI TRACKER</Text>
+      <Text allowFontScaling={false} style={styles.title} numberOfLines={1}>{place ?? 'Ski day'}</Text>
+      <Text allowFontScaling={false} style={styles.date}>{fmtDate(startedAt)}</Text>
 
       <View style={styles.grid}>
         <Big label="Top speed" value={fmtSpeed(stats.topSpeed, units)} />
@@ -77,8 +84,8 @@ export function DayShareCard({ points, speeds, stats, place, startedAt, units, r
 function Big({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.cell}>
-      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
+      <Text allowFontScaling={false} style={styles.value} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      <Text allowFontScaling={false} style={styles.label}>{label}</Text>
     </View>
   );
 }
@@ -128,7 +135,8 @@ function buildLines(points: TrackPoint[], speeds: number[], activities: Activity
 }
 
 const styles = StyleSheet.create({
-  card: { width: CARD_W, height: CARD_H, borderRadius: 24, overflow: 'hidden', backgroundColor: '#081421' },
+  // No borderRadius: this view is captured to PNG and rounded corners would come out transparent.
+  card: { width: CARD_W, height: CARD_H, overflow: 'hidden', backgroundColor: '#081421' },
   brand: { position: 'absolute', top: 18, left: PAD, color: '#7FB3E6', fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   title: { position: 'absolute', top: 32, left: PAD, right: PAD, color: '#FFFFFF', fontSize: 22, fontWeight: '900' },
   date: { position: 'absolute', top: 17, right: PAD, color: '#9FB3C8', fontSize: 12, fontWeight: '600' },

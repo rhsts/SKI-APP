@@ -60,12 +60,17 @@ export const ElevationChart = memo(function ElevationChart({
     const y = (a: number) => plotTop + pad + (1 - (a - lo) / span) * (plotH - pad * 2);
     const step = Math.max(1, Math.floor(times.length / (width * 1.5)));
     let d = '';
+    let firstX = 0, lastX = 0;
     for (let i = 0; i < times.length; i += step) {
       const a = alts[i];
       if (a == null) continue;
-      d += `${d ? 'L' : 'M'}${x(times[i]).toFixed(1)},${y(a).toFixed(1)}`;
+      const px = x(times[i]).toFixed(1);
+      if (!d) firstX = +px;
+      lastX = +px;
+      d += `${d ? 'L' : 'M'}${px},${y(a).toFixed(1)}`;
     }
-    const fill = `${d}L${width},${height}L0,${height}Z`;
+    // Drop straight down to the baseline at the first and last drawn points.
+    const fill = `${d}L${lastX},${height}L${firstX},${height}Z`;
     return { d, fill, x, y, lo, hi };
   }, [times, alts, width, height, plotTop, plotH]);
 
@@ -123,7 +128,7 @@ export const ElevationChart = memo(function ElevationChart({
                   fill={colors.accentSoft}
                 />
               ))}
-              <Path d={model.fill} fill="rgba(11,107,203,0.10)" />
+              <Path d={model.fill} fill={colors.accent} fillOpacity={0.18} />
               <Path d={model.d} stroke={colors.accent} strokeWidth={2} fill="none" />
               {cx != null ? (
                 <>

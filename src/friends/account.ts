@@ -1,8 +1,9 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { Alert } from 'react-native';
 import { matchSession } from '../challenges/service';
 import {
-  getPoints, insertMotionEvents, insertPoints, insertSessionRaw, kvGet, kvSet, listAttempts, listMotionEvents,
+  deleteSession, getPoints, insertMotionEvents, insertPoints, insertSessionRaw, kvGet, kvSet, listAttempts, listMotionEvents,
   listSessions, reassignPlayer,
 } from '../db';
 import { computeBadges } from '../lib/goals';
@@ -10,8 +11,8 @@ import { isSport } from '../lib/sport';
 import { computeStats } from '../lib/stats';
 import { packDay, unpackDay } from '../lib/trackpack';
 import { getSettings, newIdentity, updateSettings } from '../settings';
-import { api, type MeInfo } from './api';
-import { resetFriendsCache, syncFriends } from './sync';
+import { api, FriendsError, setLoggedOutHandler, type MeInfo } from './api';
+import { flushPendingDeletes, pendingDeletes, resetFriendsCache, syncFriends } from './sync';
 import { forgetAvatar, setMyAvatar } from './avatars';
 
 /**
@@ -48,14 +49,44 @@ export async function logIn(username: string, password: string): Promise<number>
   return (await missingBackups().catch(() => [])).length;
 }
 
-/** Logs out: the phone gets a fresh identity. Days stay on the phone. */
-export async function logOut(): Promise<void> {
+const CANT_LOG_OUT = 'Can’t log out: your days couldn’t be saved to your account. Connect to the internet and try again.';
+
+/**
+ * Logs out: your days are saved to your account, then removed from this phone, and the
+ * phone gets a fresh identity (so the next skier doesn't get your days).
+ * Days too big to back up block it unless `force`: then it returns how many, changing nothing.
+ */
+export async function logOut(force = false): Promise<{ unsaved: number }> {
+  if (!getSettings().account) throw new Error('You’re not logged in.');
+  // The day being recorded isn't finished, so it can't be backed up yet.
+  if (await kvGet('active')) throw new Error('Stop recording before you log out.');
+  const r = await backupDays({ all: true }).catch(() => null);
+  if (!r || r.failed || (await flushPendingDeletes().catch(() => 1))) throw new Error(CANT_LOG_OUT);
+  if (r.tooBig && !force) return { unsaved: r.tooBig };
   await api.logout().catch(() => undefined);
+  for (const d of await listSessions()) await deleteSession(d.id);
+  await forgetAccount();
+  return { unsaved: 0 };
+}
+
+/** The phone gets a fresh identity and no account. */
+async function forgetAccount() {
   await resetFriendsCache();
   await kvSet('avatar:me', null);
   forgetAvatar(getSettings().playerId);
   await updateSettings({ ...newIdentity(), account: null });
 }
+
+/**
+ * The server logged this phone out (password changed on another phone). The days are
+ * this account's own, so they stay; logging in again picks up where it left off.
+ */
+export async function loggedOutElsewhere(message: string): Promise<void> {
+  if (!getSettings().account) return;
+  await forgetAccount();
+  Alert.alert('Logged out', message);
+}
+setLoggedOutHandler(loggedOutElsewhere);
 
 export async function changePassword(old: string, password: string): Promise<void> {
   await api.changePassword(old, password);
@@ -84,25 +115,55 @@ export async function removeAvatar(): Promise<void> {
 
 // ---------- online backup ----------
 
-/** Uploads days that changed since their last backup. Returns how many were uploaded. */
-export async function backupDays(): Promise<number> {
+/** The server takes backups up to this many base64 characters (server/src/app.js MAX_TRACK). */
+const MAX_TRACK = 6 * 1000 * 1000;
+
+export interface BackupResult { uploaded: number; failed: number; tooBig: number }
+
+/**
+ * Uploads days that changed since their last backup. One day failing doesn't stop the others.
+ * `failed`: couldn't be sent (no signal, server trouble), tried again next time.
+ * `tooBig`: the server won't take them; remembered so they aren't packed again every sync.
+ * `all`: also when online backup is switched off (logging out).
+ */
+export async function backupDays({ all = false } = {}): Promise<BackupResult> {
   const s = getSettings();
-  if (!s.account || !s.backupDays) return 0;
-  let n = 0;
+  const r: BackupResult = { uploaded: 0, failed: 0, tooBig: 0 };
+  if (!s.account || !(s.backupDays || all)) return r;
   for (const day of await listSessions()) {
     if (day.isDemo) continue;
-    const points = await getPoints(day.id);
-    if (points.length < 2) continue;
-    const sig = `${points.length}:${day.endedAt}:${day.place}:${day.sport}`;
-    const key = `backup:${day.id}`;
-    if ((await kvGet(key)) === sig) continue;
-    const motion = await listMotionEvents(day.id);
-    const data = packDay({ startedAt: day.startedAt, endedAt: day.endedAt, place: day.place, sport: day.sport, isDemo: false, points, motion });
-    await api.putTrack(day.id, { startedAt: day.startedAt, endedAt: day.endedAt, place: day.place, sport: day.sport, data });
-    await kvSet(key, sig);
-    n++;
+    try {
+      const points = await getPoints(day.id);
+      if (points.length < 2) continue;
+      const sig = `${points.length}:${day.endedAt}:${day.place}:${day.sport}`;
+      const key = `backup:${day.id}`;
+      if ((await kvGet(key)) === sig) continue;
+      // Not tried again until the day changes (e.g. trimmed).
+      const bigKey = `backup-too-big:${day.id}`;
+      if ((await kvGet(bigKey)) === sig) {
+        r.tooBig++;
+        continue;
+      }
+      const motion = await listMotionEvents(day.id);
+      const data = packDay({ startedAt: day.startedAt, endedAt: day.endedAt, place: day.place, sport: day.sport, isDemo: false, points, motion });
+      try {
+        if (data.length > MAX_TRACK) throw new FriendsError('Too big', 400);
+        await api.putTrack(day.id, { startedAt: day.startedAt, endedAt: day.endedAt, place: day.place, sport: day.sport, data });
+      } catch (e) {
+        if (!(e instanceof FriendsError && e.status === 400)) throw e;
+        await kvSet(bigKey, sig);
+        r.tooBig++;
+        continue;
+      }
+      await kvSet(key, sig);
+      r.uploaded++;
+    } catch (e) {
+      r.failed++;
+      // Server unreachable: the other days won't get through either.
+      if (e instanceof FriendsError && e.status === null) break;
+    }
   }
-  return n;
+  return r;
 }
 
 /** Backed-up days that aren't on this phone. */
@@ -111,27 +172,34 @@ export async function missingBackups() {
   const local = await listSessions();
   const ids = new Set(local.map((d) => d.id));
   const starts = local.map((d) => d.startedAt);
-  return (await api.tracks()).filter((t) => !ids.has(t.dayId) && !starts.some((s) => Math.abs(s - t.startedAt) < 60000));
+  // Deleted here, but the server doesn't know yet.
+  const deleted = new Set(await pendingDeletes());
+  return (await api.tracks()).filter((t) => !ids.has(t.dayId) && !deleted.has(t.dayId) && !starts.some((s) => Math.abs(s - t.startedAt) < 60000));
 }
 
 /** Downloads backed-up days that aren't on this phone. Returns how many were added. */
 export async function restoreDays(): Promise<number> {
   let added = 0;
   for (const t of await missingBackups()) {
-    const full = await api.getTrack(t.dayId);
-    const d = unpackDay(full.data);
-    if (d.points.length < 2) continue;
-    const ok = await insertSessionRaw({
-      id: t.dayId, startedAt: d.startedAt, endedAt: d.endedAt, place: d.place, isDemo: false,
-      stats: computeStats(d.points), sport: isSport(d.sport) ? d.sport : 'ski',
-    });
-    if (!ok) continue;
-    await insertPoints(t.dayId, d.points);
-    await insertMotionEvents(t.dayId, d.motion);
-    await matchSession(t.dayId, d.points).catch(() => undefined);
-    // Already backed up: no need to upload it again.
-    await kvSet(`backup:${t.dayId}`, `${d.points.length}:${d.endedAt}:${d.place}:${d.sport}`);
-    added++;
+    // One damaged or unreachable day doesn't stop the others.
+    try {
+      const full = await api.getTrack(t.dayId);
+      const d = unpackDay(full.data);
+      if (d.points.length < 2) continue;
+      const ok = await insertSessionRaw({
+        id: t.dayId, startedAt: d.startedAt, endedAt: d.endedAt, place: d.place, isDemo: false,
+        stats: computeStats(d.points), sport: isSport(d.sport) ? d.sport : 'ski',
+      });
+      if (!ok) continue;
+      await insertPoints(t.dayId, d.points);
+      await insertMotionEvents(t.dayId, d.motion);
+      await matchSession(t.dayId, d.points).catch(() => undefined);
+      // Already backed up: no need to upload it again.
+      await kvSet(`backup:${t.dayId}`, `${d.points.length}:${d.endedAt}:${d.place}:${d.sport}`);
+      added++;
+    } catch {
+      // Tried again next time: it's still missing.
+    }
   }
   return added;
 }

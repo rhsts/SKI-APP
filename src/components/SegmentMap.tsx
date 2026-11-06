@@ -1,10 +1,11 @@
 import { useMemo, useRef } from 'react';
 import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import MapView, { Circle, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Circle, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { PathPoint } from '../lib/segments';
 import { useTheme, useStyles, type Palette } from '../theme';
 import { mapsAvailable } from '../lib/mapsAvailable';
 import { MapPlaceholder } from './MapPlaceholder';
+import { ViewMarker } from './ViewMarker';
 
 interface Props {
   path: PathPoint[];
@@ -51,22 +52,22 @@ export function SegmentMap({ path, gateRadius = 30, context, style, markers }: P
         {ctx && ctx.length > 1 ? <Polyline coordinates={ctx} strokeColor="rgba(92,107,126,0.45)" strokeWidth={3} /> : null}
         {coords.length > 1 ? <Polyline coordinates={coords} strokeColor={colors.accent} strokeWidth={6} zIndex={2} /> : null}
         <Circle center={first} radius={gateRadius} strokeColor={colors.good} fillColor="rgba(31,157,85,0.18)" />
-        {last ? <Circle center={last} radius={gateRadius} strokeColor={colors.text} fillColor="rgba(14,27,44,0.15)" /> : null}
-        <Marker coordinate={first} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false}>
+        {last ? <Circle center={last} radius={gateRadius} strokeColor="#111111" fillColor="rgba(14,27,44,0.15)" /> : null}
+        <ViewMarker coordinate={first} anchor={{ x: 0.5, y: 1 }}>
           <View style={[styles.flag, { backgroundColor: colors.good }]}><Text style={styles.flagText}>START</Text></View>
-        </Marker>
+        </ViewMarker>
         {last ? (
-          <Marker coordinate={last} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false}>
+          <ViewMarker coordinate={last} anchor={{ x: 0.5, y: 1 }}>
             <View style={[styles.flag, { backgroundColor: '#0E1B2C' }]}><Text style={styles.flagText}>🏁 FINISH</Text></View>
-          </Marker>
+          </ViewMarker>
         ) : null}
         {markers?.map((m) => (
-          <Marker key={m.key} coordinate={{ latitude: m.lat, longitude: m.lon }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false} zIndex={5}>
+          <ViewMarker key={m.key} coordinate={{ latitude: m.lat, longitude: m.lon }} anchor={{ x: 0.5, y: 0.5 }} zIndex={5}>
             <View style={styles.ghost}>
               <View style={[styles.ghostDot, { backgroundColor: m.color }]} />
               <Text style={[styles.ghostLabel, { backgroundColor: m.color }]} numberOfLines={1}>{m.label}</Text>
             </View>
-          </Marker>
+          </ViewMarker>
         ))}
       </MapView>
     </View>

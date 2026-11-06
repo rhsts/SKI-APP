@@ -118,6 +118,37 @@ test('a server password keeps strangers out', async () => {
   }
 });
 
+test('too many wrong server passwords lock that IP (and everyone, past a global cap)', () => {
+  let t = 1e12;
+  const api = createApi(openDb(':memory:'), { password: 'powder-day-42', clock: () => t });
+  let n = 0; // a brand-new phone for every request, so none is "already set up"
+  const req = (pw, ip, extra = {}, auth = `Bearer new-${n++}:${'s'.repeat(20)}`) => {
+    try {
+      return api.handle('GET', '/v1/groups', { authorization: auth, 'x-server-password': pw, ...extra }, null, ip)[0];
+    } catch (e) {
+      return e.status;
+    }
+  };
+  assert.equal(req('powder-day-42', '9.9.9.9', {}, anna.auth), 200); // anna's phone is set up
+  for (let i = 0; i < 10; i++) assert.equal(req(`guess${i}`, '1.1.1.1'), 401);
+  assert.equal(req('guess-more', '1.1.1.1'), 429);
+  assert.equal(req('powder-day-42', '1.1.1.1'), 429, 'locked even with the right password');
+  assert.equal(req('powder-day-42', '2.2.2.2'), 200, 'other IPs are unaffected');
+  // Behind Cloudflare the real client IP comes in a header.
+  for (let i = 0; i < 10; i++) req(`x${i}`, '127.0.0.1', { 'cf-connecting-ip': '3.3.3.3' });
+  assert.equal(req('powder-day-42', '127.0.0.1', { 'cf-connecting-ip': '3.3.3.3' }), 429);
+  assert.equal(req('powder-day-42', '127.0.0.1', { 'cf-connecting-ip': '4.4.4.4' }), 200);
+  // After the window, the IP may try again.
+  t += 15 * 60 * 1000 + 1;
+  assert.equal(req('powder-day-42', '1.1.1.1'), 200);
+  // Faking a new IP for every guess still runs into the global cap.
+  for (let i = 0; i < 100; i++) assert.equal(req(`g${i}`, `10.0.0.${i}`), 401);
+  assert.equal(req('another-guess', '10.0.1.1'), 429);
+  assert.equal(req('powder-day-42', '10.0.1.1'), 429);
+  // A phone that was already set up keeps working while strangers are locked out.
+  assert.equal(req('powder-day-42', '1.1.1.1', {}, anna.auth), 200);
+});
+
 test('rejects junk', async () => {
   const res = await fetch(`${base}/v1/groups`, { method: 'POST', headers: { authorization: anna.auth }, body: '{nope' });
   assert.equal(res.status, 400);

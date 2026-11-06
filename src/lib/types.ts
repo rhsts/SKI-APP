@@ -59,6 +59,8 @@ export interface DayStats {
   turns?: number;
   maxG?: number;
   activities: Activity[];
+  /** Detection logic version these stats were computed with (absent = before versioning). See STATS_VERSION. */
+  statsVersion?: number;
 }
 
 export type Units = 'metric' | 'imperial';

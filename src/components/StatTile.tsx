@@ -18,7 +18,7 @@ export function StatTile({ label, value, sub, icon }: Props) {
         <Text style={s.label} numberOfLines={1}>{label}</Text>
       </View>
       <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-      {sub ? <Text style={s.muted} numberOfLines={1}>{sub}</Text> : null}
+      {sub ? <Text style={s.muted} numberOfLines={2}>{sub}</Text> : null}
     </View>
   );
 }

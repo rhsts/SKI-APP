@@ -60,6 +60,7 @@ async function doSync() {
   const acct = me.username ? { username: me.username, isAdmin: me.isAdmin } : null;
   const cur = getSettings().account;
   if (JSON.stringify(acct) !== JSON.stringify(cur) && (acct || cur)) await updateSettings({ account: acct });
+  await flushPendingDeletes();
   const groups = await api.groups();
   await kvSet('friends:groups', JSON.stringify(groups));
   if (groups.length || acct) await uploadDays();
@@ -75,6 +76,43 @@ async function doSync() {
     await uploadProfile().catch(() => undefined);
     await backupDays();
   }
+}
+
+/** Days deleted on this phone whose online copies (leaderboard day, backup) still need removing. */
+export async function pendingDeletes(): Promise<string[]> {
+  try {
+    return JSON.parse((await kvGet('friends:pending-deletes')) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+/** Takes a deleted day off the server: off the leaderboards and out of your backup. Retried on the next sync if it fails. */
+export async function deleteDayOnline(dayId: string): Promise<void> {
+  if (!friendsEnabled()) return;
+  const ids = await pendingDeletes();
+  if (!ids.includes(dayId)) await kvSet('friends:pending-deletes', JSON.stringify([...ids, dayId]));
+  await flushPendingDeletes().catch(() => undefined);
+}
+
+/** Retries pending deletes. Returns how many are still pending. */
+export async function flushPendingDeletes(): Promise<number> {
+  const ids = await pendingDeletes();
+  if (!ids.length) return 0;
+  const left: string[] = [];
+  for (const id of ids) {
+    try {
+      await api.deleteDay(id);
+      if (getSettings().account) await api.deleteTrack(id);
+    } catch {
+      left.push(id);
+    }
+  }
+  // Re-read: a delete may have been added meanwhile.
+  const now = await pendingDeletes();
+  const keep = now.filter((id) => left.includes(id) || !ids.includes(id));
+  await kvSet('friends:pending-deletes', keep.length ? JSON.stringify(keep) : null);
+  return keep.length;
 }
 
 async function uploadDays() {
