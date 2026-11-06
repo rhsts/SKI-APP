@@ -340,23 +340,31 @@ export default function DayScreen() {
       <View style={[s.card, { gap: 8 }]}>
         {runIdxs.length ? (
           <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              {runIdxs.map((i) => {
-                const on = i === selected;
-                return (
-                  <Pressable
-                    key={i}
-                    onPress={() => selectRun(i)}
-                    style={[styles.runChip, on && { backgroundColor: colors.accent, borderColor: colors.accent }]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                  >
-                    <Text style={[styles.runChipText, on && { color: colors.onAccent }]}>Run {numbers[i]}</Text>
-                    <Text style={[styles.runChipSub, on && { color: colors.onAccent }]}>{fmtTimeOfDay(timeline[i].startTime)}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            {/* Which run is graphed: step through them here, or tap one in the timeline below. */}
+            <View style={styles.runNav}>
+              <Pressable
+                onPress={() => selected != null && selectRun(runIdxs[runIdxs.indexOf(selected) - 1])}
+                disabled={selected == null || runIdxs.indexOf(selected) <= 0}
+                hitSlop={12}
+                style={[styles.navBtn, (selected == null || runIdxs.indexOf(selected) <= 0) && { opacity: 0.3 }]}
+                accessibilityLabel="Previous run"
+              >
+                <Ionicons name="chevron-back" size={22} color={colors.accent} />
+              </Pressable>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <Text style={s.h2}>Run {selNo} of {runIdxs.length}</Text>
+                {selRun ? <Text style={s.muted}>{fmtTimeOfDay(selRun.startTime)} · tap a run below to graph it</Text> : null}
+              </View>
+              <Pressable
+                onPress={() => selected != null && selectRun(runIdxs[runIdxs.indexOf(selected) + 1])}
+                disabled={selected == null || runIdxs.indexOf(selected) >= runIdxs.length - 1}
+                hitSlop={12}
+                style={[styles.navBtn, (selected == null || runIdxs.indexOf(selected) >= runIdxs.length - 1) && { opacity: 0.3 }]}
+                accessibilityLabel="Next run"
+              >
+                <Ionicons name="chevron-forward" size={22} color={colors.accent} />
+              </Pressable>
+            </View>
             <View style={styles.replayRow}>
               <Pressable
                 onPress={() => {
@@ -370,9 +378,7 @@ export default function DayScreen() {
                 <Ionicons name={playing ? 'pause' : 'play'} size={22} color={colors.onAccent} />
               </Pressable>
               <View style={{ flex: 1 }}>
-                <Text style={s.label}>
-                  Run {selNo}{selRun ? ` · ${fmtSpeed(selRun.topSpeed, units)} top · ${fmtAlt(selRun.verticalDown, units)} ↓` : ''}
-                </Text>
+                {selRun ? <Text style={s.label}>{fmtSpeed(selRun.topSpeed, units)} top · {fmtAlt(selRun.verticalDown, units)} ↓</Text> : null}
                 <Text style={s.body}>{readout}</Text>
                 {selRun ? (
                   <Text style={s.muted}>
@@ -616,9 +622,8 @@ const makeStyles = (colors: Palette) =>
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     input: { flex: 1, fontSize: 22, fontWeight: '700', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
-    runChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1.5, borderColor: colors.faint, alignItems: 'center' },
-    runChipText: { fontWeight: '800', color: colors.text },
-    runChipSub: { fontSize: 11, color: colors.muted },
+    runNav: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    navBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: colors.faint, alignItems: 'center', justifyContent: 'center' },
     replayRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
     legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },

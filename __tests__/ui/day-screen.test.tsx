@@ -79,8 +79,16 @@ describe('day screen under stress', () => {
 
     // Lay out the graph so drags map to positions.
     await act(async () => { fireEvent(graph(), 'layout', { nativeEvent: { layout: { width: 320, height: 140, x: 0, y: 0 } } }); });
-    const chips = screen.getAllByText(/^Run \d+$/);
-    expect(chips.length).toBeGreaterThanOrEqual(5);
+    // Each run is listed once (in the timeline), not also as a row of buttons.
+    const runCards = screen.getAllByText(/^Run \d+$/);
+    expect(runCards.length).toBeGreaterThanOrEqual(5);
+    expect(new Set(runCards.map((c) => String(c.props.children))).size).toBe(runCards.length);
+    // Next / previous step through the runs.
+    expect(screen.getByText(/^Run 1 of \d+$/)).toBeTruthy();
+    await act(async () => { fireEvent.press(screen.getByLabelText('Next run')); });
+    expect(screen.getByText(/^Run 2 of \d+$/)).toBeTruthy();
+    await act(async () => { fireEvent.press(screen.getByLabelText('Previous run')); });
+    expect(screen.getByText(/^Run 1 of \d+$/)).toBeTruthy();
 
     const r = rng(7);
 
@@ -92,16 +100,18 @@ describe('day screen under stress', () => {
       for (let k = 0; k < 8; k++) {
         await act(async () => { fireEvent(graph(), 'responderMove', touch(-40 + r() * 420)); jest.advanceTimersByTime(17); });
       }
-      // Sometimes tap a run while the finger is still on the graph (the reported bug).
+      // Sometimes tap a run (timeline or arrows) while the finger is still on the graph (the reported bug).
       if (round % 3 === 0) {
-        const runChips = screen.getAllByText(/^Run \d+$/);
-        await act(async () => { fireEvent.press(runChips[Math.floor(r() * runChips.length)]); });
+        const runCards = screen.getAllByText(/^Run \d+$/);
+        await act(async () => { fireEvent.press(runCards[Math.floor(r() * runCards.length)]); });
+      } else if (round % 3 === 1) {
+        await act(async () => { fireEvent.press(screen.getByLabelText(r() < 0.5 ? 'Next run' : 'Previous run')); });
       }
       await act(async () => {
         fireEvent(graph(), round % 5 === 0 ? 'responderTerminate' : 'responderRelease', touch(100));
       });
       expect(scrollEnabled()).toBe(true);
-      readouts.add(String(screen.queryAllByText(/^\d{1,2}:\d{2} · /)[0]?.props.children ?? 'none'));
+      readouts.add(String(screen.queryAllByText(/^\d{1,2}:\d{2} · .*\d m( · |$)/)[0]?.props.children ?? 'none'));
 
       // Mix in play/pause and timeline taps.
       if (round % 4 === 1) {
@@ -127,9 +137,9 @@ describe('day screen under stress', () => {
     await act(async () => { fireEvent(graph(), 'layout', { nativeEvent: { layout: { width: 320, height: 140, x: 0, y: 0 } } }); });
     await act(async () => { fireEvent(graph(), 'responderGrant', touch(100)); });
     await act(async () => { fireEvent(graph(), 'responderMove', touch(-500)); jest.advanceTimersByTime(17); });
-    const atStart = screen.getAllByText(/^\d{1,2}:\d{2} · /)[0].props.children;
+    const atStart = screen.getAllByText(/^\d{1,2}:\d{2} · .*\d m( · |$)/)[0].props.children;
     await act(async () => { fireEvent(graph(), 'responderMove', touch(5000)); jest.advanceTimersByTime(17); });
-    const atEnd = screen.getAllByText(/^\d{1,2}:\d{2} · /)[0].props.children;
+    const atEnd = screen.getAllByText(/^\d{1,2}:\d{2} · .*\d m( · |$)/)[0].props.children;
     expect(atStart).not.toEqual(atEnd);
     await act(async () => { fireEvent(graph(), 'responderRelease', touch(5000)); });
   });
