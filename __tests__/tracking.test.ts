@@ -19,7 +19,7 @@ describe('barometric altitude', () => {
     expect(hasBarometer(simulateDay({ runs: 1, barometer: true }).points)).toBe(true);
   });
 
-  it('beats noisy GPS altitude on vertical, despite weather drift', () => {
+  it('gets vertical right with noisy GPS altitude, and with the barometer despite weather drift', () => {
     // Very noisy GPS altitude (±15 m), as on many phones.
     const gpsOnly = simulateDay({ gpsAltNoise: 15, seed: 5 });
     const withBaro = simulateDay({ gpsAltNoise: 15, seed: 5, barometer: true });
@@ -27,7 +27,9 @@ describe('barometric altitude', () => {
     const errGps = Math.abs(computeStats(gpsOnly.points).verticalDown - truth);
     const errBaro = Math.abs(computeStats(withBaro.points).verticalDown - truth);
     expect(errBaro).toBeLessThan(truth * 0.03);
-    expect(errBaro).toBeLessThan(errGps);
+    // The running median takes GPS altitude noise out too.
+    expect(errGps).toBeLessThan(truth * 0.03);
+    expect(computeStats(gpsOnly.points).runCount).toBe(4);
     expect(computeStats(withBaro.points).runCount).toBe(4);
   });
 

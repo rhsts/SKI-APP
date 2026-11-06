@@ -23,7 +23,8 @@ export interface PisteMatch {
 }
 
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-const ON_PISTE_M = 35;
+// OpenStreetMap has a piste's centre line; wide pistes put you 40–50 m from it.
+const ON_PISTE_M = 50;
 const MIN_COVERAGE = 0.5;
 
 /** Bounding box of a track with a margin, as [south, west, north, east]. */
@@ -189,13 +190,19 @@ export function matchRunsToPistes(points: TrackPoint[], runs: Activity[], pistes
         }
       });
     }
+    // One run often follows several pistes (a red into a blue…). It counts as on piste
+    // when it was on *some* piste most of the way, and is named after the one it used most.
+    const onAny = new Set<number>();
+    for (const e of byKey.values()) e.hits.forEach((h) => onAny.add(h));
     let best: PisteMatch | null = null;
     for (const e of byKey.values()) {
       const coverage = e.hits.size / samples.length;
       const better = !best || coverage > best.coverage || (coverage === best.coverage && e.name && !best.name);
       if (better) best = { name: e.name, difficulty: e.difficulty, coverage };
     }
-    if (best && best.coverage >= MIN_COVERAGE && (best.name || best.difficulty)) result[String(run.startTime)] = best;
+    if (best && onAny.size / samples.length >= MIN_COVERAGE && (best.name || best.difficulty)) {
+      result[String(run.startTime)] = { ...best, coverage: onAny.size / samples.length };
+    }
   }
   return result;
 }

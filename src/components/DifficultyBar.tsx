@@ -21,7 +21,7 @@ export function DifficultyBar({ shares, units, title = 'Pistes' }: { shares: Dif
       {shares.map((d) => (
         <View key={String(d.difficulty)} style={styles.row}>
           <View style={[styles.dot, { backgroundColor: difficultyColor(d.difficulty) }]} />
-          <Text style={[s.body, { flex: 1, fontWeight: '700' }]}>{difficultyLabel(d.difficulty) ?? 'Off piste / unknown'}</Text>
+          <Text style={[s.body, { flex: 1, fontWeight: '700' }]}>{difficultyLabel(d.difficulty) ?? 'Piste unknown'}</Text>
           <Text style={s.muted}>
             {d.runs} {d.runs === 1 ? 'run' : 'runs'} · {fmtDuration(d.time)} · {fmtAlt(d.vertical, units)}
           </Text>

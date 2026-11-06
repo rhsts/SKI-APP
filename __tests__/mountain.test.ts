@@ -1,4 +1,4 @@
-import { liftLabel, matchLiftRides, overpassQuery, parseLifts } from '../src/lib/pistes';
+import { liftLabel, matchLiftRides, matchRunsToPistes, overpassQuery, parseLifts } from '../src/lib/pistes';
 import { simulateDay, SIM_ORIGIN } from '../src/lib/sim';
 import { cleanTrack, computeStats } from '../src/lib/stats';
 import { bboxAround, buildTrailMap, covers, mapFor, nearestFeature } from '../src/lib/trailmap';
@@ -114,5 +114,36 @@ describe('snow and weather', () => {
     expect(fmtSnow(15, 'metric')).toBe('15 cm');
     expect(fmtSnow(15, 'imperial')).toBe('5.9 in');
     expect(fmtWind(40, 'imperial')).toBe('25 mph');
+  });
+});
+
+describe('runs over several pistes', () => {
+  // A straight 1 km run north→south over three pistes, none of them more than half of it.
+  const { fromXY } = localProjector(SIM_ORIGIN);
+  const pts = Array.from({ length: 101 }, (_, k) => {
+    const p = fromXY(0, 1000 - k * 10);
+    return { t: k * 1000, lat: p.lat, lon: p.lon, alt: 2000 - k * 3, acc: 5, spd: 10 };
+  });
+  const run = { kind: 'run' as const, startIndex: 0, endIndex: 100, startTime: 0, endTime: 100000, duration: 100, distance: 1000, verticalDown: 300, verticalUp: 0, topSpeed: 12, avgSpeed: 10 };
+  const line = (x: number, y0: number, y1: number) => [fromXY(x, y0), fromXY(x, y1)];
+
+  it('is on piste when it was on some piste most of the way, named after the main one', () => {
+    const pistes = [
+      { id: 'a', name: 'Rote', difficulty: 'intermediate' as const, coords: line(0, 1000, 600) },
+      { id: 'b', name: 'Blaue', difficulty: 'easy' as const, coords: line(0, 560, 300) },
+      { id: 'c', name: 'Talabfahrt', difficulty: 'easy' as const, coords: line(0, 260, 0) },
+    ];
+    const m = matchRunsToPistes(pts, [run], pistes)['0'];
+    expect(m?.name).toBe('Rote');
+    expect(m?.coverage).toBeGreaterThan(0.95);
+  });
+
+  it('a wide piste: 45 m from the centre line still counts', () => {
+    const m = matchRunsToPistes(pts, [run], [{ id: 'w', name: 'Wide', difficulty: 'easy', coords: line(45, 1000, 0) }])['0'];
+    expect(m?.name).toBe('Wide');
+  });
+
+  it('really off piste stays unmatched', () => {
+    expect(matchRunsToPistes(pts, [run], [{ id: 'f', name: 'Far', difficulty: 'easy', coords: line(200, 1000, 0) }])).toEqual({});
   });
 });

@@ -6,7 +6,7 @@ import { cleanTrack, computeStats } from '../lib/stats';
 import { bboxAround, buildTrailMap, type TrailMap } from '../lib/trailmap';
 
 /** Bump when the lookup gains something new, so older days are looked up again once. */
-export const PISTES_VERSION = 2;
+export const PISTES_VERSION = 3;
 export const VERSION_KEY = '_v';
 
 export function pistesUpToDate(p: Record<string, PisteMatch> | null): boolean {

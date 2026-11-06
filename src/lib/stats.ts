@@ -26,6 +26,11 @@ export const CONFIG = {
   maxVertRate: 25, // m/s: faster altitude changes are GPS altitude glitches (a straight schuss is ~15)
   altResyncMs: 60000, // a new altitude level that holds this long is real (e.g. after a bad first fix)
   altResyncSpread: 20, // m: "holds" = stays within this
+  altMedianMs: 15000, // ± this window: a running median removes short altitude wobbles
+  mergeGapS: 90, // s: a "lift" or stop shorter than this between two runs is noise inside one run
+  mergeGapClimb: 50, // m: …and it may not climb more than this
+  noiseRunS: 40, // s: a "run" shorter than this between two lifts is noise inside one ride
+  noiseRunDrop: 50, // m: …and it may not drop more than this
 };
 
 /**
@@ -136,6 +141,20 @@ export function smoothedAltitudes(points: TrackPoint[]): (number | null)[] {
   if (firstKnown < 0) return filled;
   for (let i = 0; i < firstKnown; i++) filled[i] = filled[firstKnown];
   for (let i = firstKnown + 1; i < n; i++) if (filled[i] == null) filled[i] = filled[i - 1];
+  // Running median over ±15 s: GPS altitude on some phones wobbles 50–100 m for a few
+  // fixes, which would otherwise split one run into run + "lift" + run.
+  const med = new Array<number>(n);
+  let lo = 0, hi = 0;
+  const win: number[] = [];
+  for (let i = 0; i < n; i++) {
+    while (lo < i && points[i].t - points[lo].t > CONFIG.altMedianMs) lo++;
+    while (hi < n && points[hi].t - points[i].t <= CONFIG.altMedianMs) hi++;
+    win.length = 0;
+    for (let k = lo; k < hi; k++) win.push(filled[k] as number);
+    win.sort((a, b) => a - b);
+    med[i] = win.length % 2 ? win[win.length >> 1] : (win[(win.length >> 1) - 1] + win[win.length >> 1]) / 2;
+  }
+  for (let i = 0; i < n; i++) filled[i] = med[i];
   const half = Math.floor(CONFIG.altSmoothing / 2);
   const out = new Array<number>(n);
   for (let i = 0; i < n; i++) {
@@ -294,7 +313,34 @@ export function segmentActivities(
       push('other', start, end);
     }
   }
-  return markLiftLines(out, pts);
+  return markLiftLines(mergeNoise(out, pts, cum, spd, a), pts);
+}
+
+/**
+ * Cleans up what altitude noise leaves behind: a run interrupted by a tiny
+ * "lift" or a short stop is one run, and a lift ride with a tiny "run" in it is
+ * one ride.
+ */
+function mergeNoise(acts: Activity[], pts: TrackPoint[], cum: number[], spd: number[], alts: number[]): Activity[] {
+  let list = acts;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 1; i < list.length - 1; i++) {
+      const [a, m, b] = [list[i - 1], list[i], list[i + 1]];
+      const runGap = a.kind === 'run' && b.kind === 'run' && m.kind !== 'run'
+        && m.duration < CONFIG.mergeGapS && m.verticalUp < CONFIG.mergeGapClimb;
+      const liftGap = a.kind === 'lift' && b.kind === 'lift' && m.kind === 'run'
+        && m.duration < CONFIG.noiseRunS && m.verticalDown < CONFIG.noiseRunDrop;
+      if (runGap || liftGap) {
+        const merged = summarise(a.kind, a.startIndex, b.endIndex, pts, cum, spd, alts);
+        list = [...list.slice(0, i - 1), merged, ...list.slice(i + 2)];
+        changed = true;
+        break;
+      }
+    }
+  }
+  return list;
 }
 
 /**
