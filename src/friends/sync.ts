@@ -1,7 +1,7 @@
 import { matchSession } from '../challenges/service';
 import { getDb, getSegment, kvGet, kvSet, listAttempts, listSessions, saveSegment } from '../db';
 import { dayUpload, localDate, type Group, type GroupChallenge } from '../lib/groups';
-import { getSettings } from '../settings';
+import { getSettings, updateSettings } from '../settings';
 import { api, friendsEnabled } from './api';
 
 /**
@@ -55,16 +55,26 @@ export function syncFriends(): Promise<void> {
 }
 
 async function doSync() {
-  await api.hello();
+  const me = await api.hello();
+  // Keep the account state in step with the server (e.g. made admin by someone else).
+  const acct = me.username ? { username: me.username, isAdmin: me.isAdmin } : null;
+  const cur = getSettings().account;
+  if (JSON.stringify(acct) !== JSON.stringify(cur) && (acct || cur)) await updateSettings({ account: acct });
   const groups = await api.groups();
   await kvSet('friends:groups', JSON.stringify(groups));
-  if (!groups.length) {
+  if (groups.length || acct) await uploadDays();
+  if (groups.length) {
+    const challenges = await pullChallenges(groups);
+    await uploadAttempts(challenges);
+  } else {
     await kvSet('friends:challenges', '[]');
-    return;
   }
-  await uploadDays();
-  const challenges = await pullChallenges(groups);
-  await uploadAttempts(challenges);
+  if (acct) {
+    // Imported lazily: account.ts uses this module too.
+    const { backupDays, uploadProfile } = await import('./account');
+    await uploadProfile().catch(() => undefined);
+    await backupDays();
+  }
 }
 
 async function uploadDays() {
@@ -140,5 +150,7 @@ async function uploadAttempts(challenges: CachedChallenge[]) {
 export async function resetFriendsCache() {
   await kvSet('friends:groups', null);
   await kvSet('friends:challenges', null);
-  await getDb().runAsync("DELETE FROM kv WHERE key LIKE 'friends:day:%' OR key LIKE 'friends:att:%'");
+  await getDb().runAsync(
+    "DELETE FROM kv WHERE key LIKE 'friends:day:%' OR key LIKE 'friends:att:%' OR key LIKE 'backup:%' OR key = 'profile:badges'",
+  );
 }

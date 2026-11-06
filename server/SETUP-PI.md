@@ -61,8 +61,11 @@ Enter. After each part there's a **✅ Checkpoint** telling you what you should 
 - **Tailscale Funnel** gives the Pi a public `https://` address. Because the Pi opens the connection itself,
   you don't change anything on your router: no port forwarding, and it works with every internet provider.
 - A **server password** keeps strangers out: without it, the app doesn't even open (it shows a lock screen).
-- Only **day totals** (vertical, top speed, runs, distance, ski time) and **challenge times** are stored.
-  GPS tracks never leave the phones.
+- Everyone has an **account** (username + password), so they can log in on any phone. The **first account**
+  created on the server becomes the **admin**: make that yours.
+- Friends see only **day totals** (vertical, top speed, runs, distance, ski time), **challenge times** and
+  your **profile** (picture, season totals, badges). Each person's **online backup** of their days (GPS
+  tracks included) is only visible to themselves; it can be switched off in the app.
 
 ---
 
@@ -459,7 +462,7 @@ curl http://localhost:8787/v1/health
 The answer should be exactly:
 
 ```
-{"ok":true,"app":"ski-tracker-friends","v":1,"password":true}
+{"ok":true,"app":"ski-tracker-friends","v":2,"accounts":true,"password":true}
 ```
 
 `"password":true` means your server password is on. The health check is the only thing that works without it.
@@ -496,7 +499,7 @@ Before making it public, test it from your phone on your **home Wi-Fi**.
    http://192.168.1.23:8787/v1/health
    ```
 
-   You should see `{"ok":true,"app":"ski-tracker-friends","v":1}`.
+   You should see `{"ok":true,"app":"ski-tracker-friends",...}`.
 3. Optional: in the app, enter `http://192.168.1.23:8787` and your **server password** under
    **Profile → Friends server**, and tap **Connect**. It should say **Connected**.
 
@@ -597,7 +600,7 @@ sudo tailscale funnel --bg 8787
    https://skipi.tail1a2b.ts.net/v1/health
    ```
 
-3. You should see `{"ok":true,"app":"ski-tracker-friends","v":1}`.
+3. You should see `{"ok":true,"app":"ski-tracker-friends",...}`.
 
 **The first time it can take up to 10 minutes** before the new address works everywhere. If it doesn't load,
 wait a few minutes and try again.
@@ -617,9 +620,13 @@ server's address and password. So someone who finds the app online can't use it.
 2. **Server address:** your public address, e.g. `https://skipi.tail1a2b.ts.net` (no `/v1/health` at the end).
 3. **Password:** your server password from Part 7.2.
 4. **Your name:** the name your friends see on leaderboards.
-5. Tap **Unlock**. The app opens, and stays unlocked, also without signal.
+5. Tap **Unlock**. Next you see **Create your account**.
+6. **Create your account first, before your friends do:** the first account on the server becomes the
+   **admin** (that's how you get *Manage people* in the app). Pick a username (e.g. `rafha`), a password of at
+   least 6 characters, and your name, then tap **Create account**.
+7. The app opens, and stays logged in, also without signal.
 
-> **Changing the password later locks everyone out** the next time their app is online, until they enter the
+> **Changing the server password later locks everyone out** the next time their app is online, until they enter the
 > new one. Use this if the password leaked: change it (Part 7.2) and send the new one only to your friends.
 >
 > **In Expo Go** (testing on your computer) there's a *Skip* link on the lock screen. The installed app
@@ -642,9 +649,30 @@ password and the group code. Your friends:
 
 > 1. Download and install the app from the link.
 > 2. **Copy the whole invite message**, open the app, and tap **Paste invite** on the lock screen.
-> 3. Fill in their name and tap **Unlock**. They're in, and already in your group.
+> 3. Tap **Unlock**, then **create their account** (username + password).
+> 4. They're in, and already in your group.
 
-### 10.4 How the group works
+### 10.4 Accounts, backups and profiles
+
+- **New phone?** Install the app, unlock it with the server address and password, choose **I have an
+  account**, and log in. Groups come back, and the app offers to download your backed-up days.
+- **Profile:** under **Profile** tap your picture to set a profile picture. In a group, tap a friend to see
+  their profile: picture, season totals, recent days and badges.
+- **Online backup:** under **Profile → Back up my days online** (on by default). Your days, GPS tracks
+  included, are kept compressed on the Pi; only you can see them. A full day is a few hundred KB.
+
+### 10.5 Manage people (admin)
+
+As the admin, **Profile → Manage people (admin)** shows everyone on the server: account, last seen, groups,
+days and backup size.
+
+- **Remove** deletes someone's account, memberships, shared days, challenge times and backup, and their phone
+  can't get back in. It can't be undone.
+- **Make admin** gives a friend the same rights.
+- To shut out **everyone** who isn't supposed to be there at once, change the server password (Part 7.2):
+  everyone gets the lock screen until they enter the new one.
+
+### 10.6 How the group works
 
 - **Leaderboard:** when someone finishes a ski day, its totals go to the group automatically. In the group,
   pick a day and rank by **Vertical**, **Top speed** or **Runs**.

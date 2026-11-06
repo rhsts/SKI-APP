@@ -155,13 +155,21 @@ export interface Settings {
   unlocked: boolean;
   /** The friends server's password (SERVER_PASSWORD on the server); empty if it has none. */
   serverPassword: string;
-  /** Random secret that proves to the friends server that you are `playerId`. */
+  /** This phone's id on the friends server (the first player id it had; stays the same after logging in). */
+  deviceId: string;
+  /** Random secret that proves to the friends server that this phone is `deviceId`. */
   deviceSecret: string;
+  /** Your account on the friends server, once created or logged in. */
+  account: { username: string; isAdmin: boolean } | null;
+  /** Back up your days (with GPS tracks) to your account. */
+  backupDays: boolean;
+  /** Development only: the lock screen was skipped (Expo Go without a server). */
+  devSkip: boolean;
   /** Also share demo/simulated days with your groups (for trying it out). */
   shareDemoDays: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true, serverUrl: '', serverPassword: '', unlocked: false, deviceSecret: '', shareDemoDays: false };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true, serverUrl: '', serverPassword: '', unlocked: false, deviceId: '', deviceSecret: '', account: null, backupDays: true, devSkip: false, shareDemoDays: false };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');
@@ -554,4 +562,9 @@ export async function motionSummaries(): Promise<Record<string, MotionSummary>> 
 
 export async function deleteMotionEvent(sessionId: string, t: number, kind: MotionKind): Promise<void> {
   await getDb().runAsync('DELETE FROM motion_events WHERE session_id = ? AND t = ? AND kind = ?', sessionId, t, kind);
+}
+
+/** After logging in to an account on this phone: your earlier challenge times become the account's. */
+export async function reassignPlayer(oldId: string, newId: string, name: string) {
+  await getDb().runAsync('UPDATE attempts SET player_id = ?, player_name = ? WHERE player_id = ?', newId, name, oldId);
 }

@@ -21,7 +21,9 @@ setupNotifications();
 export default function RootLayout() {
   const { colors, dark } = useTheme();
   const [ready, setReady] = useState(false);
-  const { unlocked } = useSettings();
+  const { unlocked, account, devSkip } = useSettings();
+  // Private app: a server + password, then an account. (Expo Go can skip it for development.)
+  const locked = !unlocked || (!account && !(__DEV__ && devSkip));
 
   useEffect(() => {
     (async () => {
@@ -62,8 +64,10 @@ export default function RootLayout() {
         <Stack.Screen name="c" options={{ title: 'Challenge invite' }} />
         <Stack.Screen name="group/new" options={{ title: 'Friend group' }} />
         <Stack.Screen name="group/[id]" options={{ title: 'Group' }} />
+        <Stack.Screen name="player/[id]" options={{ title: 'Profile' }} />
+        <Stack.Screen name="admin" options={{ title: 'Manage people' }} />
       </Stack>
-      {ready && !unlocked ? <LockScreen /> : null}
+      {ready && locked ? <LockScreen /> : null}
       {!ready ? (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }]}>
           <ActivityIndicator color={colors.accent} />

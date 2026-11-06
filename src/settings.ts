@@ -7,15 +7,24 @@ const listeners = new Set<() => void>();
 
 export async function initSettings() {
   current = await loadSettings();
-  if (!current.playerId || !current.deviceSecret) {
+  if (!current.playerId || !current.deviceSecret || !current.deviceId) {
+    const playerId = current.playerId || `p-${newId()}`;
     current = {
       ...current,
-      playerId: current.playerId || `p-${newId()}`,
+      playerId,
+      // Phones set up before accounts existed are known to the server by their player id.
+      deviceId: current.deviceId || playerId,
       deviceSecret: current.deviceSecret || randomSecret(),
     };
     await saveSettings(current);
   }
   listeners.forEach((l) => l());
+}
+
+/** A fresh identity for this phone (after logging out): new device id, secret and player id. */
+export function newIdentity(): Pick<Settings, 'playerId' | 'deviceId' | 'deviceSecret'> {
+  const id = `p-${newId()}`;
+  return { playerId: id, deviceId: id, deviceSecret: randomSecret() };
 }
 
 /** 32 random characters for the friends server login. */

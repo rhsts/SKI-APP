@@ -15,6 +15,8 @@ export interface Group {
 export interface Member {
   playerId: string;
   name: string;
+  username?: string | null;
+  hasAvatar?: boolean;
   joinedAt: number;
 }
 

@@ -23,7 +23,7 @@ async function call<T>(
   method: string, path: string, body?: unknown, base = getSettings().serverUrl, password = getSettings().serverPassword,
 ): Promise<T> {
   if (!base) throw new FriendsError('Set up your friends server in Profile first.');
-  const { playerId, deviceSecret } = getSettings();
+  const { deviceId, deviceSecret } = getSettings();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   let res: Response;
@@ -32,7 +32,7 @@ async function call<T>(
       method,
       headers: {
         'content-type': 'application/json',
-        authorization: `Bearer ${playerId}:${deviceSecret}`,
+        authorization: `Bearer ${deviceId}:${deviceSecret}`,
         ...(password ? { 'x-server-password': password } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -62,7 +62,11 @@ async function call<T>(
         res.status, 'password',
       );
     }
-    throw new FriendsError(err.error != null ? String(err.error) : `Server error (${res.status})`, res.status);
+    if (res.status === 401 && String(err.error ?? '').includes('removed')) {
+      // An admin removed this skier: back to the lock screen.
+      updateSettings({ unlocked: false, account: null }).catch(() => undefined);
+    }
+    throw new FriendsError(err.error != null ? String(err.error) : `Server error (${res.status})`, res.status, typeof err.code === 'string' ? err.code : null);
   }
   return json as T;
 }
@@ -75,8 +79,51 @@ export async function checkServer(base: string, password = ''): Promise<void> {
   await call('GET', '/v1/groups', undefined, base, password);
 }
 
+export interface MeInfo { id: string; name: string; username: string | null; isAdmin: boolean; hasAvatar: boolean }
+
+export interface PlayerTotals { days: number; vertical: number; topSpeed: number; runs: number; distance: number; skiTime: number }
+
+export interface PlayerProfile {
+  id: string;
+  name: string;
+  username: string | null;
+  hasAvatar: boolean;
+  createdAt: number;
+  season: PlayerTotals & { key: string };
+  allTime: PlayerTotals;
+  recent: { date: string; vertical: number; topSpeed: number; runs: number }[];
+  badges: { id: string; emoji: string; title: string; at: number | null }[];
+}
+
+export interface TrackInfo { dayId: string; startedAt: number; endedAt: number | null; place: string | null; sport: string | null; size: number; updatedAt: number }
+
+export interface AdminPlayer {
+  id: string; name: string; username: string | null; isAdmin: boolean; lastSeen: number | null; createdAt: number;
+  hasAvatar: boolean; groups: number; days: number; backups: number; backupBytes: number; phones: number;
+}
+
+const enc = encodeURIComponent;
+
 export const api = {
-  hello: () => call<{ id: string; name: string }>('PUT', '/v1/me', { name: displayName() }),
+  hello: () => call<MeInfo>('PUT', '/v1/me', { name: displayName() }),
+  me: () => call<MeInfo>('GET', '/v1/me'),
+  register: (username: string, password: string, name: string) => call<MeInfo>('POST', '/v1/account/register', { username, password, name }),
+  login: (username: string, password: string) => call<MeInfo>('POST', '/v1/account/login', { username, password }),
+  logout: () => call<{ ok: true }>('POST', '/v1/account/logout'),
+  changePassword: (old: string, password: string) => call<{ ok: true }>('PUT', '/v1/account/password', { old, password }),
+  setAvatar: (jpeg: string) => call<{ ok: true }>('PUT', '/v1/me/avatar', { jpeg }),
+  deleteAvatar: () => call<{ ok: true }>('DELETE', '/v1/me/avatar'),
+  setProfile: (badges: { id: string; emoji: string; title: string; at: number | null }[]) => call<{ ok: true }>('PUT', '/v1/me/profile', { badges }),
+  player: (id: string) => call<PlayerProfile>('GET', `/v1/players/${enc(id)}`),
+  playerAvatar: (id: string) => call<{ jpeg: string | null }>('GET', `/v1/players/${enc(id)}/avatar`),
+  tracks: () => call<TrackInfo[]>('GET', '/v1/me/tracks'),
+  putTrack: (dayId: string, t: { startedAt: number; endedAt: number | null; place: string | null; sport: string; data: string }) =>
+    call<{ ok: true }>('PUT', `/v1/me/tracks/${enc(dayId)}`, t),
+  getTrack: (dayId: string) => call<TrackInfo & { data: string }>('GET', `/v1/me/tracks/${enc(dayId)}`),
+  deleteTrack: (dayId: string) => call<{ ok: true }>('DELETE', `/v1/me/tracks/${enc(dayId)}`),
+  adminPlayers: () => call<AdminPlayer[]>('GET', '/v1/admin/players'),
+  adminRemove: (id: string) => call<{ ok: true }>('DELETE', `/v1/admin/players/${enc(id)}`),
+  adminSetAdmin: (id: string, isAdmin: boolean) => call<{ ok: true }>('PUT', `/v1/admin/players/${enc(id)}/admin`, { isAdmin }),
   groups: () => call<Group[]>('GET', '/v1/groups'),
   group: (id: string) => call<GroupDetail>('GET', `/v1/groups/${encodeURIComponent(id)}`),
   createGroup: (name: string) => call<Group>('POST', '/v1/groups', { name }),

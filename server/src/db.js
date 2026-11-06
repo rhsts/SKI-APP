@@ -72,5 +72,56 @@ export function openDb(file) {
     );
     CREATE INDEX IF NOT EXISTS attempts_segment ON attempts(segment_id, date);
   `);
+  migrateAccounts(db);
   return db;
+}
+
+/**
+ * Accounts (v2): a player can have a username + password, and several phones
+ * ("devices") can log in as the same player. Existing players keep working:
+ * each becomes a device of itself.
+ */
+function migrateAccounts(db) {
+  const cols = new Set(db.prepare('PRAGMA table_info(players)').all().map((c) => c.name));
+  const add = (name, def) => { if (!cols.has(name)) db.exec(`ALTER TABLE players ADD COLUMN ${name} ${def}`); };
+  add('username', 'TEXT');
+  add('pass_hash', 'TEXT');
+  add('avatar', 'TEXT');
+  add('profile_json', 'TEXT');
+  add('is_admin', 'INTEGER NOT NULL DEFAULT 0');
+  add('last_seen', 'INTEGER');
+  const hadDevices = !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'devices'").get();
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS players_username ON players(username);
+
+    CREATE TABLE IF NOT EXISTS devices (
+      id TEXT PRIMARY KEY NOT NULL,
+      secret_hash TEXT NOT NULL,
+      player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS devices_player ON devices(player_id);
+
+    -- Phones of skiers an admin removed: they can't come back as a new skier.
+    CREATE TABLE IF NOT EXISTS removed_devices (id TEXT PRIMARY KEY NOT NULL, removed_at INTEGER NOT NULL);
+
+    -- Online backup of whole days (GPS track included), only for accounts. The track is
+    -- stored as the app sent it (gzip + base64): the server never needs to read it.
+    CREATE TABLE IF NOT EXISTS tracks (
+      player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      day_id TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER,
+      place TEXT,
+      sport TEXT,
+      data TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (player_id, day_id)
+    );
+  `);
+  // Once, when upgrading: every existing player becomes a device of itself.
+  if (!hadDevices) {
+    db.exec('INSERT OR IGNORE INTO devices (id, secret_hash, player_id, created_at) SELECT id, secret_hash, id, created_at FROM players');
+  }
 }

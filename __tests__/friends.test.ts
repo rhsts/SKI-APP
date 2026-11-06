@@ -9,11 +9,12 @@ import {
   cleanCode, dayUpload, parseInvite, localDate, normalizeServerUrl, rankBoard, rankChallenge, type BoardRow,
 } from '../src/lib/groups';
 import { simulateDay } from '../src/lib/sim';
+import { packDay, unpackDay, fromBase64, toBase64 } from '../src/lib/trackpack';
 import { computeStats } from '../src/lib/stats';
 
 // The app's API client, talking to the real server (server/) with two fake phones.
 const mockUpdate = jest.fn(async (patch: object) => { Object.assign(mockSettings, patch); });
-const mockSettings = { unlocked: true, serverUrl: '', serverPassword: 'powder-day-42', playerId: 'p-anna', deviceSecret: 'anna-secret-0123456789abcdef', name: 'Anna' };
+const mockSettings = { unlocked: true, serverUrl: '', serverPassword: 'powder-day-42', playerId: 'p-anna', deviceId: 'p-anna', deviceSecret: 'anna-secret-0123456789abcdef', name: 'Anna' };
 jest.mock('../src/settings', () => ({
   getSettings: () => mockSettings,
   displayName: () => mockSettings.name,
@@ -62,6 +63,15 @@ describe('group leaderboards', () => {
     expect(parseInvite(msg)).toEqual({ server: 'https://skipi.tail1a2b.ts.net', password: 'powder-goggles-42', code: 'K7MP2Q' });
     expect(parseInvite('server http://192.168.1.20:8787, no password')).toEqual({ server: 'http://192.168.1.20:8787', password: null, code: null });
     expect(parseInvite('hello').server).toBeNull();
+  });
+
+  it('base64 round-trips any bytes (backups)', () => {
+    for (const n of [0, 1, 2, 3, 4, 5, 255, 1000]) {
+      const bytes = Uint8Array.from({ length: n }, (_, i) => (i * 37 + n) % 256);
+      expect(Array.from(fromBase64(toBase64(bytes)))).toEqual(Array.from(bytes));
+    }
+    expect(toBase64(new Uint8Array([104, 105]))).toBe('aGk=');
+    expect(() => unpackDay('bm90IGd6aXA=')).toThrow('damaged');
   });
 
   it('cleans up typed server addresses and codes', () => {
@@ -114,6 +124,7 @@ describe('app ↔ server', () => {
 
   const as = (who: 'anna' | 'ben') => {
     mockSettings.playerId = `p-${who}`;
+    mockSettings.deviceId = `p-${who}`;
     mockSettings.deviceSecret = `${who}-secret-0123456789abcdef`;
     mockSettings.name = who === 'anna' ? 'Anna' : 'Ben';
   };
@@ -167,8 +178,30 @@ describe('app ↔ server', () => {
     mockSettings.serverPassword = saved;
   });
 
+  it('accounts: create, log in on a second phone, back up a day and get it back', async () => {
+    as('anna');
+    const me = await api.register('anna', 'snowfall9', 'Anna');
+    expect(me.username).toBe('anna');
+    const sim = simulateDay({ start: new Date(2026, 0, 18, 9).getTime(), runs: 2 });
+    const data = packDay({ startedAt: sim.points[0].t, endedAt: sim.points[sim.points.length - 1].t, place: 'Ischgl', sport: 'ski', isDemo: false, points: sim.points, motion: [] });
+    await api.putTrack('anna-day-1', { startedAt: sim.points[0].t, endedAt: null, place: 'Ischgl', sport: 'ski', data });
+    // A new phone logs in to the same account and finds the day.
+    mockSettings.deviceId = 'p-anna-new-phone';
+    mockSettings.deviceSecret = 'anna-new-phone-0123456789abcdef';
+    await expect(api.login('anna', 'wrong-password')).rejects.toThrow('Wrong username or password');
+    const again = await api.login('anna', 'snowfall9');
+    expect(again.id).toBe('p-anna');
+    const list = await api.tracks();
+    expect(list.map((t) => t.dayId)).toEqual(['anna-day-1']);
+    const back = unpackDay((await api.getTrack('anna-day-1')).data);
+    expect(back.points).toHaveLength(sim.points.length);
+    expect(computeStats(back.points).runCount).toBe(2);
+    expect(back.place).toBe('Ischgl');
+  });
+
   it('a stolen player id is refused', async () => {
     mockSettings.playerId = 'p-anna';
+    mockSettings.deviceId = 'p-anna';
     mockSettings.deviceSecret = 'not-annas-secret-0123456789';
     await expect(api.groups()).rejects.toThrow('another phone');
   });

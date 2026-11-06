@@ -1,14 +1,16 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 /**
- * The friends API. No accounts or passwords: each phone makes up a random
- * player id + secret the first time, and the server remembers a hash of the
- * secret. Every request carries "Authorization: Bearer <id>:<secret>".
+ * The friends API. Each phone makes up a random device id + secret the first
+ * time, and the server remembers a hash of the secret. Every request carries
+ * "Authorization: Bearer <device id>:<secret>". A phone starts as an anonymous
+ * player; creating an account (username + password) or logging in to one ties
+ * the phone to that player, so several phones can be the same person.
  *
  * Everything is JSON under /v1. See ../README.md for the list of endpoints.
  */
 
-const MAX_BODY = 256 * 1024;
+const MAX_BODY = 8 * 1024 * 1024; // a day's GPS track (compressed) can be a few MB
 const ID_RE = /^[A-Za-z0-9._:-]{1,80}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I
@@ -16,6 +18,31 @@ const MAX_GROUPS_PER_PLAYER = 20;
 const MAX_MEMBERS = 50;
 const MAX_PATH_POINTS = 150;
 const MAX_GHOST = 64;
+const USERNAME_RE = /^[a-z0-9_.-]{3,20}$/;
+const MAX_AVATAR = 200 * 1000; // base64 characters (~150 KB JPEG)
+const MAX_TRACK = 6 * 1000 * 1000; // base64 characters
+const LOGIN_FAILS = 8; // wrong passwords per username…
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // …within this window lock it for the rest of the window
+
+function hashPassword(pw) {
+  const salt = randomBytes(16);
+  return `scrypt$${salt.toString('hex')}$${scryptSync(pw, salt, 32).toString('hex')}`;
+}
+
+function checkPasswordHash(pw, stored) {
+  const [kind, saltHex, hashHex] = String(stored ?? '').split('$');
+  if (kind !== 'scrypt' || !saltHex || !hashHex) return false;
+  const got = scryptSync(pw, Buffer.from(saltHex, 'hex'), 32);
+  const want = Buffer.from(hashHex, 'hex');
+  return got.length === want.length && timingSafeEqual(got, want);
+}
+
+/** Start of the ski season (1 July) that `date` falls in, as YYYY-MM-DD. */
+function seasonStart(ms) {
+  const d = new Date(ms);
+  const y = d.getUTCMonth() >= 6 ? d.getUTCFullYear() : d.getUTCFullYear() - 1;
+  return [`${y}-07-01`, `${y + 1}-07-01`, `${y}/${String((y + 1) % 100).padStart(2, '0')}`];
+}
 
 export class HttpError extends Error {
   constructor(status, message, code) {
@@ -75,8 +102,47 @@ export function createApi(db, { password = '' } = {}) {
 
   const q = (sql) => db.prepare(sql);
   const stmt = {
-    player: q('SELECT id, secret_hash, name FROM players WHERE id = ?'),
+    player: q('SELECT id, name, username, pass_hash, is_admin, last_seen, avatar IS NOT NULL AS hasAvatar FROM players WHERE id = ?'),
+    byUsername: q('SELECT id, name, username, pass_hash, is_admin FROM players WHERE username = ?'),
     addPlayer: q('INSERT INTO players (id, secret_hash, name, created_at) VALUES (?, ?, ?, ?)'),
+    device: q('SELECT id, secret_hash, player_id FROM devices WHERE id = ?'),
+    addDevice: q('INSERT INTO devices (id, secret_hash, player_id, created_at) VALUES (?, ?, ?, ?)'),
+    moveDevice: q('UPDATE devices SET player_id = ? WHERE id = ?'),
+    deleteDevice: q('DELETE FROM devices WHERE id = ?'),
+    removedDevice: q('SELECT 1 AS ok FROM removed_devices WHERE id = ?'),
+    deviceCount: q('SELECT COUNT(*) AS n FROM devices WHERE player_id = ?'),
+    touch: q('UPDATE players SET last_seen = ? WHERE id = ?'),
+    register: q('UPDATE players SET username = ?, pass_hash = ?, name = ?, is_admin = ? WHERE id = ?'),
+    setPassword: q('UPDATE players SET pass_hash = ? WHERE id = ?'),
+    anyAdmin: q('SELECT 1 AS ok FROM players WHERE is_admin = 1 LIMIT 1'),
+    setAvatar: q('UPDATE players SET avatar = ? WHERE id = ?'),
+    avatar: q('SELECT avatar FROM players WHERE id = ?'),
+    setProfile: q('UPDATE players SET profile_json = ? WHERE id = ?'),
+    profile: q('SELECT id, name, username, avatar IS NOT NULL AS hasAvatar, profile_json AS profile, created_at AS createdAt FROM players WHERE id = ?'),
+    sharesGroup: q('SELECT 1 AS ok FROM members a JOIN members b ON a.group_id = b.group_id WHERE a.player_id = ? AND b.player_id = ? LIMIT 1'),
+    totals: q(`SELECT COUNT(DISTINCT date) AS days, COALESCE(SUM(vertical), 0) AS vertical, COALESCE(MAX(top_speed), 0) AS topSpeed,
+                 COALESCE(SUM(runs), 0) AS runs, COALESCE(SUM(distance), 0) AS distance, COALESCE(SUM(ski_time), 0) AS skiTime
+               FROM days WHERE player_id = ? AND date >= ? AND date < ?`),
+    recentDays: q(`SELECT date, SUM(vertical) AS vertical, MAX(top_speed) AS topSpeed, SUM(runs) AS runs FROM days
+                   WHERE player_id = ? GROUP BY date ORDER BY date DESC LIMIT 8`),
+    upsertTrack: q(`INSERT INTO tracks (player_id, day_id, started_at, ended_at, place, sport, data, size, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(player_id, day_id) DO UPDATE SET started_at = excluded.started_at, ended_at = excluded.ended_at,
+                      place = excluded.place, sport = excluded.sport, data = excluded.data, size = excluded.size, updated_at = excluded.updated_at`),
+    tracks: q(`SELECT day_id AS dayId, started_at AS startedAt, ended_at AS endedAt, place, sport, size, updated_at AS updatedAt
+               FROM tracks WHERE player_id = ? ORDER BY started_at DESC`),
+    track: q(`SELECT day_id AS dayId, started_at AS startedAt, ended_at AS endedAt, place, sport, data FROM tracks
+              WHERE player_id = ? AND day_id = ?`),
+    deleteTrack: q('DELETE FROM tracks WHERE player_id = ? AND day_id = ?'),
+    adminPlayers: q(`SELECT p.id, p.name, p.username, p.is_admin AS isAdmin, p.last_seen AS lastSeen, p.created_at AS createdAt,
+                       p.avatar IS NOT NULL AS hasAvatar,
+                       (SELECT COUNT(*) FROM members m WHERE m.player_id = p.id) AS groups,
+                       (SELECT COUNT(DISTINCT date) FROM days d WHERE d.player_id = p.id) AS days,
+                       (SELECT COUNT(*) FROM tracks t WHERE t.player_id = p.id) AS backups,
+                       (SELECT COALESCE(SUM(size), 0) FROM tracks t WHERE t.player_id = p.id) AS backupBytes,
+                       (SELECT COUNT(*) FROM devices v WHERE v.player_id = p.id) AS phones
+                     FROM players p ORDER BY p.username IS NULL, p.last_seen DESC`),
+    setAdmin: q('UPDATE players SET is_admin = ? WHERE id = ?'),
     renamePlayer: q('UPDATE players SET name = ? WHERE id = ?'),
     groupById: q('SELECT id, name, code, created_by AS createdBy, created_at AS createdAt FROM groups WHERE id = ?'),
     groupByCode: q('SELECT id, name, code, created_by AS createdBy, created_at AS createdAt FROM groups WHERE code = ?'),
@@ -91,7 +157,8 @@ export function createApi(db, { password = '' } = {}) {
     myGroups: q(`SELECT g.id, g.name, g.code, g.created_by AS createdBy, g.created_at AS createdAt,
                    (SELECT COUNT(*) FROM members m2 WHERE m2.group_id = g.id) AS members
                  FROM groups g JOIN members m ON m.group_id = g.id WHERE m.player_id = ? ORDER BY g.created_at DESC`),
-    members: q(`SELECT p.id AS playerId, p.name, m.joined_at AS joinedAt FROM members m JOIN players p ON p.id = m.player_id
+    members: q(`SELECT p.id AS playerId, p.name, p.username, p.avatar IS NOT NULL AS hasAvatar, m.joined_at AS joinedAt
+                FROM members m JOIN players p ON p.id = m.player_id
                 WHERE m.group_id = ? ORDER BY m.joined_at`),
     upsertDay: q(`INSERT INTO days (player_id, day_id, date, started_at, vertical, top_speed, runs, distance, ski_time, updated_at)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -129,18 +196,100 @@ export function createApi(db, { password = '' } = {}) {
   };
 
   function auth(header) {
-    const m = /^Bearer ([A-Za-z0-9._:-]{1,80}):([A-Za-z0-9_-]{16,128})$/.exec(header ?? '');
+    const m = /^Bearer ([A-Za-z0-9._-]{1,80}):([A-Za-z0-9_-]{16,128})$/.exec(header ?? '');
     if (!m) throw new HttpError(401, 'Missing or invalid Authorization header');
-    const [, playerId, secret] = m;
+    const [, deviceId, secret] = m;
     const hash = sha(secret);
-    const row = stmt.player.get(playerId);
-    if (!row) {
-      stmt.addPlayer.run(playerId, hash, 'Skier', now());
-      return { id: playerId, name: 'Skier' };
+    const dev = stmt.device.get(deviceId);
+    if (!dev) {
+      if (stmt.removedDevice.get(deviceId)) throw new HttpError(401, 'This phone was removed from the server');
+      // A new phone: it starts as its own, anonymous player.
+      if (stmt.player.get(deviceId)) throw new HttpError(401, 'This player id belongs to another phone');
+      tx(() => {
+        stmt.addPlayer.run(deviceId, hash, 'Skier', now());
+        stmt.addDevice.run(deviceId, hash, deviceId, now());
+      });
+      return { id: deviceId, deviceId, name: 'Skier', username: null, isAdmin: false };
     }
-    const a = Buffer.from(row.secret_hash, 'hex'), b = Buffer.from(hash, 'hex');
+    const a = Buffer.from(dev.secret_hash, 'hex'), b = Buffer.from(hash, 'hex');
     if (a.length !== b.length || !timingSafeEqual(a, b)) throw new HttpError(401, 'This player id belongs to another phone');
-    return { id: row.id, name: row.name };
+    const p = stmt.player.get(dev.player_id);
+    if (!p) throw new HttpError(401, 'This account was removed');
+    if (!p.last_seen || now() - p.last_seen > 5 * 60 * 1000) stmt.touch.run(now(), p.id);
+    return { id: p.id, deviceId, name: p.name, username: p.username, isAdmin: !!p.is_admin };
+  }
+
+  const meInfo = (me) => {
+    const p = stmt.player.get(me.id);
+    return { id: p.id, name: p.name, username: p.username, isAdmin: !!p.is_admin, hasAvatar: !!p.hasAvatar };
+  };
+
+  const fails = new Map(); // username -> { n, first }
+  function loginAllowed(username) {
+    const f = fails.get(username);
+    if (f && now() - f.first > LOGIN_WINDOW_MS) fails.delete(username);
+    else if (f && f.n >= LOGIN_FAILS) throw new HttpError(429, 'Too many wrong passwords. Try again in 15 minutes.');
+  }
+  function loginFailed(username) {
+    const f = fails.get(username);
+    if (f) f.n++;
+    else fails.set(username, { n: 1, first: now() });
+    throw new HttpError(401, 'Wrong username or password', 'login');
+  }
+
+  const cleanUsername = (v) => str(v, 40).toLowerCase();
+  function validPassword(v) {
+    if (typeof v !== 'string' || v.length < 6 || v.length > 200) throw new HttpError(400, 'The password must be at least 6 characters');
+    return v;
+  }
+
+  function canSee(me, otherId) {
+    return me.id === otherId || me.isAdmin || !!stmt.sharesGroup.get(me.id, otherId);
+  }
+
+  function needAccount(me) {
+    if (!me.username) throw new HttpError(403, 'Create an account first');
+  }
+  function needAdmin(me) {
+    if (!me.isAdmin) throw new HttpError(403, 'Only an admin can do this');
+  }
+
+  /** Moves everything of an anonymous player into an account (logging in on a phone that was used before). */
+  function mergeInto(oldId, newId) {
+    db.prepare('INSERT OR IGNORE INTO members (group_id, player_id, joined_at) SELECT group_id, ?, joined_at FROM members WHERE player_id = ?').run(newId, oldId);
+    db.prepare('DELETE FROM members WHERE player_id = ?').run(oldId);
+    db.prepare('UPDATE OR IGNORE days SET player_id = ? WHERE player_id = ?').run(newId, oldId);
+    db.prepare('DELETE FROM days WHERE player_id = ?').run(oldId);
+    db.prepare('UPDATE attempts SET player_id = ? WHERE player_id = ?').run(newId, oldId);
+    db.prepare('UPDATE challenges SET created_by = ? WHERE created_by = ?').run(newId, oldId);
+    db.prepare('UPDATE groups SET created_by = ? WHERE created_by = ?').run(newId, oldId);
+    db.prepare('DELETE FROM players WHERE id = ?').run(oldId);
+  }
+
+  /** Removes a player and everything they had (admin). */
+  function removePlayer(playerId) {
+    tx(() => {
+      const groups = db.prepare('SELECT group_id AS id FROM members WHERE player_id = ?').all(playerId);
+      db.prepare('DELETE FROM members WHERE player_id = ?').run(playerId);
+      for (const g of groups) {
+        const other = db.prepare('SELECT player_id AS id FROM members WHERE group_id = ? ORDER BY joined_at LIMIT 1').get(g.id);
+        if (!other) db.prepare('DELETE FROM groups WHERE id = ?').run(g.id);
+      }
+      // Groups and challenges they started stay, handed to someone still in the group.
+      for (const g of db.prepare('SELECT id FROM groups WHERE created_by = ?').all(playerId)) {
+        const other = db.prepare('SELECT player_id AS id FROM members WHERE group_id = ? ORDER BY joined_at LIMIT 1').get(g.id);
+        if (other) db.prepare('UPDATE groups SET created_by = ? WHERE id = ?').run(other.id, g.id);
+        else db.prepare('DELETE FROM groups WHERE id = ?').run(g.id);
+      }
+      for (const c of db.prepare('SELECT id, group_id AS groupId FROM challenges WHERE created_by = ?').all(playerId)) {
+        const other = db.prepare('SELECT player_id AS id FROM members WHERE group_id = ? ORDER BY joined_at LIMIT 1').get(c.groupId);
+        if (other) db.prepare('UPDATE challenges SET created_by = ? WHERE id = ?').run(other.id, c.id);
+        else db.prepare('DELETE FROM challenges WHERE id = ?').run(c.id);
+      }
+      db.prepare('INSERT OR IGNORE INTO removed_devices (id, removed_at) SELECT id, ? FROM devices WHERE player_id = ?').run(now(), playerId);
+      for (const t of ['days', 'attempts', 'tracks', 'devices']) db.prepare(`DELETE FROM ${t} WHERE player_id = ?`).run(playerId);
+      db.prepare('DELETE FROM players WHERE id = ?').run(playerId);
+    });
   }
 
   function memberOf(groupId, me) {
@@ -172,10 +321,151 @@ export function createApi(db, { password = '' } = {}) {
 
   // [method, path regex, handler(me, params, body, query)]
   const routes = [
+    ['GET', /^\/v1\/me$/, (me) => meInfo(me)],
+
     ['PUT', /^\/v1\/me$/, (me, _p, body) => {
       const name = str(body?.name, 30) || 'Skier';
       stmt.renamePlayer.run(name, me.id);
-      return { id: me.id, name };
+      return meInfo(me);
+    }],
+
+    // ----- accounts -----
+    ['POST', /^\/v1\/account\/register$/, (me, _p, body) => {
+      if (me.username) throw new HttpError(400, `This phone is already logged in as ${me.username}`);
+      const username = cleanUsername(body?.username);
+      if (!USERNAME_RE.test(username)) throw new HttpError(400, 'Usernames are 3–20 letters, digits, dots, dashes or underscores');
+      const pw = validPassword(body?.password);
+      if (stmt.byUsername.get(username)) throw new HttpError(409, 'That username is taken');
+      const name = str(body?.name, 30) || me.name;
+      // The first account on a server runs it.
+      const admin = stmt.anyAdmin.get() ? 0 : 1;
+      stmt.register.run(username, hashPassword(pw), name, admin, me.id);
+      return meInfo(me);
+    }],
+
+    ['POST', /^\/v1\/account\/login$/, (me, _p, body) => {
+      const username = cleanUsername(body?.username);
+      loginAllowed(username);
+      const acct = username ? stmt.byUsername.get(username) : null;
+      if (!acct || typeof body?.password !== 'string' || !checkPasswordHash(body.password, acct.pass_hash)) loginFailed(username);
+      fails.delete(username);
+      if (acct.id !== me.id) {
+        tx(() => {
+          stmt.moveDevice.run(acct.id, me.deviceId);
+          // This phone was used without an account: its groups, days and times come along.
+          if (!me.username && stmt.deviceCount.get(me.id).n === 0) mergeInto(me.id, acct.id);
+        });
+      }
+      return meInfo({ id: acct.id });
+    }],
+
+    ['POST', /^\/v1\/account\/logout$/, (me) => {
+      stmt.deleteDevice.run(me.deviceId);
+      return { ok: true };
+    }],
+
+    ['PUT', /^\/v1\/account\/password$/, (me, _p, body) => {
+      needAccount(me);
+      const acct = stmt.player.get(me.id);
+      if (typeof body?.old !== 'string' || !checkPasswordHash(body.old, acct.pass_hash)) throw new HttpError(401, 'Your current password is wrong', 'login');
+      stmt.setPassword.run(hashPassword(validPassword(body?.password)), me.id);
+      return { ok: true };
+    }],
+
+    // ----- profile -----
+    ['PUT', /^\/v1\/me\/avatar$/, (me, _p, body) => {
+      const img = typeof body?.jpeg === 'string' ? body.jpeg : '';
+      if (!img || img.length > MAX_AVATAR || !/^[A-Za-z0-9+/=]+$/.test(img)) throw new HttpError(400, 'Invalid picture');
+      stmt.setAvatar.run(img, me.id);
+      return { ok: true };
+    }],
+
+    ['DELETE', /^\/v1\/me\/avatar$/, (me) => {
+      stmt.setAvatar.run(null, me.id);
+      return { ok: true };
+    }],
+
+    ['PUT', /^\/v1\/me\/profile$/, (me, _p, body) => {
+      const badges = (Array.isArray(body?.badges) ? body.badges : []).slice(0, 40)
+        .filter((b) => b && typeof b.id === 'string')
+        .map((b) => ({ id: str(b.id, 30), emoji: str(b.emoji, 8), title: str(b.title, 30), at: typeof b.at === 'number' ? b.at : null }));
+      stmt.setProfile.run(JSON.stringify({ badges }), me.id);
+      return { ok: true };
+    }],
+
+    ['GET', /^\/v1\/players\/([^/]+)$/, (me, [pid]) => {
+      if (!canSee(me, pid)) throw new HttpError(404, 'Skier not found');
+      const p = stmt.profile.get(pid);
+      if (!p) throw new HttpError(404, 'Skier not found');
+      const [from, to, key] = seasonStart(now());
+      let badges = [];
+      try { badges = JSON.parse(p.profile ?? '{}').badges ?? []; } catch { badges = []; }
+      return {
+        id: p.id, name: p.name, username: p.username, hasAvatar: !!p.hasAvatar, createdAt: p.createdAt,
+        season: { key, ...stmt.totals.get(pid, from, to) },
+        allTime: stmt.totals.get(pid, '0000-00-00', '9999-99-99'),
+        recent: stmt.recentDays.all(pid),
+        badges,
+      };
+    }],
+
+    ['GET', /^\/v1\/players\/([^/]+)\/avatar$/, (me, [pid]) => {
+      if (!canSee(me, pid)) throw new HttpError(404, 'Skier not found');
+      return { jpeg: stmt.avatar.get(pid)?.avatar ?? null };
+    }],
+
+    // ----- online backup of days -----
+    ['GET', /^\/v1\/me\/tracks$/, (me) => {
+      needAccount(me);
+      return stmt.tracks.all(me.id);
+    }],
+
+    ['PUT', /^\/v1\/me\/tracks\/([^/]+)$/, (me, [dayId], body) => {
+      needAccount(me);
+      id(dayId, 'day id');
+      const data = typeof body?.data === 'string' ? body.data : '';
+      if (!data || data.length > MAX_TRACK || !/^[A-Za-z0-9+/=]+$/.test(data)) throw new HttpError(400, 'Invalid track');
+      stmt.upsertTrack.run(
+        me.id, dayId, num(body?.startedAt, 0, 1e14), typeof body?.endedAt === 'number' ? body.endedAt : null,
+        str(body?.place, 80) || null, str(body?.sport, 20) || null, data, data.length, now(),
+      );
+      return { ok: true };
+    }],
+
+    ['GET', /^\/v1\/me\/tracks\/([^/]+)$/, (me, [dayId]) => {
+      needAccount(me);
+      const t = stmt.track.get(me.id, id(dayId, 'day id'));
+      if (!t) throw new HttpError(404, 'No backup of that day');
+      return t;
+    }],
+
+    ['DELETE', /^\/v1\/me\/tracks\/([^/]+)$/, (me, [dayId]) => {
+      needAccount(me);
+      stmt.deleteTrack.run(me.id, id(dayId, 'day id'));
+      return { ok: true };
+    }],
+
+    // ----- admin -----
+    ['GET', /^\/v1\/admin\/players$/, (me) => {
+      needAdmin(me);
+      return stmt.adminPlayers.all().map((p) => ({ ...p, isAdmin: !!p.isAdmin, hasAvatar: !!p.hasAvatar }));
+    }],
+
+    ['DELETE', /^\/v1\/admin\/players\/([^/]+)$/, (me, [pid]) => {
+      needAdmin(me);
+      if (pid === me.id) throw new HttpError(400, 'You can’t remove yourself');
+      if (!stmt.player.get(pid)) throw new HttpError(404, 'Skier not found');
+      removePlayer(pid);
+      return { ok: true };
+    }],
+
+    ['PUT', /^\/v1\/admin\/players\/([^/]+)\/admin$/, (me, [pid], body) => {
+      needAdmin(me);
+      const p = stmt.player.get(pid);
+      if (!p || !p.username) throw new HttpError(404, 'Only accounts can be admins');
+      if (pid === me.id && !body?.isAdmin) throw new HttpError(400, 'You can’t take away your own admin rights');
+      stmt.setAdmin.run(body?.isAdmin ? 1 : 0, pid);
+      return { ok: true };
     }],
 
     ['GET', /^\/v1\/groups$/, (me) => stmt.myGroups.all(me.id)],
@@ -305,7 +595,7 @@ export function createApi(db, { password = '' } = {}) {
   function handle(method, url, headers, body) {
     const u = new URL(url, 'http://x');
     if (method === 'GET' && u.pathname === '/v1/health') {
-      return [200, { ok: true, app: 'ski-tracker-friends', v: 1, password: !!passwordHash }];
+      return [200, { ok: true, app: 'ski-tracker-friends', v: 2, accounts: true, password: !!passwordHash }];
     }
     for (const [m, re, fn] of routes) {
       if (m !== method) continue;
@@ -351,7 +641,7 @@ export function listener(api, log = () => undefined) {
       } catch (e) {
         status = e instanceof HttpError ? e.status : 500;
         out = { error: e instanceof HttpError ? e.message : 'Server error', ...(e?.code ? { code: e.code } : {}) };
-        if (e?.code === 'password') delay = WRONG_PASSWORD_DELAY_MS;
+        if (e?.code === 'password' || e?.code === 'login') delay = WRONG_PASSWORD_DELAY_MS;
         if (!(e instanceof HttpError)) log(e);
       }
       const send = () => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(out));

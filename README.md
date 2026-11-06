@@ -37,6 +37,8 @@ the phone in your pocket, and the app logs your day:
   falls per run, and an **"Are you OK?"** check after a hard fall that opens SOS if you don't answer
 - **Private app**: it only opens for people who know your friends server's address and password (a lock screen
   on first start, which locks again if you change the password)
+- **Accounts** on your friends server: log in on any phone, **online backup** of your days, a **profile** with
+  picture, season totals and badges for friends, and **Manage people** for the admin
 - **Friend groups** (needs the friends server in [`server/`](server/README.md), e.g. on a Raspberry Pi): a group
   per ski trip with a **daily leaderboard** (vertical, top speed, runs) and **group challenges**: everyone who
   skis the stretch on that day is timed automatically and ranked

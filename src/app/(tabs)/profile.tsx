@@ -6,6 +6,7 @@ import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
 import { addDemoDay } from '../../tracking/demo';
+import { AccountCard } from '../../components/AccountCard';
 import { checkServer } from '../../friends/api';
 import { resetFriendsCache, syncFriends } from '../../friends/sync';
 import { normalizeServerUrl } from '../../lib/groups';
@@ -56,6 +57,8 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
+      <AccountCard />
+
       <View style={[s.card, styles.section]}>
         <Text style={s.label}>Your name</Text>
         <TextInput
@@ -71,8 +74,8 @@ export default function ProfileScreen() {
       <View style={[s.card, styles.section]}>
         <Text style={s.label}>Friends server</Text>
         <Text style={s.muted}>
-          For friend groups and group challenges. Your friends use the same address. Only day totals and challenge
-          times are shared, never your GPS tracks.
+          For your account, friend groups and group challenges. Your friends use the same address. Friends only see
+          day totals, challenge times and your profile; GPS tracks are only stored for your own online backup.
         </Text>
         <TextInput
           value={server}

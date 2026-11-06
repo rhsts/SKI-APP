@@ -13,6 +13,7 @@ import {
 } from '../../lib/groups';
 import type { Segment } from '../../lib/segments';
 import { useSettings } from '../../settings';
+import { Avatar } from '../../components/Avatar';
 import { useStyles, useTheme, type Palette } from '../../theme';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -134,6 +135,7 @@ export default function GroupScreen() {
     ]);
 
   const ranked = board ? rankBoard(board, metric) : null;
+  const avatarOf = new Map(detail.members.map((m) => [m.playerId, !!m.hasAvatar]));
   const fmtMetric = (r: BoardRow) =>
     metric === 'vertical' ? fmtAlt(r.vertical, units) : metric === 'topSpeed' ? fmtSpeed(r.topSpeed, units) : `${r.runs} ${r.runs === 1 ? 'run' : 'runs'}`;
   const dayChallenges = detail.challenges.filter((c) => c.date === shown);
@@ -194,8 +196,14 @@ export default function GroupScreen() {
           </Text>
         ) : (
           ranked.map((r) => (
-            <View key={r.playerId} style={[styles.rankRow, r.playerId === playerId && styles.meRow, r.rank == null && { opacity: 0.45 }]}>
+            <Pressable
+              key={r.playerId}
+              onPress={() => router.push(`/player/${r.playerId}`)}
+              style={[styles.rankRow, r.playerId === playerId && styles.meRow, r.rank == null && { opacity: 0.45 }]}
+              accessibilityLabel={`${r.name}’s profile`}
+            >
               <Text style={styles.rank}>{r.rank == null ? '–' : MEDALS[r.rank - 1] ?? `${r.rank}`}</Text>
+              <Avatar playerId={r.playerId} name={r.name} size={34} hasAvatar={!!avatarOf.get(r.playerId)} />
               <View style={{ flex: 1 }}>
                 <Text style={[s.body, { fontWeight: '800' }]} numberOfLines={1}>{r.playerId === playerId ? `${r.name} (you)` : r.name}</Text>
                 {r.rank != null ? (
@@ -213,7 +221,7 @@ export default function GroupScreen() {
                 )}
               </View>
               {r.rank != null ? <Text style={styles.value}>{fmtMetric(r)}</Text> : null}
-            </View>
+            </Pressable>
           ))
         )}
       </View>
