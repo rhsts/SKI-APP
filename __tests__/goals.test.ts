@@ -68,3 +68,19 @@ describe('badges', () => {
     expect(computeBadges([], [], 'me').every((b) => b.earnedAt == null)).toBe(true);
   });
 });
+
+describe('badge details', () => {
+  it('every badge has a description and a tip to show when tapped', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { badgeInfo, computeBadges } = require('../src/lib/goals');
+    const all = computeBadges([], [], 'me') as { id: string; emoji: string; title: string }[];
+    expect(all.length).toBeGreaterThan(15);
+    for (const b of all) {
+      const info = badgeInfo(b.id);
+      expect(info?.title).toBe(b.title);
+      expect(info?.description.length).toBeGreaterThan(5);
+      expect(info?.tip?.length).toBeGreaterThan(10);
+    }
+    expect(badgeInfo('no-such-badge')).toBeNull();
+  });
+});

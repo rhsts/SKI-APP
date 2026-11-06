@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BadgeSheet, type BadgeView } from '../../components/BadgeSheet';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { api, type PlayerProfile } from '../../friends/api';
@@ -18,6 +19,7 @@ export default function PlayerScreen() {
   const { units, playerId } = useSettings();
   const [p, setP] = useState<PlayerProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openBadge, setOpenBadge] = useState<BadgeView | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -76,15 +78,22 @@ export default function PlayerScreen() {
       {p.badges.length ? (
         <View style={styles.badges}>
           {p.badges.map((b) => (
-            <View key={b.id} style={[s.card, styles.badge]}>
+            <Pressable
+              key={b.id}
+              onPress={() => setOpenBadge({ id: b.id, emoji: b.emoji, title: b.title, earnedAt: b.at })}
+              style={({ pressed }) => [s.card, styles.badge, pressed && { transform: [{ scale: 0.96 }] }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${b.title}. Tap for details.`}
+            >
               <Text style={{ fontSize: 28 }}>{b.emoji}</Text>
               <Text style={styles.badgeTitle} numberOfLines={1}>{b.title}</Text>
-            </View>
+            </Pressable>
           ))}
         </View>
       ) : (
         <Text style={s.muted}>No badges yet.</Text>
       )}
+      <BadgeSheet badge={openBadge} onClose={() => setOpenBadge(null)} whose={p.id === playerId ? 'you' : p.name} />
     </ScrollView>
   );
 }

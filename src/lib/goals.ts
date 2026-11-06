@@ -109,6 +109,37 @@ const CHALLENGE_BADGES = [
   { id: 'champion', emoji: '🏆', title: 'Champion', description: 'Lead a challenge with at least 2 skiers.' },
 ];
 
+/** A little extra on how a badge is earned, shown when you tap it. */
+const TIPS: Record<string, string> = {
+  'first-tracks': 'Start recording on the Record tab, or import a day from Slopes or a GPX file.',
+  'speed-60': 'Your top speed comes from GPS. Short glitches are filtered out, so it has to be real.',
+  'speed-80': 'Your top speed comes from GPS. Short glitches are filtered out, so it has to be real.',
+  'speed-100': 'Your top speed comes from GPS. Short glitches are filtered out, so it has to be real.',
+  'vert-5k': 'Vertical is the height you skied down, added up over all runs of the day.',
+  'vert-10k': 'Vertical is the height you skied down, added up over all runs of the day.',
+  'runs-20': 'Every descent counts as a run; tiny stops in the middle don’t split it.',
+  'early-bird': 'Times are your phone’s local time.',
+  'last-chair': 'Times are your phone’s local time.',
+  'days-10': 'Several recordings on the same day count as one ski day. The season runs from 1 July to 30 June.',
+  'season-50k': 'That’s more than five times the height of Mount Everest. The season runs from 1 July to 30 June.',
+  explorer: 'Places are the resort names the app found (or you typed) for your days.',
+  'turns-300': 'Turns are counted from your GPS track: medium and long turns count, very quick ones blur together.',
+  carver: 'g is the sideways force of a turn: 1 g is as strong as gravity. It’s worked out from speed and how sharply you turn.',
+  'air-half': 'Jumps are felt by the motion sensor: switch on Profile → Jumps and falls, and keep the app open while you ski.',
+  'air-1': 'Jumps are felt by the motion sensor: switch on Profile → Jumps and falls, and keep the app open while you ski.',
+  'streak-3': 'Calendar days in a row with at least one recorded day.',
+  'streak-5': 'Calendar days in a row with at least one recorded day.',
+  'weekly-hero': 'You find this week’s three challenges on the Season tab. They change every Monday.',
+  challenger: 'Make a challenge from a run (the flag in a day’s timeline), or join one from a friend, then ski it.',
+  champion: 'Have the fastest time on a challenge that at least one other skier has also done.',
+};
+
+/** Title, description and tip of a badge by id (for badges shown on a friend's profile). */
+export function badgeInfo(id: string): { emoji: string; title: string; description: string; tip: string | null } | null {
+  const def = [...DEFS, ...CHALLENGE_BADGES].find((d) => d.id === id);
+  return def ? { emoji: def.emoji, title: def.title, description: def.description, tip: TIPS[id] ?? null } : null;
+}
+
 /**
  * All badges, each with the day that earned it (or null). Days are scanned
  * oldest first, so a badge belongs to the first day that qualified.

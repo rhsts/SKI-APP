@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { DifficultyBar } from '../../components/DifficultyBar';
+import { BadgeSheet } from '../../components/BadgeSheet';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { difficultyBreakdown } from '../../lib/breakdown';
 import { SPORTS } from '../../lib/sport';
@@ -26,6 +27,7 @@ export default function SeasonScreen() {
   const [motion, setMotion] = useState<Record<string, MotionSummary>>({});
   const [now, setNow] = useState(0);
   const [editing, setEditing] = useState<keyof Goals | null>(null);
+  const [openBadge, setOpenBadge] = useState<Badge | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [currentKey, setCurrentKey] = useState<string | null>(null);
 
@@ -157,8 +159,17 @@ export default function SeasonScreen() {
         <Text style={s.muted}>{earned} of {badges.length}</Text>
       </View>
       <View style={styles.badgeGrid}>
-        {badges.map((b) => <BadgeTile key={b.id} b={b} />)}
+        {badges.map((b) => <BadgeTile key={b.id} b={b} onPress={() => setOpenBadge(b)} />)}
       </View>
+      <BadgeSheet
+        badge={openBadge}
+        onClose={() => setOpenBadge(null)}
+        onOpenDay={openBadge?.dayId ? () => {
+          const id = openBadge.dayId;
+          setOpenBadge(null);
+          router.push(`/day/${id}`);
+        } : undefined}
+      />
 
       <Text style={[s.h2, { marginTop: 8 }]}>{allTime ? 'All-time records' : 'Personal records'}</Text>
       <RecordRow icon="speedometer" label="Fastest speed" rec={r.topSpeed} fmt={(v) => fmtSpeed(v, units)} />
@@ -266,16 +277,16 @@ function WeeklyRow({ w, units }: { w: WeeklyChallenge; units: Units }) {
   );
 }
 
-function BadgeTile({ b }: { b: Badge }) {
+function BadgeTile({ b, onPress }: { b: Badge; onPress: () => void }) {
   const { s } = useTheme();
   const styles = useStyles(makeStyles);
   const got = b.earnedAt != null;
   return (
     <Pressable
-      style={[s.card, styles.badge, !got && { opacity: 0.45 }]}
-      disabled={!b.dayId}
-      onPress={() => b.dayId && router.push(`/day/${b.dayId}`)}
-      accessibilityLabel={`${b.title}: ${b.description}${got ? ' Earned.' : ' Not earned yet.'}`}
+      style={({ pressed }) => [s.card, styles.badge, !got && { opacity: 0.45 }, pressed && { transform: [{ scale: 0.96 }] }]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${b.title}: ${b.description}${got ? ' Earned.' : ' Not earned yet.'} Tap for details.`}
     >
       <Text style={{ fontSize: 30 }}>{got ? b.emoji : '🔒'}</Text>
       <Text style={styles.badgeTitle} numberOfLines={1}>{b.title}</Text>
