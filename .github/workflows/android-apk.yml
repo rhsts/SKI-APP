@@ -3,10 +3,8 @@ name: Build Android APK
 # Builds an installable APK, checks on an Android emulator that it starts without
 # crashing, and only then attaches it to a GitHub Release.
 # Optional repository secret GOOGLE_MAPS_API_KEY enables maps.
+# Only runs when started by hand: GitHub → Actions → Build Android APK → Run workflow.
 on:
-  push:
-    branches: [main, claude/elegant-mendel-38c8p6]
-    paths-ignore: ['docs/**', '**.md']
   workflow_dispatch:
 
 permissions:

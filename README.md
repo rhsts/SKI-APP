@@ -81,7 +81,8 @@ To host the page somewhere else, change `INVITE_PAGE_URL` in `src/config.ts`.
 
 ## Install the app (Android)
 
-Every push builds an installable APK on GitHub Actions and attaches it to a **Release**.
+An installable APK is built on GitHub Actions **when you start it**: on GitHub, **Actions → Build Android APK →
+Run workflow** (branch `claude/elegant-mendel-38c8p6`). After about 15 minutes it's attached to a **Release**.
 
 1. On your phone, open **https://github.com/rhsts/SKI-APP/releases** and tap the newest release.
 2. Tap `ski-tracker-<n>.apk` to download it. When asked, allow your browser to **install unknown apps**,
@@ -89,8 +90,7 @@ Every push builds an installable APK on GitHub Actions and attaches it to a **Re
 3. On first launch, allow location **"All the time"** (for tracking with the screen off and start reminders)
    and notifications.
 
-New builds install over the old one and keep your data. To build manually: **Actions → Build Android APK →
-Run workflow**.
+New builds install over the old one and keep your data.
 
 ### Google Maps key (needed for maps in the installed app)
 
