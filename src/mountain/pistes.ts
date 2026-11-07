@@ -1,4 +1,4 @@
-import { getPoints, getSession, newId, saveTrailMap, setSessionPistes } from '../db';
+import { getPoints, getSession, newId, saveTrailMap, setSessionPistes, type SessionRow } from '../db';
 import {
   bboxOf, matchLiftRides, matchRunsToPistes, OVERPASS_URL, overpassQuery, parseLifts, parseOverpass, type PisteMatch,
 } from '../lib/pistes';
@@ -6,7 +6,7 @@ import { cleanTrack, computeStats } from '../lib/stats';
 import { bboxAround, buildTrailMap, type TrailMap } from '../lib/trailmap';
 
 /** Bump when the lookup gains something new, so older days are looked up again once. */
-export const PISTES_VERSION = 4;
+export const PISTES_VERSION = 5; // 5: stats v4 finds runs that used to be lost, which need names too
 export const VERSION_KEY = '_v';
 
 export function pistesUpToDate(p: Record<string, PisteMatch> | null): boolean {
@@ -55,6 +55,29 @@ export async function lookupPistes(sessionId: string): Promise<Record<string, Pi
   await setSessionPistes(sessionId, matches);
   await saveTrailMap(buildTrailMap(json, bbox, `day-${sessionId}`)).catch(() => undefined);
   return matches;
+}
+
+const tried = new Set<string>();
+let queue: Promise<void> = Promise.resolve();
+
+/**
+ * Looks up pistes in the background for finished days whose names are missing or
+ * stale, one day at a time (Overpass is rate-limited) and each at most once per
+ * app run; failed days are simply tried again next app start.
+ */
+export function lookupStalePistes(
+  days: SessionRow[],
+  onFound: (id: string, pistes: Record<string, PisteMatch>) => void,
+): Promise<void> {
+  const todo = days.filter((d) => d.endedAt != null && !d.isDemo && !pistesUpToDate(d.pistes) && !tried.has(d.id));
+  todo.forEach((d) => tried.add(d.id));
+  queue = queue.then(async () => {
+    for (const d of todo) {
+      const p = await lookupPistes(d.id).catch(() => null);
+      if (p) onFound(d.id, p);
+    }
+  });
+  return queue;
 }
 
 /** Downloads the pistes and lifts around a point (about 6 km each way) for offline use. */

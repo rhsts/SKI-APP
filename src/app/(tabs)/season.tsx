@@ -7,6 +7,7 @@ import { BadgeSheet } from '../../components/BadgeSheet';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { difficultyBreakdown } from '../../lib/breakdown';
 import { SPORTS } from '../../lib/sport';
+import { lookupStalePistes, pistesUpToDate } from '../../mountain/pistes';
 import { listAttempts, listSessions, motionSummaries, type SessionRow } from '../../db';
 import type { MotionSummary } from '../../lib/motion';
 import { computeStreaks, weeklyChallenges, type WeeklyChallenge } from '../../lib/streaks';
@@ -35,7 +36,11 @@ export default function SeasonScreen() {
     useCallback(() => {
       setCurrentKey(seasonOf(Date.now()).key);
       setNow(Date.now());
-      listSessions().then(setDays).catch(() => setDays([]));
+      listSessions().then((all) => {
+        setDays(all);
+        // Days not reopened since the piste lookup improved get their names here, one by one.
+        lookupStalePistes(all, (id, pistes) => setDays((cur) => cur.map((d) => (d.id === id ? { ...d, pistes } : d))));
+      }).catch(() => setDays([]));
       listAttempts().then(setAttempts).catch(() => setAttempts([]));
       motionSummaries().then(setMotion).catch(() => setMotion({}));
     }, []),
@@ -56,8 +61,8 @@ export default function SeasonScreen() {
   const allTime = key === ALL_TIME;
   const shares = useMemo(
     () => difficultyBreakdown(
-      // Days whose pistes were never looked up (offline, demo) would only add "Piste unknown".
-      days.filter((d) => d.stats && d.pistes && (allTime || seasonOf(d.startedAt).key === key)).map((d) => ({ activities: d.stats!.activities, pistes: d.pistes })),
+      // Days whose pistes were never looked up (offline, demo) or are stale (still being looked up) would only add "Piste unknown".
+      days.filter((d) => d.stats && pistesUpToDate(d.pistes) && (allTime || seasonOf(d.startedAt).key === key)).map((d) => ({ activities: d.stats!.activities, pistes: d.pistes })),
     ),
     [days, key, allTime],
   );
