@@ -143,6 +143,29 @@ describe('runs over several pistes', () => {
     expect(m?.name).toBe('Wide');
   });
 
+  it('takes the name from one OSM piece and the difficulty from another', () => {
+    const m = matchRunsToPistes(pts, [run], [
+      { id: 'r', name: 'Route 7', difficulty: null, coords: line(0, 1000, 0) },
+      { id: 'w', name: null, difficulty: 'intermediate', coords: line(10, 1000, 0) },
+    ])['0'];
+    expect(m).toMatchObject({ name: 'Route 7', difficulty: 'intermediate' });
+  });
+
+  it('a piste mapped as an area counts anywhere inside it', () => {
+    const box = [fromXY(-150, 1050), fromXY(150, 1050), fromXY(150, -50), fromXY(-150, -50), fromXY(-150, 1050)];
+    const m = matchRunsToPistes(pts, [run], [{ id: 'a', name: null, difficulty: 'easy', coords: box, area: true }])['0'];
+    expect(m?.difficulty).toBe('easy');
+  });
+
+  it('a long wait at the side of the piste does not make the run off piste', () => {
+    const side = fromXY(80, 500);
+    const wait = Array.from({ length: 300 }, (_, k) => ({ t: 50500 + k * 1000, lat: side.lat, lon: side.lon, alt: 1850, acc: 5, spd: 0 }));
+    const later = pts.slice(51).map((p) => ({ ...p, t: p.t + 301000 }));
+    const all = [...pts.slice(0, 51), ...wait, ...later];
+    const long = { ...run, endIndex: all.length - 1, endTime: all[all.length - 1].t };
+    expect(matchRunsToPistes(all, [long], [{ id: 'p', name: 'Main', difficulty: 'easy', coords: line(0, 1000, 0) }])['0']?.name).toBe('Main');
+  });
+
   it('really off piste stays unmatched', () => {
     expect(matchRunsToPistes(pts, [run], [{ id: 'f', name: 'Far', difficulty: 'easy', coords: line(200, 1000, 0) }])).toEqual({});
   });

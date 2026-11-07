@@ -13,6 +13,8 @@ export interface Piste {
   name: string | null;
   difficulty: Difficulty;
   coords: LatLon[];
+  /** Mapped as an area (closed outline of the whole slope), not a centre line. */
+  area?: boolean;
 }
 
 export interface PisteMatch {
@@ -139,7 +141,9 @@ export function parseOverpass(json: unknown): Piste[] {
     // The same response also holds lifts: only downhill pistes count here.
     if (el.tags?.['piste:type'] !== 'downhill') continue;
     if (el.type === 'way' && geomOk(el.geometry)) {
-      out.push({ id: `w${el.id}`, name: nameOf(el.tags), difficulty: difficultyOf(el.tags), coords: el.geometry });
+      const g = el.geometry, first = g[0], last = g[g.length - 1];
+      const area = el.tags?.area === 'yes' && g.length >= 4 && first.lat === last.lat && first.lon === last.lon;
+      out.push({ id: `w${el.id}`, name: nameOf(el.tags), difficulty: difficultyOf(el.tags), coords: g, area });
     } else if (el.type === 'relation' && Array.isArray(el.members)) {
       el.members.forEach((m, k) => {
         if (m.type === 'way' && geomOk(m.geometry)) {
@@ -158,6 +162,16 @@ export function matchRunsToPistes(points: TrackPoint[], runs: Activity[], pistes
   const { toXY } = localProjector(points[0]);
   const lines = pistes.map((p) => ({ piste: p, xy: p.coords.map(toXY) }));
 
+  // Inside a piste mapped as an area = on it, however far from its outline.
+  const inside = (q: { x: number; y: number }, xy: { x: number; y: number }[]) => {
+    let c = false;
+    for (let i = 0, j = xy.length - 1; i < xy.length; j = i++) {
+      const a = xy[i], b = xy[j];
+      if ((a.y > q.y) !== (b.y > q.y) && q.x < ((b.x - a.x) * (q.y - a.y)) / (b.y - a.y) + a.x) c = !c;
+    }
+    return c;
+  };
+
   const distTo = (q: { x: number; y: number }, xy: { x: number; y: number }[]) => {
     let best = Infinity;
     for (let i = 0; i < xy.length - 1; i++) {
@@ -173,9 +187,17 @@ export function matchRunsToPistes(points: TrackPoint[], runs: Activity[], pistes
 
   for (const run of runs) {
     if (run.kind !== 'run') continue;
-    const slice = points.slice(run.startIndex, run.endIndex + 1);
-    const step = Math.max(1, Math.floor(slice.length / 60));
-    const samples = slice.filter((_, i) => i % step === 0).map(toXY);
+    // About 60 samples evenly spaced along the way down, so standing still somewhere
+    // (waiting for friends at the edge of the piste) doesn't outweigh the skiing.
+    const xy = points.slice(run.startIndex, run.endIndex + 1).map(toXY);
+    let path = 0;
+    for (let i = 1; i < xy.length; i++) path += Math.hypot(xy[i].x - xy[i - 1].x, xy[i].y - xy[i - 1].y);
+    const step = path / 60;
+    const samples = xy.slice(0, 1);
+    for (let i = 1, gone = 0; i < xy.length; i++) {
+      gone += Math.hypot(xy[i].x - xy[i - 1].x, xy[i].y - xy[i - 1].y);
+      if (gone >= step) { samples.push(xy[i]); gone = 0; }
+    }
     if (!samples.length) continue;
     // Merge coverage of pieces of the same named piste (a piste is often several OSM ways).
     const byKey = new Map<string, { name: string | null; difficulty: Difficulty; hits: Set<number> }>();
@@ -183,7 +205,7 @@ export function matchRunsToPistes(points: TrackPoint[], runs: Activity[], pistes
       const key = piste.name ?? piste.id;
       let entry = byKey.get(key);
       samples.forEach((q, i) => {
-        if (distTo(q, xy) <= ON_PISTE_M) {
+        if ((piste.area && inside(q, xy)) || distTo(q, xy) <= ON_PISTE_M) {
           if (!entry) { entry = { name: piste.name, difficulty: piste.difficulty, hits: new Set() }; byKey.set(key, entry); }
           entry.hits.add(i);
           if (!entry.difficulty) entry.difficulty = piste.difficulty;
@@ -194,14 +216,14 @@ export function matchRunsToPistes(points: TrackPoint[], runs: Activity[], pistes
     // when it was on *some* piste most of the way, and is named after the one it used most.
     const onAny = new Set<number>();
     for (const e of byKey.values()) e.hits.forEach((h) => onAny.add(h));
-    let best: PisteMatch | null = null;
-    for (const e of byKey.values()) {
-      const coverage = e.hits.size / samples.length;
-      const better = !best || coverage > best.coverage || (coverage === best.coverage && e.name && !best.name);
-      if (better) best = { name: e.name, difficulty: e.difficulty, coverage };
-    }
-    if (best && onAny.size / samples.length >= MIN_COVERAGE && (best.name || best.difficulty)) {
-      result[String(run.startTime)] = { ...best, coverage: onAny.size / samples.length };
+    // Name after the piste used most; OSM often has the name on one piece (a route) and
+    // the difficulty on another (the way, or an unnamed area), so fill in what's missing.
+    const ranked = [...byKey.values()].sort((a, b) => b.hits.size - a.hits.size);
+    const name = ranked.find((e) => e.name)?.name ?? null;
+    const difficulty = ranked.find((e) => e.name === name && e.difficulty)?.difficulty ?? ranked.find((e) => e.difficulty)?.difficulty ?? null;
+    const coverage = onAny.size / samples.length;
+    if (coverage >= MIN_COVERAGE && (name || difficulty)) {
+      result[String(run.startTime)] = { name, difficulty, coverage };
     }
   }
   return result;

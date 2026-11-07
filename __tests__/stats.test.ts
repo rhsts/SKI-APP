@@ -1,5 +1,5 @@
 import { distance, simplify } from '../src/lib/geo';
-import { cleanTrack, computeStats, trendLegs } from '../src/lib/stats';
+import { cleanTrack, computeStats, runStops, trendLegs } from '../src/lib/stats';
 import { statsForSport } from '../src/lib/stats';
 import { simulateDay } from '../src/lib/sim';
 import type { TrackPoint } from '../src/lib/types';
@@ -212,6 +212,40 @@ describe('riding a lift down', () => {
     expect(s.liftCount).toBe(0);
   });
 
+  it('altitude freezing on a lift, then jumping down, is not a run', () => {
+    // Seen on real phones: altitude stuck at one value for ~70 s while the gondola climbs, then 100 m lower.
+    const alt = (k: number) => (k < 200 ? 1300 + 1.5 * k : k < 270 ? 1600 : 1300 + 1.5 * k - 205);
+    const s = computeStats(track((k) => ({ x: 0, y: 5 * k, alt: alt(k), spd: 5 + Math.sin(k) * 0.2 }), 500));
+    expect(s.runCount).toBe(0);
+    expect(s.liftCount).toBe(1);
+  });
+
+  it('a 2-minute wait halfway down shows as a stop and is left out of the average speed', () => {
+    const turning = (k: number) => ({
+      x: 15 * Math.sin((2 * Math.PI * k) / 8), y: 5 * k, alt: 2400 - 2.5 * k, spd: 7 + 2 * Math.cos((2 * Math.PI * k) / 4),
+    });
+    const s = computeStats(track((k) => (k < 80 ? turning(k) : k < 200 ? { ...turning(80), spd: 0 } : turning(k - 120)), 280));
+    const run = s.activities.find((a) => a.kind === 'run')!;
+    expect(s.runCount).toBe(1);
+    expect(run.stops).toBe(1);
+    expect(run.stopTime).toBeGreaterThan(100);
+    expect(run.avgSpeed).toBeCloseTo(run.distance / (run.duration - run.stopTime!), 5);
+    expect(run.avgSpeed).toBeGreaterThan(run.distance / run.duration * 1.5);
+  });
+
+  it('a T-bar on gentle ground is a lift, not a climb', () => {
+    // 2 m/s along, only 0.25 m/s up: like the slow lifts at Grandvalira.
+    const s = computeStats(track((k) => ({ x: 0, y: 2 * k, alt: 2000 + 0.25 * k, spd: 2 + Math.sin(k) * 0.1 }), 600));
+    expect(s.liftCount).toBe(1);
+    expect(s.activities.some((a) => a.kind === 'tour')).toBe(false);
+  });
+
+  it('skinning uphill stays a climb', () => {
+    const s = computeStats(track((k) => ({ x: 0, y: 1.05 * k, alt: 2000 + 0.15 * k, spd: 1.05 + Math.sin(k) * 0.1 }), 900));
+    expect(s.liftCount).toBe(0);
+    expect(s.activities.some((a) => a.kind === 'tour')).toBe(true);
+  });
+
   it('a straight schuss at varying speed stays a run', () => {
     let y = 0;
     const s = computeStats(track((k) => {
@@ -220,5 +254,21 @@ describe('riding a lift down', () => {
       return { x: 0, y, alt: 2400 - y / 2, spd };
     }, 120));
     expect(s.runCount).toBe(1);
+  });
+});
+
+describe('stops partway down a run', () => {
+  // One fix a second; speed in m/s per fix.
+  const track = (spd: number[]) => ({ pts: spd.map((_, i) => ({ t: i * 1000, lat: 0, lon: 0, alt: 0, acc: 5, spd: null })), spd });
+  const run = (...parts: [number, number][]) => parts.flatMap(([n, v]) => Array<number>(n).fill(v));
+
+  it('counts a wait for friends, ignoring a short shuffle and a brief pause', () => {
+    const { pts, spd } = track(run([60, 10], [100, 0], [3, 2], [80, 0], [60, 10], [15, 0], [60, 10]));
+    expect(runStops(pts, spd, 0, pts.length - 1)).toEqual({ stops: 1, stopTime: 182 });
+  });
+
+  it('no stops on a run skied straight down', () => {
+    const { pts, spd } = track(run([200, 10]));
+    expect(runStops(pts, spd, 0, pts.length - 1)).toEqual({ stops: 0, stopTime: 0 });
   });
 });

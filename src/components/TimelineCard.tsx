@@ -72,10 +72,11 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
             <Metric label="Dist" value={fmtDist(a.distance, units)} />
           </View>
         ) : null}
-        {isRun && (a.turns || motion?.jumps || motion?.falls) ? (
+        {isRun && (a.turns || a.stops || motion?.jumps || motion?.falls) ? (
           <Text style={s.muted}>
             {[
               a.turns ? `🌀 ${a.turns} turns` : null,
+              a.stops ? `⏸ ${a.stops} ${a.stops === 1 ? 'stop' : 'stops'} · ${fmtDuration(a.stopTime ?? 0)}` : null,
               motion?.jumps ? `🦘 ${motion.jumps} · best ${fmtAir(motion.bestAir)}` : null,
               motion?.falls ? `💥 ${motion.falls} ${motion.falls === 1 ? 'fall' : 'falls'}` : null,
             ].filter(Boolean).join('   ')}

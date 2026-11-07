@@ -31,6 +31,9 @@ export interface Activity {
   /** Runs only: turns counted from the GPS track, and the strongest turn in g. */
   turns?: number;
   maxG?: number;
+  /** Runs only: times you stood still partway down (waiting for friends, a rest), and for how long in total (s). */
+  stops?: number;
+  stopTime?: number;
 }
 
 export interface DayStats {

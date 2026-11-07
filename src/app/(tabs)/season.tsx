@@ -56,7 +56,8 @@ export default function SeasonScreen() {
   const allTime = key === ALL_TIME;
   const shares = useMemo(
     () => difficultyBreakdown(
-      days.filter((d) => d.stats && (allTime || seasonOf(d.startedAt).key === key)).map((d) => ({ activities: d.stats!.activities, pistes: d.pistes })),
+      // Days whose pistes were never looked up (offline, demo) would only add "Piste unknown".
+      days.filter((d) => d.stats && d.pistes && (allTime || seasonOf(d.startedAt).key === key)).map((d) => ({ activities: d.stats!.activities, pistes: d.pistes })),
     ),
     [days, key, allTime],
   );

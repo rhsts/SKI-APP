@@ -15,7 +15,8 @@ export const CONFIG = {
   trendThreshold: 25, // m: altitude change that flips run <-> lift
   movingSpeed: 1, // m/s
   runEdgeSpeed: 1.5, // m/s: standing still at top/bottom of a run is trimmed off
-  liftMinClimbRate: 0.5, // m/s vertical: slower climbs are hiking/walking
+  liftMinClimbRate: 0.5, // m/s vertical: slower climbs are hiking/walking…
+  slowLiftMinSpeed: 1.1, // m/s straight-line while moving: …unless this fast, i.e. a T-bar or slow chair on gentle ground
   liftMaxSpeed: 8, // m/s average along the lift
   liftMinStraightness: 0.6, // straight-line / path distance
   runMinAvgSpeed: 2, // m/s: slower descents are walking
@@ -34,10 +35,15 @@ export const CONFIG = {
   downLiftMinS: 60, // s: riding a gondola/chair down lasts at least this…
   downLiftMaxWinding: 1.05, // …its path is this close to a straight line (path / straight-line distance)…
   downLiftMaxSpeedCv: 0.2, // …and its speed this steady (std dev / mean). Real runs turn and vary.
+  // Some phones freeze GPS altitude for a minute or more, then jump: mid-lift that looks like a short run.
+  fakeRunMaxWinding: 1.02, // a "run" this close to a dead-straight line…
+  fakeRunMaxSpeedCv: 0.3, // …at this steady a speed is really a lift ride
+  stopMinS: 30, // s: standing still this long partway down a run counts as a stop
+  stopBlipS: 10, // s: shuffling about for less than this doesn't end a stop
 };
 
 /** Bump whenever detection logic changes, so days saved by older versions get their stats recomputed. */
-export const STATS_VERSION = 2;
+export const STATS_VERSION = 3;
 
 /**
  * Phones' GPS altitude sometimes jumps hundreds of metres for a few seconds.
@@ -311,9 +317,10 @@ export function segmentActivities(
       const climb = a[e] - a[s];
       const straight = distance(pts[s], pts[e]);
       const straightness = leg.distance > 0 ? straight / leg.distance : 0;
+      // ponytail: skinning/hiking is slower than 1.1 m/s; a fast walk uphill in a straight line would pass for a lift.
       const isLift =
         leg.duration > 0 &&
-        climb / leg.duration >= CONFIG.liftMinClimbRate &&
+        (climb / leg.duration >= CONFIG.liftMinClimbRate || straightSpeed(s, e, pts, spd) >= CONFIG.slowLiftMinSpeed) &&
         leg.avgSpeed <= CONFIG.liftMaxSpeed &&
         straightness >= CONFIG.liftMinStraightness;
       // A slow, steady climb that isn't a lift: ski touring / hiking up.
@@ -339,15 +346,48 @@ export function segmentActivities(
  */
 function isDownLift(run: Activity, s: number, e: number, pts: TrackPoint[], spd: number[], a: number[]): boolean {
   if (run.duration < CONFIG.downLiftMinS || run.avgSpeed > CONFIG.liftMaxSpeed) return false;
-  const straight = distance(pts[s], pts[e]);
-  if (straight <= 0 || run.distance / straight > CONFIG.downLiftMaxWinding) return false;
-  let sum = 0, sq = 0;
-  for (let i = s; i <= e; i++) { sum += spd[i]; sq += spd[i] * spd[i]; }
-  const n = e - s + 1, mean = sum / n;
-  if (mean <= 0 || Math.sqrt(Math.max(0, sq / n - mean * mean)) / mean > CONFIG.downLiftMaxSpeedCv) return false;
+  if (winding(run, pts) > CONFIG.downLiftMaxWinding || speedCv(spd, s, e) > CONFIG.downLiftMaxSpeedCv) return false;
   // Steady descent: each half drops at least a quarter of the total.
   const mid = (s + e) >> 1, drop = a[s] - a[e];
   return a[s] - a[mid] >= drop / 4 && a[mid] - a[e] >= drop / 4;
+}
+
+/**
+ * Straight-line distance covered per second of moving (stops left out), m/s.
+ * Unlike path speed, GPS jitter can't inflate it, and a zig-zag skin track scores low.
+ */
+function straightSpeed(s: number, e: number, pts: TrackPoint[], spd: number[]): number {
+  let time = 0;
+  for (let i = s + 1; i <= e; i++) {
+    const dt = (pts[i].t - pts[i - 1].t) / 1000;
+    if (spd[i] > CONFIG.movingSpeed / 2 && dt <= CONFIG.maxGapForMoving) time += dt; // slow skinning still counts as moving
+  }
+  return time > 0 ? distance(pts[s], pts[e]) / time : 0;
+}
+
+/** Path length / straight-line distance (1 = dead straight). */
+function winding(a: Activity, pts: TrackPoint[]): number {
+  const straight = distance(pts[a.startIndex], pts[a.endIndex]);
+  return straight > 0 ? a.distance / straight : Infinity;
+}
+
+/** How much speed varies (std dev / mean). */
+function speedCv(spd: number[], s: number, e: number): number {
+  let sum = 0, sq = 0;
+  for (let i = s; i <= e; i++) { sum += spd[i]; sq += spd[i] * spd[i]; }
+  const n = e - s + 1, mean = sum / n;
+  return mean > 0 ? Math.sqrt(Math.max(0, sq / n - mean * mean)) / mean : Infinity;
+}
+
+/**
+ * A "run" no skier made: steeper than 45° on average (an altitude jump), or a
+ * dead-straight line at a lift's steady speed (frozen altitude on a lift, then a jump).
+ */
+function isFakeRun(a: Activity, pts: TrackPoint[], spd: number[]): boolean {
+  if (a.kind !== 'run') return false;
+  if (a.verticalDown > a.distance) return true;
+  return a.avgSpeed <= CONFIG.liftMaxSpeed && winding(a, pts) <= CONFIG.fakeRunMaxWinding
+    && speedCv(spd, a.startIndex, a.endIndex) <= CONFIG.fakeRunMaxSpeedCv;
 }
 
 /**
@@ -358,6 +398,10 @@ function isDownLift(run: Activity, s: number, e: number, pts: TrackPoint[], spd:
 function mergeNoise(acts: Activity[], pts: TrackPoint[], cum: number[], spd: number[], alts: number[]): Activity[] {
   let list = acts;
   let changed = true;
+  const merge = (i: number, j: number, kind: ActivityKind) => {
+    list = [...list.slice(0, i), summarise(kind, list[i].startIndex, list[j].endIndex, pts, cum, spd, alts), ...list.slice(j + 1)];
+    changed = true;
+  };
   while (changed) {
     changed = false;
     for (let i = 1; i < list.length - 1; i++) {
@@ -365,16 +409,25 @@ function mergeNoise(acts: Activity[], pts: TrackPoint[], cum: number[], spd: num
       const runGap = a.kind === 'run' && b.kind === 'run' && m.kind !== 'run'
         && m.duration < CONFIG.mergeGapS && m.verticalUp < CONFIG.mergeGapClimb;
       const liftGap = a.kind === 'lift' && b.kind === 'lift' && m.kind === 'run'
-        && m.duration < CONFIG.noiseRunS && m.verticalDown < CONFIG.noiseRunDrop;
-      if (runGap || liftGap) {
-        const merged = summarise(a.kind, a.startIndex, b.endIndex, pts, cum, spd, alts);
-        list = [...list.slice(0, i - 1), merged, ...list.slice(i + 2)];
-        changed = true;
-        break;
-      }
+        && ((m.duration < CONFIG.noiseRunS && m.verticalDown < CONFIG.noiseRunDrop) || isFakeRun(m, pts, spd));
+      if (runGap || liftGap) { merge(i - 1, i + 1, a.kind); break; }
+    }
+    if (changed) continue;
+    // A fake run right after or before a lift is part of that ride.
+    for (let i = 0; i < list.length - 1; i++) {
+      const [a, b] = [list[i], list[i + 1]];
+      if ((a.kind === 'lift' && isFakeRun(b, pts, spd)) || (isFakeRun(a, pts, spd) && b.kind === 'lift')) { merge(i, i + 1, 'lift'); break; }
     }
   }
-  return list;
+  // Any other fake run: we don't know what you were doing.
+  const out: Activity[] = [];
+  for (const x of list) {
+    const kind = isFakeRun(x, pts, spd) ? 'other' : x.kind;
+    const prev = out[out.length - 1];
+    if (kind === 'other' && prev?.kind === 'other') out[out.length - 1] = summarise('other', prev.startIndex, x.endIndex, pts, cum, spd, alts);
+    else out.push(kind === x.kind ? x : summarise(kind, x.startIndex, x.endIndex, pts, cum, spd, alts));
+  }
+  return out;
 }
 
 /**
@@ -392,6 +445,33 @@ function markLiftLines(acts: Activity[], pts: TrackPoint[]): Activity[] {
     while (k > prev.startIndex && distance(pts[k], bottom) <= CONFIG.queueMaxSpread) k--;
     return { ...a, wait: Math.max(0, (pts[prev.endIndex].t - pts[k].t) / 1000) };
   });
+}
+
+/** Stops partway down a run: stretches below walking pace of at least `stopMinS`. */
+export function runStops(pts: TrackPoint[], spd: number[], s: number, e: number): { stops: number; stopTime: number } {
+  let stops = 0, stopTime = 0;
+  let from = -1, to = -1; // current stop: first and last slow fix
+  const close = () => {
+    const d = (pts[to].t - pts[from].t) / 1000;
+    if (d >= CONFIG.stopMinS) { stops++; stopTime += d; }
+    from = -1;
+  };
+  for (let i = s; i <= e; i++) {
+    if (spd[i] < CONFIG.movingSpeed) {
+      if (from < 0) from = i;
+      to = i;
+    } else if (from >= 0 && (pts[i].t - pts[to].t) / 1000 > CONFIG.stopBlipS) {
+      close();
+    }
+  }
+  if (from >= 0) close();
+  return { stops, stopTime };
+}
+
+/** A run's average speed leaves its stops out: waiting for friends doesn't make you slow. */
+function withStops(run: Activity, stops: { stops: number; stopTime: number }): Activity {
+  const moving = run.duration - stops.stopTime;
+  return { ...run, ...stops, avgSpeed: moving > 0 ? run.distance / moving : run.avgSpeed };
 }
 
 /** Everything the app shows about a day, computed from raw GPS fixes. */
@@ -429,13 +509,14 @@ export function computeStats(rawPoints: TrackPoint[]): DayStats {
   const hasAlt = alts[0] != null;
   const vert = hasAlt ? verticalTotals(alts as number[]) : { down: 0, up: 0 };
   const activities = segmentActivities(pts, cum, spd, alts).map((a) =>
-    a.kind === 'run' ? { ...a, ...analyseTurns(pts, a.startIndex, a.endIndex, spd) } : a,
+    a.kind === 'run' ? withStops({ ...a, ...analyseTurns(pts, a.startIndex, a.endIndex, spd) }, runStops(pts, spd, a.startIndex, a.endIndex)) : a,
   );
   const runs = activities.filter((x) => x.kind === 'run');
   const lifts = activities.filter((x) => x.kind === 'lift');
   const tours = activities.filter((x) => x.kind === 'tour');
   const skiTime = runs.reduce((s, r) => s + r.duration, 0);
   const skiDistance = runs.reduce((s, r) => s + r.distance, 0);
+  const skiMovingTime = skiTime - runs.reduce((s, r) => s + (r.stopTime ?? 0), 0);
 
   return {
     duration: (pts[n - 1].t - pts[0].t) / 1000,
@@ -449,7 +530,7 @@ export function computeStats(rawPoints: TrackPoint[]): DayStats {
     skiDistance,
     topSpeed: top,
     topSpeedTime: topT,
-    avgSkiSpeed: skiTime > 0 ? skiDistance / skiTime : 0,
+    avgSkiSpeed: skiMovingTime > 0 ? skiDistance / skiMovingTime : 0,
     verticalDown: vert.down,
     verticalUp: vert.up,
     maxAlt,
