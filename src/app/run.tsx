@@ -2,21 +2,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { ElevationChart } from '../components/ElevationChart';
 import { RouteMap } from '../components/RouteMap';
 import { SpeedChart } from '../components/SpeedChart';
 import { StatGrid, StatTile } from '../components/StatTile';
-import { getPoints, getSession, type SessionRow } from '../db';
+import { getPoints, getSession, listPhotos, listTrailMaps, type PhotoRow, type SessionRow } from '../db';
 import { fmtAlt, fmtClock, fmtDist, fmtSpeed, fmtTimeOfDay } from '../lib/format';
 import { difficultyColor, difficultyLabel } from '../lib/pistes';
 import { runDetail } from '../lib/rundetail';
+import { mapFor, type TrailMap } from '../lib/trailmap';
 import { cleanTrack, computeStats, smoothedAltitudes, smoothedSpeeds } from '../lib/stats';
 import type { TrackPoint } from '../lib/types';
 import { useSettings } from '../settings';
 import { useStyles, useTheme, type Palette } from '../theme';
 
-/** One run up close: map, speed and elevation over the run, steepness, and prev/next. */
+/** One run up close: map with the resort's pistes, speed and elevation over the run, steepness, and prev/next. */
 export default function RunScreen() {
   const { session: sessionId, i } = useLocalSearchParams<{ session: string; i: string }>();
   const { colors, s, dark } = useTheme();
@@ -27,6 +28,9 @@ export default function RunScreen() {
   const [readoutH, setReadoutH] = useState(0);
   const [session, setSession] = useState<SessionRow | null>(null);
   const [raw, setRaw] = useState<TrackPoint[] | null>(null);
+  const [trail, setTrail] = useState<TrailMap | null>(null);
+  const [photos, setPhotos] = useState<PhotoRow[]>([]);
+  const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   // The cursor belongs to one run: after Previous / Next it starts empty again.
   const [cursorAt, setCursorAt] = useState<{ run: string; at: number } | null>(null);
   const cursor = cursorAt?.run === i ? cursorAt.at : null;
@@ -39,7 +43,15 @@ export default function RunScreen() {
   useEffect(() => {
     getSession(sessionId).then(setSession);
     getPoints(sessionId).then(setRaw);
+    listPhotos(sessionId).then(setPhotos).catch(() => setPhotos([]));
   }, [sessionId]);
+
+  // Offline trail map for this area (saved when the day's pistes were looked up, or downloaded).
+  useEffect(() => {
+    if (!raw?.length) return;
+    const mid = raw[Math.floor(raw.length / 2)];
+    listTrailMaps().then((maps) => setTrail(mapFor(maps, mid))).catch(() => setTrail(null));
+  }, [raw, session?.pistes]);
 
   const day = useMemo(() => {
     if (!raw) return null;
@@ -78,9 +90,11 @@ export default function RunScreen() {
   const piste = session.pistes?.[String(run.startTime)];
   const go = (k: number) => router.replace({ pathname: '/run', params: { session: sessionId, i: String(k) } });
   const cur = cursor != null ? slice.pts[cursor] : null;
+  const runPhotos = photos.filter((ph) => ph.t >= run.startTime && ph.t <= run.endTime);
+  const shown = photos.find((ph) => ph.id === openPhoto) ?? null;
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={styles.content} scrollEnabled={!scrubbing}>
+    <ScrollView style={s.screen} contentContainerStyle={styles.content} scrollEnabled={!scrubbing} testID="run-scroll">
       <Stack.Screen options={{ title: `Run ${number} of ${runIndices.length}` }} />
 
       {piste ? (
@@ -92,7 +106,21 @@ export default function RunScreen() {
       ) : null}
       <Text style={s.muted}>{fmtTimeOfDay(run.startTime)} – {fmtTimeOfDay(run.endTime)} · {fmtClock(run.duration)}</Text>
 
-      <RouteMap points={slice.pts} speeds={slice.speeds} activities={slice.activities} cursor={cursor} />
+      <RouteMap
+        points={slice.pts}
+        speeds={slice.speeds}
+        activities={slice.activities}
+        cursor={cursor}
+        trail={trail}
+        photos={runPhotos}
+        onPhotoPress={setOpenPhoto}
+      />
+      <SpeedLegend />
+      <Modal visible={!!shown} transparent animationType="fade" onRequestClose={() => setOpenPhoto(null)}>
+        <Pressable style={styles.photoBack} onPress={() => setOpenPhoto(null)} accessibilityLabel="Close photo">
+          {shown ? <Image source={{ uri: shown.uri }} style={styles.photo} resizeMode="contain" /> : null}
+        </Pressable>
+      </Modal>
 
       <View style={[s.card, { gap: 10 }]}>
         <Text
@@ -138,6 +166,20 @@ export default function RunScreen() {
   );
 }
 
+function SpeedLegend() {
+  const { s } = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.legend}>
+      <Text style={s.muted}>Slow</Text>
+      {['rgb(40,110,220)', 'rgb(30,170,110)', 'rgb(240,190,30)', 'rgb(220,50,40)'].map((c) => (
+        <View key={c} style={[styles.swatch, { backgroundColor: c }]} />
+      ))}
+      <Text style={s.muted}>Fast</Text>
+    </View>
+  );
+}
+
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
@@ -146,4 +188,8 @@ const makeStyles = (colors: Palette) =>
     nav: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
     navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent },
     navText: { color: colors.accent, fontWeight: '800' },
+    legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
+    swatch: { width: 18, height: 6, borderRadius: 3 },
+    photoBack: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
+    photo: { width: '100%', height: '80%' },
   });

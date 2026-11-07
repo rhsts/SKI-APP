@@ -39,7 +39,7 @@ export function PhotoStrip({ photos, open, onOpen, onAdd, onRemove, busy }: Prop
           ))}
         </ScrollView>
       ) : (
-        <Text style={s.muted}>Pick photos from this day: they’re pinned on the map where you took them.</Text>
+        <Text style={s.muted}>Pick photos from this day: they’re pinned on the map of the run you took them on.</Text>
       )}
 
       <Modal visible={!!current} transparent animationType="fade" onRequestClose={() => onOpen(null)}>
