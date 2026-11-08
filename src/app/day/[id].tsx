@@ -47,6 +47,7 @@ export default function DayScreen() {
   const [openPhoto, setOpenPhoto] = useState<string | null>(null);
   const [addingPhotos, setAddingPhotos] = useState(false);
   const [motion, setMotion] = useState<MotionRow[]>([]);
+  const [lookupFailed, setLookupFailed] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -57,6 +58,7 @@ export default function DayScreen() {
       if (ses && !pistesUpToDate(ses.pistes) && !ses.isDemo) {
         lookupPistes(ses.id).then((p) => {
           if (p) setSession((cur) => (cur ? { ...cur, pistes: p } : cur));
+          else setLookupFailed(true);
         });
       }
     });
@@ -103,7 +105,8 @@ export default function DayScreen() {
   const { stats } = day;
   const suggestedRunNo = suggestion ? stats.activities.slice(0, suggestion.activityIndex + 1).filter((a) => a.kind === 'run').length : 0;
   const timeline = stats.activities;
-  const shares = session.pistes && Object.keys(session.pistes).length ? difficultyBreakdown([{ activities: timeline, pistes: session.pistes }]) : [];
+  // Out-of-date names would show the runs found since as "Piste unknown": wait for the new lookup.
+  const shares = pistesUpToDate(session.pistes) ? difficultyBreakdown([{ activities: timeline, pistes: session.pistes }]) : [];
   const motionDay = summariseMotion(motion);
   const runOfEvent = (t: number) => {
     const i = timeline.findIndex((a) => a.kind === 'run' && t >= a.startTime - 5000 && t <= a.endTime + 5000);
@@ -217,6 +220,9 @@ export default function DayScreen() {
       </StatGrid>
 
       <DifficultyBar shares={shares} units={units} />
+      {!shares.length && !session.isDemo && stats.runCount ? (
+        <Text style={s.muted}>{lookupFailed ? 'Couldn’t look up the pistes (no internet, or the map server is busy). Open this day again to retry.' : 'Looking up the pistes…'}</Text>
+      ) : null}
 
       <Text style={[s.h2, { marginTop: 8 }]}>Runs</Text>
       <Text style={s.muted}>Tap a run to see it on the map. Tap 🏳 to make it a challenge for your friends.</Text>

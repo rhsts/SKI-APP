@@ -66,6 +66,7 @@ export default function SeasonScreen() {
     ),
     [days, key, allTime],
   );
+  const waiting = days.filter((d) => d.stats?.runCount && !d.isDemo && !pistesUpToDate(d.pistes) && (allTime || seasonOf(d.startedAt).key === key)).length;
   const progress = useMemo(() => (now ? goalProgress(summaries, goals, now) : []), [summaries, goals, now]);
   const badges = useMemo(() => computeBadges(summaries, attempts, playerId, motion), [summaries, attempts, playerId, motion]);
   const streaks = useMemo(() => (now ? computeStreaks(summaries, now) : null), [summaries, now]);
@@ -147,6 +148,7 @@ export default function SeasonScreen() {
       <Text style={[s.muted, { fontSize: 12 }]}>New challenges every Monday, based on your own days. Finish all three for the Weekly hero badge.</Text>
 
       <DifficultyBar shares={shares} units={units} title={allTime ? 'Pistes, all time' : 'Pistes this season'} />
+      {waiting ? <Text style={[s.muted, { fontSize: 12 }]}>Looking up the pistes for {waiting} {waiting === 1 ? 'day' : 'days'} (needs internet); they’re added as they come in.</Text> : null}
 
       <Text style={[s.h2, { marginTop: 8 }]}>Goals</Text>
       {progress.map((g) => (
