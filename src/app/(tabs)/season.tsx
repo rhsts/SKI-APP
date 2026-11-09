@@ -7,7 +7,7 @@ import { BadgeSheet } from '../../components/BadgeSheet';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { difficultyBreakdown } from '../../lib/breakdown';
 import { SPORTS } from '../../lib/sport';
-import { lookupStalePistes, pistesUpToDate } from '../../mountain/pistes';
+import { lookupStalePistes, onPistesFound, pistesUpToDate } from '../../mountain/pistes';
 import { listAttempts, listSessions, motionSummaries, type SessionRow } from '../../db';
 import type { MotionSummary } from '../../lib/motion';
 import { computeStreaks, weeklyChallenges, type WeeklyChallenge } from '../../lib/streaks';
@@ -38,11 +38,13 @@ export default function SeasonScreen() {
       setNow(Date.now());
       listSessions().then((all) => {
         setDays(all);
-        // Days not reopened since the piste lookup improved get their names here, one by one.
-        lookupStalePistes(all, (id, pistes) => setDays((cur) => cur.map((d) => (d.id === id ? { ...d, pistes } : d))));
+        lookupStalePistes(all); // retries days that failed earlier; already-queued days aren't added twice
       }).catch(() => setDays([]));
+      // Piste names come in one day at a time from the app-wide queue.
+      const stop = onPistesFound((id, pistes) => setDays((cur) => cur.map((d) => (d.id === id ? { ...d, pistes } : d))));
       listAttempts().then(setAttempts).catch(() => setAttempts([]));
       motionSummaries().then(setMotion).catch(() => setMotion({}));
+      return stop;
     }, []),
   );
 

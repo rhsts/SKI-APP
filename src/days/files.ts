@@ -7,7 +7,7 @@ import {
   upsertAttempts,
 } from '../db';
 import { lookupPlace } from '../tracking/place';
-import { lookupPistes } from '../mountain/pistes';
+import { lookupStalePistes } from '../mountain/pistes';
 import { buildBackup, packPoints, parseBackup, unpackPoints } from '../lib/backup';
 import { fileNameFor, parseGpx, splitDays, toGpx } from '../lib/gpx';
 import { strFromU8 } from 'fflate';
@@ -141,10 +141,11 @@ export async function importTracks(): Promise<{ added: number; skipped: number; 
       await insertPoints(id, day);
       existing.push(startedAt);
       await matchSession(id, day).catch(() => undefined);
-      lookupPistes(id).catch(() => undefined);
       added++;
     }
   }
+  // Piste names one day at a time (asking for all at once makes the map server refuse most).
+  if (added) listSessions().then((all) => lookupStalePistes(all)).catch(() => undefined);
   if (!added && !skipped && failed) {
     throw new Error('None of these files could be read. Pick .gpx or .slopes files.');
   }

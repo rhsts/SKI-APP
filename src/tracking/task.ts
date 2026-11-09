@@ -5,6 +5,7 @@ import { fmtAlt, fmtSpeed } from '../lib/format';
 import { decideGpsMode, GPS_OPTIONS, notificationBody, type GpsMode } from '../lib/power';
 import { computeStats } from '../lib/stats';
 import { readPressure } from './barometer';
+import { prefetchTrailMap } from '../mountain/pistes';
 import type { TrackPoint } from '../lib/types';
 
 /**
@@ -110,6 +111,8 @@ if (!TaskManager.isTaskDefined(LOCATION_TASK)) {
     const pres = await readPressure();
     const pts = data.locations.map((l) => ({ ...toTrackPoint(l), pres }));
     await insertPoints(active.sessionId, pts);
+    const last = pts[pts.length - 1];
+    prefetchTrailMap(last.lat, last.lon, last.t).catch(() => undefined); // no await: never hold up recording
     try {
       await adapt(active.sessionId, pts[pts.length - 1].t);
     } catch {

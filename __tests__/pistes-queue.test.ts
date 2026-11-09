@@ -1,10 +1,10 @@
 /**
- * Background piste lookup from the Season tab: stale finished days get looked up
- * one at a time, each at most once per app run.
+ * App-wide piste lookup queue: stale finished days get looked up one at a time,
+ * newest first; a failed day is tried again on the next call.
  */
 import type { SessionRow } from '../src/db';
 import { simulateDay } from '../src/lib/sim';
-import { lookupPistes, lookupStalePistes, OVERPASS_RETRY, PISTES_VERSION, VERSION_KEY } from '../src/mountain/pistes';
+import { lookupPistes, lookupStalePistes, onPistesFound, prefetchTrailMap, PREFETCH_EVERY_MS, OVERPASS_RETRY, PISTES_VERSION, VERSION_KEY } from '../src/mountain/pistes';
 
 OVERPASS_RETRY.waitsMs = [0, 1, 1]; // no real waiting in tests
 
@@ -30,7 +30,7 @@ beforeEach(() => { mockMaps.length = 0; });
 const fresh = { [VERSION_KEY]: { name: null, difficulty: null, coverage: PISTES_VERSION } };
 const stale = { [VERSION_KEY]: { name: null, difficulty: null, coverage: PISTES_VERSION - 1 } };
 
-it('looks up stale days one at a time, skips the rest, survives failures, never twice', async () => {
+it('looks up stale days one at a time, newest first, skips the rest, retries only failures', async () => {
   let open = 0;
   let maxOpen = 0;
   let calls = 0;
@@ -45,22 +45,36 @@ it('looks up stale days one at a time, skips the rest, survives failures, never 
   }) as unknown as typeof fetch;
 
   const days = [
-    day('a', { pistes: stale }), // fails every try
-    day('b'), // never looked up
+    day('f', { pistes: stale, startedAt: 1 }),
+    day('b', { startedAt: 2 }), // never looked up
     day('c', { pistes: fresh }), // up to date
     day('d', { isDemo: true }), // demo
     day('e', { endedAt: null }), // still recording
-    day('f', { pistes: stale }),
+    day('a', { pistes: stale, startedAt: 3 }), // newest; fails every try
   ];
   const found: string[] = [];
-  await lookupStalePistes(days, (id) => found.push(id));
+  const stop = onPistesFound((id) => found.push(id));
+  await lookupStalePistes(days);
   // a: every try fails; b: one fetch; f: same track as b, so it reuses b's saved map.
   expect(calls).toBe(OVERPASS_RETRY.waitsMs.length + 1);
   expect(maxOpen).toBe(1);
   expect(found).toEqual(['b', 'f']);
 
-  await lookupStalePistes(days, (id) => found.push(id)); // second visit to the tab, same app run
+  // Next call (back in the app, Season tab): only the failed day a is tried again,
+  // and it now finds b's saved map, so no new fetch.
+  await lookupStalePistes(days);
   expect(calls).toBe(OVERPASS_RETRY.waitsMs.length + 1);
+  expect(found).toEqual(['b', 'f', 'a']);
+  stop();
+});
+
+it('limit caps how many days one call takes on', async () => {
+  globalThis.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ elements: [] }) })) as unknown as typeof fetch;
+  const found: string[] = [];
+  const stop = onPistesFound((id) => found.push(id));
+  await lookupStalePistes([day('k', { startedAt: 5 }), day('l', { startedAt: 6 })], 1);
+  expect(found).toEqual(['l']);
+  stop();
 });
 
 it('a half-finished answer (busy server) is not saved; it asks again', async () => {
@@ -108,4 +122,26 @@ it('another day at the same resort reuses the saved map instead of asking the se
   mockMaps.push({ id: 'old', bbox: [-90, -180, 90, 180], fetchedAt: 0, pistes: [], lifts: [] });
   await lookupPistes('j');
   expect(calls).toBe(2);
+});
+
+it('while recording, fetches the resort map once and then only rechecks every 10 minutes', async () => {
+  let calls = 0;
+  globalThis.fetch = jest.fn(async () => {
+    calls++;
+    return { ok: true, json: async () => ({ elements: [] }) };
+  }) as unknown as typeof fetch;
+  const { lat, lon } = mockPoints[0];
+  const t0 = 1e12;
+  await prefetchTrailMap(lat, lon, t0);
+  expect(calls).toBe(1);
+  await prefetchTrailMap(lat, lon, t0 + 60000); // too soon: not even checked
+  await prefetchTrailMap(lat, lon, t0 + PREFETCH_EVERY_MS); // saved map covers here: no fetch
+  expect(calls).toBe(1);
+  await prefetchTrailMap(lat + 0.5, lon, t0 + 2 * PREFETCH_EVERY_MS); // another resort
+  expect(calls).toBe(2);
+  // At the end of the day, the lookup uses the map saved during the day.
+  day('m');
+  const p = await lookupPistes('m');
+  expect(calls).toBe(2);
+  expect(p?.[VERSION_KEY]?.coverage).toBe(PISTES_VERSION);
 });

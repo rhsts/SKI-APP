@@ -68,9 +68,7 @@ async function lookup(sessionId: string): Promise<Record<string, PisteMatch> | n
   const acts = computeStats(raw).activities;
   const day = bboxOf(pts);
   // The server takes ~30-40 s for a resort: reuse an area another day (or a download) already fetched.
-  let map = (await listTrailMaps().catch(() => [])).find(
-    (m) => m.complete && m.bbox[0] <= day[0] && m.bbox[1] <= day[1] && m.bbox[2] >= day[2] && m.bbox[3] >= day[3],
-  );
+  let map = (await listTrailMaps().catch(() => [])).find((m) => m.complete && contains(m.bbox, day));
   if (!map) {
     const bbox = bboxOf(pts, 0.01); // ~1 km more around, so more of the resort's other days fit inside it
     const json = await fetchOverpass(bbox);
@@ -84,30 +82,64 @@ async function lookup(sessionId: string): Promise<Record<string, PisteMatch> | n
     [VERSION_KEY]: { name: null, difficulty: null, coverage: PISTES_VERSION },
   };
   await setSessionPistes(sessionId, matches);
+  listeners.forEach((l) => l(sessionId, matches));
   return matches;
+}
+
+type FoundListener = (id: string, pistes: Record<string, PisteMatch>) => void;
+const listeners = new Set<FoundListener>();
+
+/** Tells a screen whenever any day's pistes come in (from the queue, the day screen or the background task). */
+export function onPistesFound(listener: FoundListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 const tried = new Set<string>();
 let queue: Promise<void> = Promise.resolve();
 
 /**
- * Looks up pistes in the background for finished days whose names are missing or
- * stale, one day at a time (Overpass is rate-limited) and each at most once per
- * app run; failed days are simply tried again next app start.
+ * Looks up pistes for finished days whose names are missing or stale, one day at a
+ * time (Overpass is rate-limited), newest day first. Started at launch, so it runs
+ * whatever screen is open; a day that failed is tried again on the next call.
+ * `limit` caps how many days this call takes on (the background task has little time).
  */
-export function lookupStalePistes(
-  days: SessionRow[],
-  onFound: (id: string, pistes: Record<string, PisteMatch>) => void,
-): Promise<void> {
-  const todo = days.filter((d) => d.endedAt != null && !d.isDemo && !pistesUpToDate(d.pistes) && !tried.has(d.id));
+export function lookupStalePistes(days: SessionRow[], limit = Infinity): Promise<void> {
+  const todo = days
+    .filter((d) => d.endedAt != null && !d.isDemo && !pistesUpToDate(d.pistes) && !tried.has(d.id))
+    .sort((a, b) => b.startedAt - a.startedAt)
+    .slice(0, limit);
   todo.forEach((d) => tried.add(d.id));
   queue = queue.then(async () => {
     for (const d of todo) {
       const p = await lookupPistes(d.id).catch(() => null);
-      if (p) onFound(d.id, p);
+      if (!p) tried.delete(d.id); // no internet or busy server: next call tries again
     }
   });
   return queue;
+}
+
+const contains = (outer: number[], inner: number[]) =>
+  outer[0] <= inner[0] && outer[1] <= inner[1] && outer[2] >= inner[2] && outer[3] >= inner[3];
+
+export const PREFETCH_EVERY_MS = 10 * 60000;
+let lastPrefetch = -Infinity;
+
+/**
+ * While recording, makes sure the resort around the skier is saved as a trail map,
+ * so when the day is finished its pistes are named straight away instead of
+ * waiting ~45 s for the map server. Checks at most every 10 minutes (cheap when
+ * a saved map already covers ~2 km around the skier).
+ */
+export async function prefetchTrailMap(lat: number, lon: number, now = Date.now()): Promise<void> {
+  if (now - lastPrefetch < PREFETCH_EVERY_MS) return;
+  lastPrefetch = now;
+  const near = bboxAround(lat, lon, 2);
+  const maps = await listTrailMaps().catch(() => []);
+  if (maps.some((m) => m.complete && contains(m.bbox, near))) return;
+  await downloadTrailMap(lat, lon).catch(() => null); // failed: tried again in 10 minutes
 }
 
 /** Downloads the pistes and lifts around a point (about 6 km each way) for offline use. */

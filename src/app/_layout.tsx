@@ -1,12 +1,15 @@
 // Registers the background GPS task before anything else, so Android can deliver
 // locations to it even when it starts the app headless with the screen off.
 import '../tracking/task';
+// Same for the task that looks up piste names while the app is closed.
+import { registerPistesTask } from '../mountain/pistes-task';
 
 import Stack from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { getDb } from '../db';
+import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
+import { getDb, listSessions } from '../db';
+import { lookupStalePistes } from '../mountain/pistes';
 import { getSettings, initSettings, useSettings } from '../settings';
 import { LockScreen } from '../components/LockScreen';
 import { checkServer } from '../friends/api';
@@ -34,9 +37,17 @@ export default function RootLayout() {
       // offline it simply stays open). Then: share new days, fetch group challenges.
       checkServer(getSettings().serverUrl, getSettings().serverPassword).catch(() => undefined);
       syncFriends().catch(() => undefined);
+      // Piste names for days still missing them, one by one while any screen is open.
+      lookupStalePistes(await listSessions()).catch(() => undefined);
+      registerPistesTask().catch(() => undefined);
     })()
       .catch((e) => console.warn('Startup failed', e))
       .finally(() => setReady(true));
+    // Back in the app: try again the days that failed (no internet, busy server).
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') listSessions().then((all) => lookupStalePistes(all)).catch(() => undefined);
+    });
+    return () => sub.remove();
   }, []);
 
   // The navigator is always mounted so an invite link that launches the app is
