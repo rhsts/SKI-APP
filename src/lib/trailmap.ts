@@ -10,6 +10,8 @@ export interface TrailMap {
   /** [south, west, north, east] */
   bbox: [number, number, number, number];
   fetchedAt: number;
+  /** Built from a full answer (older saved maps may be half-finished ones), so piste lookups can reuse it. */
+  complete?: boolean;
   pistes: Piste[];
   lifts: Lift[];
 }
@@ -37,6 +39,7 @@ export function buildTrailMap(json: unknown, bbox: TrailMap['bbox'], id: string,
     id,
     bbox,
     fetchedAt: now,
+    complete: true,
     pistes: parseOverpass(json).map((p) => ({ ...p, coords: thin(p.coords) })),
     lifts: parseLifts(json).map((l) => ({ ...l, coords: thin(l.coords) })),
   };

@@ -10,11 +10,13 @@ OVERPASS_RETRY.waitsMs = [0, 1, 1]; // no real waiting in tests
 
 const mockPoints = simulateDay().points;
 const mockSessions: Record<string, Partial<SessionRow>> = {};
+const mockMaps: unknown[] = [];
 jest.mock('../src/db', () => ({
   getSession: jest.fn(async (id: string) => mockSessions[id] ?? null),
   getPoints: jest.fn(async () => mockPoints),
   setSessionPistes: jest.fn(async () => undefined),
-  saveTrailMap: jest.fn(async () => undefined),
+  saveTrailMap: jest.fn(async (m: unknown) => { mockMaps.push(m); }),
+  listTrailMaps: jest.fn(async () => mockMaps),
   newId: () => 'x',
 }));
 
@@ -23,6 +25,8 @@ const day = (id: string, o: Partial<SessionRow> = {}): SessionRow => {
   mockSessions[id] = d;
   return d;
 };
+// Every test starts with no saved maps (they'd otherwise answer the next test's lookups).
+beforeEach(() => { mockMaps.length = 0; });
 const fresh = { [VERSION_KEY]: { name: null, difficulty: null, coverage: PISTES_VERSION } };
 const stale = { [VERSION_KEY]: { name: null, difficulty: null, coverage: PISTES_VERSION - 1 } };
 
@@ -50,12 +54,13 @@ it('looks up stale days one at a time, skips the rest, survives failures, never 
   ];
   const found: string[] = [];
   await lookupStalePistes(days, (id) => found.push(id));
-  expect(calls).toBe(OVERPASS_RETRY.waitsMs.length + 2);
+  // a: every try fails; b: one fetch; f: same track as b, so it reuses b's saved map.
+  expect(calls).toBe(OVERPASS_RETRY.waitsMs.length + 1);
   expect(maxOpen).toBe(1);
   expect(found).toEqual(['b', 'f']);
 
   await lookupStalePistes(days, (id) => found.push(id)); // second visit to the tab, same app run
-  expect(calls).toBe(OVERPASS_RETRY.waitsMs.length + 2);
+  expect(calls).toBe(OVERPASS_RETRY.waitsMs.length + 1);
 });
 
 it('a half-finished answer (busy server) is not saved; it asks again', async () => {
@@ -83,4 +88,24 @@ it('the day screen and the Season tab asking at once share one lookup', async ()
   const [a, b] = await Promise.all([lookupPistes('h'), lookupPistes('h')]);
   expect(calls).toBe(1);
   expect(a).toBe(b);
+});
+
+it('another day at the same resort reuses the saved map instead of asking the server', async () => {
+  day('i');
+  day('j');
+  let calls = 0;
+  globalThis.fetch = jest.fn(async () => {
+    calls++;
+    return { ok: true, json: async () => ({ elements: [] }) };
+  }) as unknown as typeof fetch;
+  mockMaps.length = 0;
+  await lookupPistes('i');
+  const p = await lookupPistes('j'); // same track, so inside the saved area
+  expect(calls).toBe(1);
+  expect(p?.[VERSION_KEY]?.coverage).toBe(PISTES_VERSION);
+  // A map saved before maps were known to be complete isn't trusted.
+  mockMaps.length = 0;
+  mockMaps.push({ id: 'old', bbox: [-90, -180, 90, 180], fetchedAt: 0, pistes: [], lifts: [] });
+  await lookupPistes('j');
+  expect(calls).toBe(2);
 });

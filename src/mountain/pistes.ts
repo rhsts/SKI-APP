@@ -1,6 +1,6 @@
-import { getPoints, getSession, newId, saveTrailMap, setSessionPistes, type SessionRow } from '../db';
+import { getPoints, getSession, listTrailMaps, newId, saveTrailMap, setSessionPistes, type SessionRow } from '../db';
 import {
-  bboxOf, matchLiftRides, matchRunsToPistes, OVERPASS_URL, overpassQuery, parseLifts, parseOverpass, type PisteMatch,
+  bboxOf, matchLiftRides, matchRunsToPistes, OVERPASS_URL, overpassQuery, type PisteMatch,
 } from '../lib/pistes';
 import { cleanTrack, computeStats } from '../lib/stats';
 import { bboxAround, buildTrailMap, type TrailMap } from '../lib/trailmap';
@@ -66,16 +66,24 @@ async function lookup(sessionId: string): Promise<Record<string, PisteMatch> | n
   const pts = cleanTrack(raw);
   if (pts.length < 2) return null;
   const acts = computeStats(raw).activities;
-  const bbox = bboxOf(pts);
-  const json = await fetchOverpass(bbox);
-  if (!json) return null;
+  const day = bboxOf(pts);
+  // The server takes ~30-40 s for a resort: reuse an area another day (or a download) already fetched.
+  let map = (await listTrailMaps().catch(() => [])).find(
+    (m) => m.complete && m.bbox[0] <= day[0] && m.bbox[1] <= day[1] && m.bbox[2] >= day[2] && m.bbox[3] >= day[3],
+  );
+  if (!map) {
+    const bbox = bboxOf(pts, 0.01); // ~1 km more around, so more of the resort's other days fit inside it
+    const json = await fetchOverpass(bbox);
+    if (!json) return null;
+    map = buildTrailMap(json, bbox, `day-${sessionId}`);
+    await saveTrailMap(map).catch(() => undefined);
+  }
   const matches: Record<string, PisteMatch> = {
-    ...matchRunsToPistes(pts, acts.filter((a) => a.kind === 'run'), parseOverpass(json)),
-    ...matchLiftRides(pts, acts.filter((a) => a.kind === 'lift'), parseLifts(json)),
+    ...matchRunsToPistes(pts, acts.filter((a) => a.kind === 'run'), map.pistes),
+    ...matchLiftRides(pts, acts.filter((a) => a.kind === 'lift'), map.lifts),
     [VERSION_KEY]: { name: null, difficulty: null, coverage: PISTES_VERSION },
   };
   await setSessionPistes(sessionId, matches);
-  await saveTrailMap(buildTrailMap(json, bbox, `day-${sessionId}`)).catch(() => undefined);
   return matches;
 }
 
