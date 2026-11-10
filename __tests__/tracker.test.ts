@@ -18,6 +18,7 @@ const mockLookupPlace = jest.fn();
 jest.mock('../src/db', () => ({
   createSession: jest.fn(async () => { const id = `s${mockSessions.size + 1}`; mockSessions.set(id, { endedAt: null, place: null }); return id; }),
   deleteSession: jest.fn(async (id: string) => { mockSessions.delete(id); }),
+  deleteUnfinishedSessions: jest.fn(async () => undefined),
   finishSession: (...a: [string, number, unknown, string | null]) => mockFinish(...a),
   getSession: jest.fn(async (id: string) => (mockSessions.has(id) ? { id, ...mockSessions.get(id) } : null)),
   getPoints: jest.fn(async (_id: string, after = -1) => mockPoints.filter((p) => p.t > after)),
@@ -68,6 +69,8 @@ jest.mock('expo-haptics', () => ({
 
 // eslint-disable-next-line import/first
 import { dismissLastRun, recoverActiveDay, startDay, stopDay, useTracker } from '../src/tracking/tracker';
+// eslint-disable-next-line import/first
+import { matchSession } from '../src/challenges/service';
 
 /** 3 minutes of slow movement: long enough to keep as a day. */
 const day = (from = 0) => Array.from({ length: 180 }, (_, i) => ({ t: 1e12 + (from + i) * 1000, lat: 47 + (from + i) * 1e-5, lon: 10, alt: 2000, spd: 1 }));
@@ -115,6 +118,29 @@ describe('tracker', () => {
     expect(result.current.status).toBe('paused');
     await act(async () => { expect(await stopDay()).toBe(id); });
     expect(mockSessions.get(id)!.place).toBe('Ischgl');
+    expect(result.current.status).toBe('idle');
+  });
+
+  it('a double tap on Start records one day, not two', async () => {
+    mockWatch.mockResolvedValue({ remove: jest.fn() });
+    mockLookupPlace.mockResolvedValue(null);
+    const before = mockSessions.size;
+    await Promise.all([startDay(false), startDay(false)]);
+    expect(mockSessions.size).toBe(before + 1);
+    expect(mockWatch).toHaveBeenCalledTimes(1);
+    mockPoints = day();
+    await stopDay();
+  });
+
+  it('finishes the day even when timing its challenges fails', async () => {
+    mockWatch.mockResolvedValue({ remove: jest.fn() });
+    mockLookupPlace.mockResolvedValue(null);
+    const { result } = await renderHook(() => useTracker());
+    await act(() => startDay(false));
+    const id = activeId();
+    mockPoints = day();
+    (matchSession as jest.Mock).mockRejectedValueOnce(new Error('db busy'));
+    await act(async () => { expect(await stopDay()).toBe(id); });
     expect(result.current.status).toBe('idle');
   });
 

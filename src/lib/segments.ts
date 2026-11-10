@@ -274,10 +274,10 @@ export class Racer {
 }
 
 /** Every timed pass through a segment in a recorded day. */
-export function findAttempts(points: TrackPoint[], segment: Segment) {
+export function findAttempts(points: TrackPoint[], segment: Segment, cleaned = cleanTrack(points)) {
   const racer = new Racer(segment);
   const out: Extract<RaceEvent, { type: 'finish' }>[] = [];
-  for (const p of cleanTrack(points)) {
+  for (const p of cleaned) {
     const ev = racer.push(p);
     if (ev?.type === 'finish') out.push(ev);
   }

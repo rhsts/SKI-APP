@@ -3,8 +3,9 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSyncExternalStore } from 'react';
+import { AppState } from 'react-native';
 import {
-  createSession, deleteMotionEvent, deleteSession, finishSession, getPoints, getSession, insertMotionEvents, insertPoints, kvGet, kvSet,
+  createSession, deleteMotionEvent, deleteSession, deleteUnfinishedSessions, finishSession, getPoints, getSession, insertMotionEvents, insertPoints, kvGet, kvSet,
   listAttempts, listMotionEvents, listSegments, upsertAttempts,
 } from '../db';
 import { EMPTY_MOTION, summariseMotion, type MotionEvent, type MotionSummary } from '../lib/motion';
@@ -126,6 +127,7 @@ export function useTracker(): TrackerState {
 
 // ---------- polling the DB for new fixes ----------
 
+const BACKGROUND_STATS_MS = 15000;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let lastStatsAt = 0;
 let polling = false;
@@ -147,9 +149,11 @@ async function pollOnce() {
   const fresh = await getPoints(a.sessionId, lastT);
   if (!fresh.length || state.active?.sessionId !== a.sessionId) return;
   const points = state.points.concat(fresh);
-  // Live stats: recompute at most every second, every 3 s once the day gets long.
+  // Live stats: recompute at most every second, every 3 s once the day gets long. With the app
+  // in the background (phone in your pocket) nobody is looking: every 15 s saves battery, and
+  // the buzz at the end of a run only comes after 90 s anyway.
   const now = Date.now();
-  const every = points.length > 6000 ? 3000 : 1000;
+  const every = AppState.currentState === 'background' ? BACKGROUND_STATS_MS : points.length > 6000 ? 3000 : 1000;
   let stats = state.stats;
   if (!stats || now - lastStatsAt >= every) {
     stats = computeStats(points);
@@ -510,13 +514,28 @@ export function dismissFinish() {
 
 // ---------- actions ----------
 
+/**
+ * Start, pause, resume and finish run one after another: each checks the state when its turn
+ * comes, so a double tap can't start two days or finish one twice at the same time.
+ */
+let actions: Promise<unknown> = Promise.resolve();
+function inTurn<T>(fn: () => Promise<T>): Promise<T> {
+  const run = actions.then(fn);
+  actions = run.catch(() => undefined);
+  return run;
+}
+
 /** Undo a half-started source so the next start binds GPS and the motion sensor afresh. */
 async function cleanUpFailedStart() {
   stopPolling();
   await stopSource().catch(() => undefined);
 }
 
-export async function startDay(simulate: boolean, sport: Sport = 'ski'): Promise<void> {
+export function startDay(simulate: boolean, sport: Sport = 'ski'): Promise<void> {
+  return inTurn(() => doStartDay(simulate, sport));
+}
+
+async function doStartDay(simulate: boolean, sport: Sport): Promise<void> {
   if (state.status !== 'idle') return;
   set({ error: null });
   const startedAt = Date.now();
@@ -539,7 +558,11 @@ export async function startDay(simulate: boolean, sport: Sport = 'ski'): Promise
   }
 }
 
-export async function pauseDay(): Promise<void> {
+export function pauseDay(): Promise<void> {
+  return inTurn(doPauseDay);
+}
+
+async function doPauseDay(): Promise<void> {
   if (state.status !== 'recording' || !state.active) return;
   await stopSource();
   await poll();
@@ -549,7 +572,11 @@ export async function pauseDay(): Promise<void> {
   set({ status: 'paused', active, currentSpeed: 0 });
 }
 
-export async function resumeDay(): Promise<void> {
+export function resumeDay(): Promise<void> {
+  return inTurn(doResumeDay);
+}
+
+async function doResumeDay(): Promise<void> {
   if (!state.active || state.status === 'recording') return;
   const active = { ...state.active, paused: false };
   await saveActive(active);
@@ -570,7 +597,11 @@ export async function resumeDay(): Promise<void> {
  * Ends the day: computes final stats, looks up where you were and saves it.
  * Returns the saved session id, or null if it was too short to keep.
  */
-export async function stopDay(): Promise<string | null> {
+export function stopDay(): Promise<string | null> {
+  return inTurn(doStopDay);
+}
+
+async function doStopDay(): Promise<string | null> {
   const a = state.active;
   if (!a) return null;
   await stopSource();
@@ -598,7 +629,8 @@ export async function stopDay(): Promise<string | null> {
     throw e;
   }
   // Re-time all challenges on the complete day (catches anything missed live).
-  await matchSession(a.sessionId, points);
+  // The day is saved by now: a failure here must not leave the screen stuck on "recording".
+  await matchSession(a.sessionId, points).catch(() => undefined);
   // Piste names in the background; the day screen retries if this fails (e.g. no signal).
   if (a.source === 'gps') {
     lookupPistes(a.sessionId).catch(() => undefined);
@@ -614,6 +646,8 @@ export async function stopDay(): Promise<string | null> {
 /** Called once at launch: picks up a day that was still recording when the app was closed. */
 export async function recoverActiveDay(): Promise<void> {
   const a = await readActive();
+  // Leftovers of a start that was interrupted.
+  await deleteUnfinishedSessions(a?.sessionId ?? null).catch(() => undefined);
   if (!a) return;
   // Killed while finishing: the day was already saved (or deleted as too short).
   const s = await getSession(a.sessionId);

@@ -14,6 +14,8 @@ export class FriendsError extends Error {
 }
 
 const TIMEOUT_MS = 12000;
+/** A whole day's GPS track is a few MB: on mountain signal that needs longer. */
+const TRACK_TIMEOUT_MS = 60000;
 
 let onLoggedOut: ((message: string) => Promise<void>) | null = null;
 /** Called when the server says this phone was logged out (password changed on another phone). */
@@ -27,12 +29,15 @@ export function friendsEnabled(): boolean {
 
 async function call<T>(
   method: string, path: string, body?: unknown, base = getSettings().serverUrl, password = getSettings().serverPassword,
+  timeoutMs = TIMEOUT_MS,
 ): Promise<T> {
   if (!base) throw new FriendsError('Set up your friends server in Profile first.');
   const { deviceId, deviceSecret } = getSettings();
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  // The timer covers reading the answer too: a download that stalls halfway must not hang for ever.
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let res: Response;
+  let json: unknown = null;
   try {
     res = await fetch(`${base}${path}`, {
       method,
@@ -44,16 +49,16 @@ async function call<T>(
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: ctrl.signal,
     });
+    try {
+      json = await res.json();
+    } catch {
+      if (ctrl.signal.aborted) throw new Error('timed out');
+      json = null; // not JSON: handled below by the status
+    }
   } catch {
     throw new FriendsError('Can’t reach the friends server. Check your internet connection and the server address.');
   } finally {
     clearTimeout(timer);
-  }
-  let json: unknown = null;
-  try {
-    json = await res.json();
-  } catch {
-    json = null;
   }
   if (!res.ok) {
     const err = (json && typeof json === 'object' ? json : {}) as { error?: unknown; code?: unknown };
@@ -128,8 +133,8 @@ export const api = {
   playerAvatar: (id: string) => call<{ jpeg: string | null }>('GET', `/v1/players/${enc(id)}/avatar`),
   tracks: () => call<TrackInfo[]>('GET', '/v1/me/tracks'),
   putTrack: (dayId: string, t: { startedAt: number; endedAt: number | null; place: string | null; sport: string; data: string }) =>
-    call<{ ok: true }>('PUT', `/v1/me/tracks/${enc(dayId)}`, t),
-  getTrack: (dayId: string) => call<TrackInfo & { data: string }>('GET', `/v1/me/tracks/${enc(dayId)}`),
+    call<{ ok: true }>('PUT', `/v1/me/tracks/${enc(dayId)}`, t, undefined, undefined, TRACK_TIMEOUT_MS),
+  getTrack: (dayId: string) => call<TrackInfo & { data: string }>('GET', `/v1/me/tracks/${enc(dayId)}`, undefined, undefined, undefined, TRACK_TIMEOUT_MS),
   deleteTrack: (dayId: string) => call<{ ok: true }>('DELETE', `/v1/me/tracks/${enc(dayId)}`),
   adminPlayers: () => call<AdminPlayer[]>('GET', '/v1/admin/players'),
   adminRemove: (id: string) => call<{ ok: true }>('DELETE', `/v1/admin/players/${enc(id)}`),

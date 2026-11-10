@@ -34,10 +34,11 @@ export async function matchSession(sessionId: string, points?: TrackPoint[], onl
   const segments = only ?? (await listSegments());
   if (!segments.length) return [];
   const pts = points ?? (await getPoints(sessionId));
+  const cleaned = cleanTrack(pts); // once, not once per challenge
   const found: Attempt[] = [];
   for (const seg of segments) {
     await deleteSessionAttempts(sessionId, seg.id);
-    const attempts = findAttempts(pts, seg).map((r) => myAttempt(seg, sessionId, r));
+    const attempts = findAttempts(pts, seg, cleaned).map((r) => myAttempt(seg, sessionId, r));
     await upsertAttempts(attempts);
     found.push(...attempts);
   }
