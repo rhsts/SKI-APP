@@ -144,8 +144,9 @@ long time even when buttons move.
 1. In the console, open the menu (☰) → **Compute** → **Instances**, and click **Create instance**.
 2. **Name:** `skicloud`.
 3. **Image and shape** → **Edit**:
-   - **Image:** click **Change image**, choose **Ubuntu**, and pick the newest **Canonical Ubuntu**
-     LTS version (e.g. 24.04). Not the "Minimal" one.
+   - **Image:** click **Change image**, choose **Ubuntu**, and pick **Canonical Ubuntu 24.04**: the plain
+     one, not "Minimal" or "Minimal aarch64". It's well tested with Docker and Tailscale and gets updates
+     until 2029. Oracle uses its Arm (aarch64) build automatically once you pick the Ampere shape.
    - **Shape:** click **Change shape** → **Ampere** → **VM.Standard.A1.Flex**. Set **1 OCPU** and
      **6 GB memory**. It should show an **Always Free-eligible** label.
 4. **Networking:** keep **Create new virtual cloud network** and **Create new public subnet**, and make sure
