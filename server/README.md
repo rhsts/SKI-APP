@@ -16,6 +16,9 @@ rankings. A Raspberry Pi 4 handles this easily: it's built for a handful to a fe
 **New to this? Follow [SETUP-PI.md](SETUP-PI.md):** a step-by-step manual from an empty SD card to a working
 server, reachable from the mountain for free with Tailscale Funnel.
 
+**No Pi, or don't want it to depend on your home internet? Follow [SETUP-ORACLE.md](SETUP-ORACLE.md):** the
+same server on a free Oracle Cloud VM, including moving your data over from a Pi.
+
 ## Run it on a Raspberry Pi (Docker)
 
 You need a 64-bit Raspberry Pi OS. A USB SSD is better than the SD card, but either works.
