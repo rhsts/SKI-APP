@@ -141,6 +141,14 @@ It's one long line starting with `ssh-ed25519`. Keep this window open: you paste
 Oracle's console changes its layout now and then. Look for the labels below; they've stayed the same for a
 long time even when buttons move.
 
+**First, make the network** (otherwise the public IP switch below may be greyed out):
+
+1. Menu (☰) → **Networking** → **Virtual cloud networks** → **Actions** → **Start VCN Wizard**.
+2. Choose **Create VCN with Internet Connectivity**, name it `skicloud-vcn`, click **Next** and **Create**,
+   and wait until everything is green.
+
+**Then the VM:**
+
 1. In the console, open the menu (☰) → **Compute** → **Instances**, and click **Create instance**.
 2. **Name:** `skicloud`.
 3. **Image and shape** → **Edit**:
@@ -149,11 +157,17 @@ long time even when buttons move.
      until 2029. Oracle uses its Arm (aarch64) build automatically once you pick the Ampere shape.
    - **Shape:** click **Change shape** → **Ampere** → **VM.Standard.A1.Flex**. Set **1 OCPU** and
      **6 GB memory**. It should show an **Always Free-eligible** label.
-4. **Networking:** keep **Create new virtual cloud network** and **Create new public subnet**, and make sure
-   **Automatically assign public IPv4 address** is on.
-5. **Add SSH keys:** choose **Paste public keys** and paste the `ssh-ed25519 …` line from Part 2.
-6. **Boot volume:** leave it as it is (about 50 GB, inside the free 200 GB).
-7. Click **Create**.
+4. **Security:** leave **Shielded instance** and **Confidential computing** off. A warning that
+   confidential computing isn't possible is fine.
+5. **Networking:** choose **Select existing virtual cloud network** → `skicloud-vcn`, and **Select existing
+   subnet** → the one with *public subnet* in its name. Then switch on **Automatically assign public IPv4
+   address**.
+   - Forgot the VCN wizard and the switch is greyed out? Create the instance anyway, then add the address:
+     instance → **Networking** → **Attached VNICs** → the VNIC → **IP administration** → **⋮** next to the
+     private IP → **Edit** → **Ephemeral public IP** → **Update**.
+6. **Add SSH keys:** choose **Paste public key** and paste the `ssh-ed25519 …` line from Part 2.
+7. **Boot volume:** leave it as it is (about 50 GB, inside the free 200 GB).
+8. Leave **Capacity type** on **On-demand** (the other options aren't free). Click **Create**.
 
 The VM is ready when its status says **Running** (1–3 minutes). On the instance page, find **Public IP
 address** (e.g. `141.144.12.34`) and **write it down**.
@@ -161,6 +175,11 @@ address** (e.g. `141.144.12.34`) and **write it down**.
 > **"Out of capacity for shape VM.Standard.A1.Flex"?** Your region has no free Arm VMs right now. Try a
 > different **Availability domain** (under Placement, if your region has more than one), or try again later:
 > early morning often works. Nothing is charged for failed attempts.
+>
+> **Or use the small free AMD VM, which is usually available:** **Change shape** → **Specialty and previous
+> generation** → **VM.Standard.E2.1.Micro** (*Always Free-eligible*, 1 GB memory). That's enough for the
+> friends server. Keep the image on plain Ubuntu 24.04, and add swap in [Part 5.1](#51-install-all-updates).
+> **Don't** pick E4.Flex or E5.Flex under *AMD*: those aren't free. And don't click **Upgrade**.
 
 ✅ **Checkpoint:** the instance `skicloud` shows **Running** and has a public IP address.
 
@@ -195,7 +214,16 @@ sudo apt update && sudo apt full-upgrade -y
 ```
 
 If a purple screen asks which services to restart, press **Enter** to accept. Ubuntu installs security
-updates automatically by itself after this.
+updates automatically by itself after this. Ignore the login message about a new Ubuntu release: don't run
+`do-release-upgrade`.
+
+**On the 1 GB E2.1.Micro VM only**, add 2 GB of swap so building the server doesn't run out of memory:
+
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+`free -h` should now show `Swap: 2.0Gi`.
 
 Restart once to load everything:
 
@@ -251,6 +279,9 @@ can see it on the Pi with `cat ~/SKI-APP/server/.env`.
 ```bash
 echo "SERVER_PASSWORD=powder-goggles-fondue-42" > .env
 ```
+
+Only change the part **after** `=`. The name `SERVER_PASSWORD` must stay exactly like that, or the server
+runs without a password. Check with `cat .env`.
 
 **Moving from a Pi?** Don't start the server yet: go to [Part 9](#part-9-move-your-data-from-the-pi-optional)
 first to copy your data in, then come back to 6.3.
