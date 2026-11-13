@@ -1,3 +1,4 @@
+import { Tap } from '../../components/Tap';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -120,7 +121,7 @@ export default function LeaderboardScreen() {
         return (
           <View key={cat.id} style={[s.card, { gap: 8 }]}>
             <View style={styles.catHead}>
-              <Text style={{ fontSize: 26 }}>{cat.emoji}</Text>
+              <Text style={{ fontSize: 24 }}>{cat.emoji}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={s.h2}>{cat.title}</Text>
                 <Text style={s.muted}>{cat.blurb}</Text>
@@ -129,10 +130,10 @@ export default function LeaderboardScreen() {
             {rows.length ? shown.map((r) => {
               const isMe = r.friend.id === playerId;
               return (
-                <Pressable
+                <Tap
                   key={r.friend.id}
                   onPress={() => router.push(`/player/${r.friend.id}`)}
-                  style={({ pressed }) => [styles.row, isMe && styles.rowMe, pressed && { opacity: 0.7 }]}
+                  style={[styles.row, isMe && styles.rowMe]}
                   accessibilityLabel={`${r.rank}. ${r.friend.name}, ${fmt(cat.kind, r.value, units)}`}
                 >
                   <Text style={styles.rank}>{MEDALS[r.rank - 1] ?? r.rank}</Text>
@@ -141,7 +142,7 @@ export default function LeaderboardScreen() {
                     {isMe ? 'You' : r.friend.name}
                   </Text>
                   <Text style={styles.value}>{fmt(cat.kind, r.value, units)}</Text>
-                </Pressable>
+                </Tap>
               );
             }) : <Text style={s.muted}>Nobody yet. Go ski!</Text>}
             {!expanded && mine && mine.rank > SHOWN ? (
@@ -163,18 +164,18 @@ export default function LeaderboardScreen() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 32 },
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
     cta: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 999, backgroundColor: colors.accent },
-    ctaText: { color: colors.onAccent, fontWeight: '800' },
+    ctaText: { color: colors.onAccent, fontWeight: '700' },
     pills: { flexDirection: 'row', gap: 8 },
-    pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
+    pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    pillText: { fontWeight: '700', color: colors.text },
+    pillText: { fontWeight: '600', color: colors.text },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-    catHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 10 },
+    catHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
     rowMe: { backgroundColor: colors.warnSoft },
-    rank: { width: 28, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.muted },
-    value: { fontWeight: '800', color: colors.text },
-    more: { color: colors.accent, fontWeight: '700', textAlign: 'center', paddingVertical: 4 },
+    rank: { width: 28, textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.muted },
+    value: { fontWeight: '700', color: colors.text },
+    more: { color: colors.accent, fontWeight: '600', textAlign: 'center', paddingVertical: 4 },
   });

@@ -1,3 +1,4 @@
+import { Tap } from '../../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
@@ -54,7 +55,7 @@ export default function NewGroupScreen() {
     // Edge-to-edge Android doesn't resize the window for the keyboard, so pad for it on both platforms.
     <KeyboardAvoidingView style={s.screen} behavior="padding" keyboardVerticalOffset={headerHeight}>
       <ScrollView style={s.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={[s.card, { gap: 10 }]}>
+        <View style={[s.card, { gap: 12 }]}>
           <Text style={s.h2}>Join a group</Text>
           <Text style={s.muted}>Type the 6-letter code a friend sent you.</Text>
           <TextInput
@@ -72,7 +73,7 @@ export default function NewGroupScreen() {
 
         <Text style={[s.muted, { textAlign: 'center' }]}>or</Text>
 
-        <View style={[s.card, { gap: 10 }]}>
+        <View style={[s.card, { gap: 12 }]}>
           <Text style={s.h2}>Start a new group</Text>
           <Text style={s.muted}>One group per trip works well, e.g. “Ischgl 2026”. You get a code to send to your friends.</Text>
           <TextInput value={name} onChangeText={setName} placeholder="Group name" placeholderTextColor={colors.muted} style={styles.input} maxLength={40} />
@@ -89,15 +90,15 @@ function Btn({ label, icon, onPress, disabled, busy }: {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       disabled={disabled || busy}
-      style={({ pressed }) => [styles.btn, (disabled || busy) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
+      style={[styles.btn, (disabled || busy) && { opacity: 0.5 }]}
       accessibilityRole="button"
     >
       {busy ? <ActivityIndicator color={colors.onAccent} /> : <Ionicons name={icon} size={20} color={colors.onAccent} />}
       <Text style={styles.btnText}>{label}</Text>
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -105,8 +106,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12 },
     input: { fontSize: 17, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
-    code: { fontSize: 28, fontWeight: '900', letterSpacing: 6, textAlign: 'center' },
-    btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 14, minHeight: 52 },
-    btnText: { color: colors.onAccent, fontWeight: '800', fontSize: 17 },
-    link: { color: colors.accent, fontWeight: '800', fontSize: 15 },
+    code: { fontSize: 28, fontWeight: '700', letterSpacing: 6, textAlign: 'center' },
+    btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, minHeight: 52 },
+    btnText: { color: colors.onAccent, fontWeight: '700', fontSize: 17 },
+    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
   });

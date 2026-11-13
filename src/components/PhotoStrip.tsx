@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { PhotoRow } from '../db';
+import { Appear } from './Appear';
 import { fmtTimeOfDay } from '../lib/format';
 import { useStyles, useTheme, type Palette } from '../theme';
 
@@ -21,7 +22,7 @@ export function PhotoStrip({ photos, open, onOpen, onAdd, onRemove, busy }: Prop
   const idx = current ? photos.indexOf(current) : -1;
 
   return (
-    <View style={[s.card, { gap: 10 }]}>
+    <View style={[s.card, { gap: 12 }]}>
       <View style={styles.head}>
         <Text style={s.label}>Photos</Text>
         <Pressable onPress={onAdd} disabled={busy} hitSlop={8} style={styles.add}>
@@ -44,7 +45,11 @@ export function PhotoStrip({ photos, open, onOpen, onAdd, onRemove, busy }: Prop
 
       <Modal visible={!!current} transparent animationType="fade" onRequestClose={() => onOpen(null)}>
         <View style={styles.viewer}>
-          {current ? <Image source={{ uri: current.uri }} style={styles.full} resizeMode="contain" /> : null}
+          {current ? (
+            <Appear key={current.id} style={styles.full}>
+              <Image source={{ uri: current.uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+            </Appear>
+          ) : null}
           <View style={styles.bar}>
             <Pressable onPress={() => onOpen(null)} hitSlop={12} accessibilityLabel="Close">
               <Ionicons name="close" size={28} color="#fff" />
@@ -81,12 +86,12 @@ export function PhotoStrip({ photos, open, onOpen, onAdd, onRemove, busy }: Prop
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    add: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    addText: { color: colors.accent, fontWeight: '800' },
-    thumb: { width: 88, height: 88, borderRadius: 10, backgroundColor: colors.faint },
+    add: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    addText: { color: colors.accent, fontWeight: '700' },
+    thumb: { width: 88, height: 88, borderRadius: 12, backgroundColor: colors.faint },
     viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
     full: { width: '100%', height: '75%' },
     bar: { position: 'absolute', top: 48, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    barText: { color: '#fff', fontWeight: '700' },
+    barText: { color: '#fff', fontWeight: '600' },
     nav: { position: 'absolute', bottom: 48, left: 24, right: 24, flexDirection: 'row', justifyContent: 'space-between' },
   });

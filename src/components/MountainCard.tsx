@@ -101,9 +101,9 @@ export function MountainCard({ points, units }: { points: TrackPoint[]; units: U
   const now = w ? weatherInfo(w.code) : null;
 
   return (
-    <View style={[s.card, { gap: 10 }]}>
+    <View style={[s.card, { gap: 12 }]}>
       {area ? (
-        <Text style={[s.body, { fontWeight: '700' }]}>
+        <Text style={[s.body, { fontWeight: '600' }]}>
           📍 {points.length ? area.name : `You’re at ${area.name}`}
           <Text style={s.muted}>  {area.days} {area.days === 1 ? 'day' : 'days'} here before</Text>
         </Text>
@@ -135,8 +135,8 @@ export function MountainCard({ points, units }: { points: TrackPoint[]; units: U
             {w.days.slice(0, 3).map((d) => (
               <View key={d.date} style={styles.day}>
                 <Text style={s.muted}>{DAY_NAMES[new Date(`${d.date}T12:00:00`).getDay()]}</Text>
-                <Text style={{ fontSize: 22 }}>{weatherInfo(d.code).emoji}</Text>
-                <Text style={[s.body, { fontWeight: '700' }]}>{fmtTemp(d.maxC, units)} / {fmtTemp(d.minC, units)}</Text>
+                <Text style={{ fontSize: 20 }}>{weatherInfo(d.code).emoji}</Text>
+                <Text style={[s.body, { fontWeight: '600' }]}>{fmtTemp(d.maxC, units)} / {fmtTemp(d.minC, units)}</Text>
                 {d.snowCm > 0 ? <Text style={[s.muted, { color: colors.accent }]}>❄ {fmtSnow(d.snowCm, units)}</Text> : null}
               </View>
             ))}
@@ -163,7 +163,7 @@ export function MountainCard({ points, units }: { points: TrackPoint[]; units: U
         <Text style={[s.muted, { fontSize: 12 }]}>
           Offline map: {trail.pistes.length} pistes, {trail.lifts.length} lifts · saved {new Date(trail.fetchedAt).toLocaleDateString()}
           {'  '}
-          <Text style={{ color: colors.accent, fontWeight: '700' }} onPress={download}>Update</Text>
+          <Text style={{ color: colors.accent, fontWeight: '600' }} onPress={download}>Update</Text>
         </Text>
       ) : null}
       {showMap && trail ? <LiveMap points={points} trail={trail} center={pos} /> : null}
@@ -174,13 +174,13 @@ export function MountainCard({ points, units }: { points: TrackPoint[]; units: U
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    temp: { fontSize: 22, fontWeight: '900', color: colors.text },
-    snowRow: { flexDirection: 'row', gap: 10 },
-    snowCell: { flex: 1, backgroundColor: colors.accentSoft, borderRadius: 12, padding: 10 },
-    snowVal: { fontSize: 20, fontWeight: '900', color: colors.text },
+    temp: { fontSize: 20, fontWeight: '700', color: colors.text },
+    snowRow: { flexDirection: 'row', gap: 12 },
+    snowCell: { flex: 1, backgroundColor: colors.accentSoft, borderRadius: 12, padding: 12 },
+    snowVal: { fontSize: 20, fontWeight: '700', color: colors.text },
     days: { flexDirection: 'row', justifyContent: 'space-between' },
     day: { alignItems: 'center', flex: 1, gap: 2 },
-    mapRow: { flexDirection: 'row', gap: 10 },
-    btn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent },
-    btnText: { color: colors.accent, fontWeight: '800' },
+    mapRow: { flexDirection: 'row', gap: 12 },
+    btn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.accent },
+    btnText: { color: colors.accent, fontWeight: '700' },
   });

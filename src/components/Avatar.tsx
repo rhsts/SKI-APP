@@ -24,5 +24,5 @@ export function Avatar({ playerId, name, size = 36, hasAvatar = true }: {
 
 const styles = StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
-  initials: { color: '#fff', fontWeight: '800' },
+  initials: { color: '#fff', fontWeight: '700' },
 });

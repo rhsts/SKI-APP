@@ -1,3 +1,4 @@
+import { Tap } from './Tap';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
@@ -76,10 +77,10 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
           Only for our crew. Enter the server address and password a friend sent you. You only need to do this once.
         </Text>
 
-        <Pressable style={({ pressed }) => [styles.paste, pressed && { opacity: 0.8 }]} onPress={paste}>
+        <Tap style={styles.paste} onPress={paste}>
           <Ionicons name="clipboard-outline" size={18} color={colors.accent} />
           <Text style={styles.pasteText}>Paste invite from a friend</Text>
-        </Pressable>
+        </Tap>
 
         <View style={[s.card, { gap: 12 }]}>
           <Field label="Server address">
@@ -117,16 +118,16 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
               onSubmitEditing={unlock}
             />
           </Field>
-          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontWeight: '800' }}>{code}</Text> too.</Text> : null}
-          <Pressable
+          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontWeight: '700' }}>{code}</Text> too.</Text> : null}
+          <Tap
             onPress={unlock}
             disabled={busy || !server.trim()}
-            style={({ pressed }) => [styles.btn, (busy || !server.trim()) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
+            style={[styles.btn, (busy || !server.trim()) && { opacity: 0.5 }]}
             accessibilityRole="button"
           >
             {busy ? <ActivityIndicator color={colors.onAccent} /> : <Ionicons name="lock-open" size={20} color={colors.onAccent} />}
             <Text style={styles.btnText}>Unlock</Text>
-          </Pressable>
+          </Tap>
         </View>
 
         <Text style={[s.muted, { textAlign: 'center', fontSize: 12 }]}>
@@ -265,16 +266,16 @@ function AccountStep({ code }: { code: string | null }) {
               />
             </Field>
           ) : null}
-          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontWeight: '800' }}>{code}</Text> too.</Text> : null}
-          <Pressable
+          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontWeight: '700' }}>{code}</Text> too.</Text> : null}
+          <Tap
             onPress={submit}
             disabled={busy || !ready}
-            style={({ pressed }) => [styles.btn, (busy || !ready) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
+            style={[styles.btn, (busy || !ready) && { opacity: 0.5 }]}
             accessibilityRole="button"
           >
             {busy ? <ActivityIndicator color={colors.onAccent} /> : <Ionicons name={mode === 'create' ? 'person-add' : 'log-in'} size={20} color={colors.onAccent} />}
             <Text style={styles.btnText}>{mode === 'create' ? 'Create account' : 'Log in'}</Text>
-          </Pressable>
+          </Tap>
         </View>
 
         <Pressable onPress={() => updateSettings({ unlocked: false })} hitSlop={10}>
@@ -307,12 +308,12 @@ const makeStyles = (colors: Palette) =>
     input: { fontSize: 17, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
     paste: {
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, borderStyle: 'dashed',
+      borderRadius: 12, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed',
     },
-    pasteText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
-    btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 14, minHeight: 54 },
-    btnText: { color: colors.onAccent, fontWeight: '800', fontSize: 17 },
-    tabs: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 3 },
-    tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-    tabText: { fontWeight: '700', color: colors.text },
+    pasteText: { color: colors.accent, fontWeight: '600', fontSize: 15 },
+    btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, minHeight: 54 },
+    btnText: { color: colors.onAccent, fontWeight: '700', fontSize: 17 },
+    tabs: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 4 },
+    tab: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+    tabText: { fontWeight: '600', color: colors.text },
   });

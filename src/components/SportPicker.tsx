@@ -28,6 +28,6 @@ export function SportPicker({ value, onChange }: { value: Sport; onChange: (s: S
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1.5, borderColor: colors.faint, backgroundColor: colors.card },
-    text: { fontWeight: '700', color: colors.text, fontSize: 15 },
+    chip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, borderWidth: 1, borderColor: colors.faint, backgroundColor: colors.card },
+    text: { fontWeight: '600', color: colors.text, fontSize: 15 },
   });

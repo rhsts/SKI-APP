@@ -77,9 +77,9 @@ export function SegmentMap({ path, gateRadius = 30, context, style, markers }: P
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     wrap: { height: 260, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
-    flag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+    flag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
     ghost: { alignItems: 'center' },
     ghostDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 3, borderColor: '#fff' },
-    ghostLabel: { color: '#fff', fontSize: 10, fontWeight: '800', paddingHorizontal: 4, borderRadius: 3, marginTop: 2, overflow: 'hidden', maxWidth: 80 },
-    flagText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+    ghostLabel: { color: '#fff', fontSize: 11, fontWeight: '700', paddingHorizontal: 4, borderRadius: 4, marginTop: 2, overflow: 'hidden', maxWidth: 80 },
+    flagText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   });

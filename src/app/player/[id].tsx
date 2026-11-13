@@ -1,8 +1,9 @@
+import { Tap } from '../../components/Tap';
 import { useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useEffect, useState } from 'react';
 import { BadgeSheet, type BadgeView } from '../../components/BadgeSheet';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { api, type PlayerProfile } from '../../friends/api';
@@ -63,7 +64,7 @@ export default function PlayerScreen() {
       ) : null}
 
       {p.recent.length ? (
-        <View style={[s.card, { gap: 6 }]}>
+        <View style={[s.card, { gap: 8 }]}>
           <Text style={s.label}>Recent days</Text>
           {p.recent.map((d) => (
             <View key={d.date} style={styles.dayRow}>
@@ -78,16 +79,16 @@ export default function PlayerScreen() {
       {p.badges.length ? (
         <View style={styles.badges}>
           {p.badges.map((b) => (
-            <Pressable
+            <Tap
               key={b.id}
               onPress={() => setOpenBadge({ id: b.id, emoji: b.emoji, title: b.title, earnedAt: b.at })}
-              style={({ pressed }) => [s.card, styles.badge, pressed && { transform: [{ scale: 0.96 }] }]}
+              style={[s.card, styles.badge]}
               accessibilityRole="button"
               accessibilityLabel={`${b.title}. Tap for details.`}
             >
               <Text style={{ fontSize: 28 }}>{b.emoji}</Text>
               <Text style={styles.badgeTitle} numberOfLines={1}>{b.title}</Text>
-            </Pressable>
+            </Tap>
           ))}
         </View>
       ) : (
@@ -101,9 +102,9 @@ export default function PlayerScreen() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
-    hero: { alignItems: 'center', gap: 6, paddingVertical: 20 },
+    hero: { alignItems: 'center', gap: 8, paddingVertical: 20 },
     dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    badge: { width: '31%', alignItems: 'center', gap: 2, paddingVertical: 12, paddingHorizontal: 6 },
-    badgeTitle: { fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center' },
+    badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    badge: { width: '31%', alignItems: 'center', gap: 2, paddingVertical: 12, paddingHorizontal: 8 },
+    badgeTitle: { fontSize: 12, fontWeight: '700', color: colors.text, textAlign: 'center' },
   });

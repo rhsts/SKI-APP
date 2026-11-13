@@ -1,3 +1,4 @@
+import { Tap } from '../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -92,7 +93,7 @@ export default function InviteScreen() {
           {board.map((e) => (
             <View key={e.playerId} style={styles.lbRow}>
               <Text style={s.body}>#{e.rank} {e.playerName}{e.playerId === playerId ? ' (you)' : ''}</Text>
-              <Text style={[s.body, { fontWeight: '800' }]}>{fmtRaceTime(e.time)}</Text>
+              <Text style={[s.body, { fontWeight: '700' }]}>{fmtRaceTime(e.time)}</Text>
             </View>
           ))}
         </View>
@@ -100,9 +101,9 @@ export default function InviteScreen() {
 
       {fromMe ? <Text style={[s.muted, { textAlign: 'center' }]}>This is your own invite: it only has your times.</Text> : null}
 
-      <Pressable onPress={accept} disabled={saving || have === null} style={({ pressed }) => [styles.accept, pressed && { opacity: 0.85 }]}>
+      <Tap onPress={accept} disabled={saving || have === null} style={styles.accept}>
         {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.acceptText}>{have ? 'Update leaderboard' : 'Accept challenge'}</Text>}
-      </Pressable>
+      </Tap>
       <Text style={[s.muted, { textAlign: 'center' }]}>
         After you accept, just record your ski day. When you ski through the start and finish, you’re timed automatically.
       </Text>
@@ -114,10 +115,10 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-    hero: { alignItems: 'center', gap: 6, paddingVertical: 20 },
+    hero: { alignItems: 'center', gap: 8, paddingVertical: 20 },
     lbRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    accept: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-    acceptText: { color: colors.onAccent, fontSize: 18, fontWeight: '800' },
-    secondary: { borderWidth: 1.5, borderColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
-    secondaryText: { color: colors.accent, fontWeight: '700' },
+    accept: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+    acceptText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    secondary: { borderWidth: 1, borderColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12 },
+    secondaryText: { color: colors.accent, fontWeight: '600' },
   });

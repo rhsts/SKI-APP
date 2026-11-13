@@ -1,4 +1,5 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Appear } from './Appear';
 import { badgeInfo } from '../lib/goals';
 import { fmtDate } from '../lib/format';
 import { useStyles, useTheme, type Palette } from '../theme';
@@ -31,13 +32,14 @@ export function BadgeSheet({ badge, onClose, onOpenDay, whose = 'you' }: {
     <Modal visible={!!badge} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close">
         {badge ? (
+          <Appear>
           <Pressable style={[styles.sheet, { backgroundColor: colors.card }]} onPress={() => undefined}>
             <View style={[styles.medal, { backgroundColor: got ? colors.warnSoft : colors.faint }]}>
               <Text style={[styles.emoji, !got && { opacity: 0.4 }]}>{badge.emoji}</Text>
               {!got ? <Text style={styles.lock}>🔒</Text> : null}
             </View>
             <Text style={[s.h1, { textAlign: 'center' }]}>{badge.title}</Text>
-            <Text style={[s.body, { textAlign: 'center', fontWeight: '700' }]}>
+            <Text style={[s.body, { textAlign: 'center', fontWeight: '600' }]}>
               {info?.description ?? ''}
             </Text>
             {info?.tip ? <Text style={[s.muted, { textAlign: 'center' }]}>{info.tip}</Text> : null}
@@ -57,6 +59,7 @@ export function BadgeSheet({ badge, onClose, onOpenDay, whose = 'you' }: {
               <Text style={[styles.close, { color: colors.accent }]}>Close</Text>
             </Pressable>
           </Pressable>
+          </Appear>
         ) : null}
       </Pressable>
     </Modal>
@@ -66,12 +69,12 @@ export function BadgeSheet({ badge, onClose, onOpenDay, whose = 'you' }: {
 const makeStyles = (_: Palette) =>
   StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 },
-    sheet: { borderRadius: 20, padding: 24, gap: 12, alignItems: 'stretch' },
+    sheet: { borderRadius: 16, padding: 24, gap: 12, alignItems: 'stretch' },
     medal: { alignSelf: 'center', width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
     emoji: { fontSize: 52 },
-    lock: { position: 'absolute', right: 2, bottom: 2, fontSize: 22 },
+    lock: { position: 'absolute', right: 2, bottom: 2, fontSize: 20 },
     status: { borderRadius: 12, padding: 12 },
-    btn: { borderRadius: 14, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-    btnText: { fontWeight: '800', fontSize: 16 },
-    close: { textAlign: 'center', fontWeight: '800', fontSize: 16, paddingVertical: 4 },
+    btn: { borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+    btnText: { fontWeight: '700', fontSize: 15 },
+    close: { textAlign: 'center', fontWeight: '700', fontSize: 15, paddingVertical: 4 },
   });

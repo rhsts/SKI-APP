@@ -11,7 +11,7 @@ export function DifficultyBar({ shares, units, title = 'Pistes' }: { shares: Dif
   const styles = useStyles(makeStyles);
   if (!shares.length) return null;
   return (
-    <View style={[s.card, { gap: 10 }]}>
+    <View style={[s.card, { gap: 12 }]}>
       <Text style={s.label}>{title}</Text>
       <View style={styles.bar}>
         {shares.map((d) => (
@@ -34,11 +34,11 @@ export function DifficultyBar({ shares, units, title = 'Pistes' }: { shares: Dif
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    bar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', gap: 2 },
+    bar: { flexDirection: 'row', height: 12, borderRadius: 8, overflow: 'hidden', gap: 2 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.faint },
+    dot: { width: 12, height: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.faint },
     // The label keeps its full width; the details line gives way (ellipsis) on narrow screens.
-    name: { flexShrink: 0, maxWidth: '50%', fontWeight: '700' },
+    name: { flexShrink: 0, maxWidth: '50%', fontWeight: '600' },
     detail: { flex: 1, flexShrink: 1, textAlign: 'right' },
-    pct: { width: 40, textAlign: 'right', fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+    pct: { width: 40, textAlign: 'right', fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
   });

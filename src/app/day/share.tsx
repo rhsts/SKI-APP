@@ -1,8 +1,9 @@
+import { Tap } from '../../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { DayShareCard } from '../../components/DayShareCard';
 import { getPoints, getSession, type SessionRow } from '../../db';
@@ -59,14 +60,14 @@ export default function ShareDayScreen() {
         startedAt={session.startedAt}
         units={units}
       />
-      <Pressable onPress={share} disabled={busy} style={({ pressed }) => [styles.button, pressed && { opacity: 0.85 }]}>
+      <Tap onPress={share} disabled={busy} style={styles.button}>
         {busy ? <ActivityIndicator color={colors.onAccent} /> : (
           <>
             <Ionicons name="share-social" size={22} color={colors.onAccent} />
             <Text style={styles.buttonText}>Share image</Text>
           </>
         )}
-      </Pressable>
+      </Tap>
       <Text style={[s.muted, { textAlign: 'center' }]}>Post it to Instagram, WhatsApp or anywhere else.</Text>
     </ScrollView>
   );
@@ -75,6 +76,6 @@ export default function ShareDayScreen() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 16, alignItems: 'center', paddingBottom: 40 },
-    button: { alignSelf: 'stretch', flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16 },
-    buttonText: { color: colors.onAccent, fontSize: 18, fontWeight: '800' },
+    button: { alignSelf: 'stretch', flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16 },
+    buttonText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
   });

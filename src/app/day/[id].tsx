@@ -164,7 +164,7 @@ export default function DayScreen() {
         options={{
           title: fmtDate(session.startedAt),
           headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: 18 }}>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
               <Pressable onPress={() => router.push({ pathname: '/day/share', params: { id: session.id } })} hitSlop={10} accessibilityLabel="Share as image">
                 <Ionicons name="share-social-outline" size={22} color={colors.accent} />
               </Pressable>
@@ -243,8 +243,8 @@ export default function DayScreen() {
             const r = runOfEvent(e.t);
             return (
               <Pressable key={`${e.kind}-${e.t}`} onPress={() => showEvent(e.t)} onLongPress={() => removeEvent(e)} style={styles.timedRow}>
-                <Text style={{ fontSize: 18 }}>{e.kind === 'jump' ? '🦘' : '💥'}</Text>
-                <Text style={[s.body, { flex: 1, fontWeight: '700' }]}>
+                <Text style={{ fontSize: 17 }}>{e.kind === 'jump' ? '🦘' : '💥'}</Text>
+                <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>
                   {e.kind === 'jump' ? `${fmtAir(e.value)} airtime` : 'Fall'}
                   <Text style={s.muted}>
                     {e.kind === 'jump' ? `  ${fmtJumpHeight(jumpHeight(e.value), units)} high` : `  ${fmtG(e.value)} impact`}
@@ -285,8 +285,8 @@ export default function DayScreen() {
 
       {suggestion ? (
         <View style={[s.card, styles.suggest]}>
-          <Text style={{ fontSize: 26 }}>🏁</Text>
-          <View style={{ flex: 1, gap: 6 }}>
+          <Text style={{ fontSize: 24 }}>🏁</Text>
+          <View style={{ flex: 1, gap: 8 }}>
             <Text style={s.h2}>You skied this line {suggestion.times} times</Text>
             <Text style={s.muted}>
               Make it a challenge to get timed on it from now on and race your friends. Your fastest was Run {suggestedRunNo}.
@@ -315,7 +315,7 @@ export default function DayScreen() {
             <Pressable key={attempt.id} onPress={() => router.push(`/segment/${segment.id}`)} style={styles.timedRow}>
               <Text style={[s.body, { flex: 1 }]} numberOfLines={1}>🏁 {segment.name}</Text>
               <Text style={s.muted}>{fmtTimeOfDay(attempt.at)}</Text>
-              <Text style={[s.body, { fontWeight: '800', minWidth: 64, textAlign: 'right' }]}>{fmtRaceTime(attempt.time)}</Text>
+              <Text style={[s.body, { fontWeight: '700', minWidth: 64, textAlign: 'right' }]}>{fmtRaceTime(attempt.time)}</Text>
             </Pressable>
           ))}
         </View>
@@ -374,9 +374,9 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    input: { flex: 1, fontSize: 22, fontWeight: '700', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
-    play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-    suggest: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderLeftWidth: 4, borderLeftColor: colors.good },
-    link: { color: colors.accent, fontWeight: '800', fontSize: 15 },
-    timedRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    input: { flex: 1, fontSize: 20, fontWeight: '600', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
+    play: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+    suggest: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    timedRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   });

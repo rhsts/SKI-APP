@@ -1,3 +1,4 @@
+import { Tap } from '../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
@@ -60,10 +61,10 @@ export default function SosScreen() {
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
       {numbers.map((n, k) => (
-        <Pressable key={n} onPress={() => call(n)} style={({ pressed }) => [styles.call, k > 0 && styles.callAlt, pressed && { opacity: 0.85 }]}>
+        <Tap key={n} onPress={() => call(n)} style={[styles.call, k > 0 && styles.callAlt]}>
           <Ionicons name="call" size={k === 0 ? 28 : 20} color={k === 0 ? '#fff' : colors.danger} />
-          <Text style={[styles.callText, k > 0 && { color: colors.danger, fontSize: 18 }]}>Call {n}</Text>
-        </Pressable>
+          <Text style={[styles.callText, k > 0 && { color: colors.danger, fontSize: 17 }]}>Call {n}</Text>
+        </Tap>
       ))}
       <Text style={[s.muted, { textAlign: 'center' }]}>
         112 works across Europe and on most phones worldwide. On a piste, ski patrol can also be reached via the
@@ -80,7 +81,7 @@ export default function SosScreen() {
             <Text selectable style={styles.coords}>{c.decimal}</Text>
             <Text selectable style={[s.body, { fontVariant: ['tabular-nums'] }]}>{c.dms}</Text>
             {near ? (
-              <Text style={[s.body, { fontWeight: '700' }]}>
+              <Text style={[s.body, { fontWeight: '600' }]}>
                 {near.kind === 'lift' ? '🚡' : '⛷️'} {near.meters < 30 ? 'On' : `${near.meters} m from`} {near.kind === 'lift' ? 'lift' : 'piste'} “{near.name}”
               </Text>
             ) : null}
@@ -114,7 +115,7 @@ export default function SosScreen() {
         )}
       </View>
 
-      <View style={[s.card, { gap: 6 }]}>
+      <View style={[s.card, { gap: 8 }]}>
         <Text style={s.label}>What to tell them</Text>
         {[
           'What happened and how many people are hurt',
@@ -133,11 +134,11 @@ export default function SosScreen() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
-    call: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: 18, minHeight: 76 },
+    call: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: 16, minHeight: 76 },
     callAlt: { backgroundColor: 'transparent', borderWidth: 2, borderColor: colors.danger, minHeight: 52 },
-    callText: { color: '#fff', fontSize: 26, fontWeight: '900' },
-    coords: { fontSize: 22, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
-    row: { flexDirection: 'row', gap: 10, marginTop: 4 },
-    btn: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent },
-    btnText: { color: colors.accent, fontWeight: '800' },
+    callText: { color: '#fff', fontSize: 24, fontWeight: '700' },
+    coords: { fontSize: 20, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    row: { flexDirection: 'row', gap: 12, marginTop: 4 },
+    btn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.accent },
+    btnText: { color: colors.accent, fontWeight: '700' },
   });

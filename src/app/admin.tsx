@@ -94,7 +94,7 @@ export default function AdminScreen() {
             </Text>
           </View>
           {p.id !== playerId ? (
-            <View style={{ gap: 10, alignItems: 'flex-end' }}>
+            <View style={{ gap: 12, alignItems: 'flex-end' }}>
               {p.username ? (
                 <Pressable onPress={() => toggleAdmin(p)} hitSlop={8}>
                   <Text style={styles.link}>{p.isAdmin ? 'Unadmin' : 'Make admin'}</Text>
@@ -113,7 +113,7 @@ export default function AdminScreen() {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    list: { padding: 16, gap: 10 },
+    list: { padding: 16, gap: 12 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    link: { color: colors.accent, fontWeight: '700' },
+    link: { color: colors.accent, fontWeight: '600' },
   });

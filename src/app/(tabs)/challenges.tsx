@@ -1,3 +1,4 @@
+import { Tap } from '../../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
@@ -83,7 +84,7 @@ export default function ChallengesScreen() {
       data={rows}
       keyExtractor={(r) => r.segment.id}
       ListHeaderComponent={
-        <View style={{ gap: 10, marginBottom: 4 }}>
+        <View style={{ gap: 12, marginBottom: 4 }}>
           <View style={styles.groupsHead}>
             <Text style={s.h2}>Friend groups</Text>
             <Pressable onPress={() => router.push('/group/new')} hitSlop={8}>
@@ -106,7 +107,7 @@ export default function ChallengesScreen() {
             groups.map((g) => {
               const todays = groupChallenges.filter((c) => c.groupId === g.id && c.date === today);
               return (
-                <Pressable key={g.id} style={({ pressed }) => [s.card, styles.row, pressed && { opacity: 0.85 }]} onPress={() => router.push(`/group/${g.id}`)}>
+                <Tap key={g.id} style={[s.card, styles.row]} onPress={() => router.push(`/group/${g.id}`)}>
                   <View style={[styles.badge, { backgroundColor: colors.accentSoft }]}>
                     <Ionicons name="people" size={20} color={colors.accent} />
                   </View>
@@ -118,15 +119,15 @@ export default function ChallengesScreen() {
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.muted} />
-                </Pressable>
+                </Tap>
               );
             })
           )}
-          <Text style={[s.h2, { marginTop: 6 }]}>Challenges</Text>
-          <Pressable style={({ pressed }) => [styles.paste, pressed && { opacity: 0.8 }]} onPress={paste}>
+          <Text style={[s.h2, { marginTop: 8 }]}>Challenges</Text>
+          <Tap style={styles.paste} onPress={paste}>
             <Ionicons name="clipboard-outline" size={18} color={colors.accent} />
             <Text style={styles.pasteText}>Paste invite from a friend</Text>
-          </Pressable>
+          </Tap>
         </View>
       }
       ListEmptyComponent={
@@ -143,8 +144,8 @@ export default function ChallengesScreen() {
         const leader = item.board[0];
         const iLead = leader && leader.playerId === playerId;
         return (
-          <Pressable
-            style={({ pressed }) => [s.card, styles.row, pressed && { opacity: 0.85 }]}
+          <Tap
+            style={[s.card, styles.row]}
             onPress={() => router.push(`/segment/${item.segment.id}`)}
           >
             <View style={[styles.badge, { backgroundColor: iLead ? colors.warnSoft : colors.accentSoft }]}>
@@ -157,7 +158,7 @@ export default function ChallengesScreen() {
                 {item.board.length > 1 ? ` · ${item.board.length} skiers` : ''}
               </Text>
               {groupChallenges.some((c) => c.segmentId === item.segment.id) ? (
-                <Text style={[s.muted, { color: colors.accent, fontWeight: '700' }]} numberOfLines={1}>
+                <Text style={[s.muted, { color: colors.accent, fontWeight: '600' }]} numberOfLines={1}>
                   👥 {[...new Set(groupChallenges.filter((c) => c.segmentId === item.segment.id).map((c) => c.groupName))].join(', ')}
                 </Text>
               ) : null}
@@ -172,7 +173,7 @@ export default function ChallengesScreen() {
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.muted} />
-          </Pressable>
+          </Tap>
         );
       }}
     />
@@ -181,17 +182,17 @@ export default function ChallengesScreen() {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    list: { padding: 16, gap: 10 },
+    list: { padding: 16, gap: 12 },
     paste: {
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
+      borderRadius: 12, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
     },
     groupsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-    link: { color: colors.accent, fontWeight: '800', fontSize: 15 },
-    pasteText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
-    empty: { alignItems: 'center', gap: 10, paddingVertical: 32 },
+    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    pasteText: { color: colors.accent, fontWeight: '600', fontSize: 15 },
+    empty: { alignItems: 'center', gap: 12, paddingVertical: 32 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    badge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+    badge: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
     times: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
-    time: { fontSize: 14, fontWeight: '700', color: colors.text },
+    time: { fontSize: 13, fontWeight: '600', color: colors.text },
   });

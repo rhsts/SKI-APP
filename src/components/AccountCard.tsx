@@ -1,3 +1,4 @@
+import { Tap } from './Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -155,21 +156,21 @@ function Row({ label, onPress, danger, busy }: { label: string; onPress: () => v
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   return (
-    <Pressable onPress={onPress} disabled={busy} style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
-      <Text style={[s.body, { color: danger ? colors.danger : colors.accent, fontWeight: '700' }]}>{label}</Text>
+    <Tap onPress={onPress} disabled={busy} style={styles.row}>
+      <Text style={[s.body, { color: danger ? colors.danger : colors.accent, fontWeight: '600' }]}>{label}</Text>
       {busy ? <ActivityIndicator color={colors.accent} /> : null}
-    </Pressable>
+    </Tap>
   );
 }
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    section: { gap: 10 },
-    head: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    section: { gap: 12 },
+    head: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     picBusy: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.faint },
     camera: { position: 'absolute', right: -2, bottom: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.card },
-    link: { color: colors.accent, fontWeight: '700', marginTop: 4 },
+    link: { color: colors.accent, fontWeight: '600', marginTop: 4 },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    input: { fontSize: 16, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 6 },
+    input: { fontSize: 15, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.faint },
   });

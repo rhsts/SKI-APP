@@ -44,5 +44,5 @@ export function SpeedChart({ times, speeds, cursor, units, height = 110 }: {
 
 const makeStyles = (_: Palette) =>
   StyleSheet.create({
-    legend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 },
+    legend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
   });

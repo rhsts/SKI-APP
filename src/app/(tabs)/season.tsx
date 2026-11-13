@@ -1,3 +1,4 @@
+import { Tap } from '../../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -128,7 +129,7 @@ export default function SeasonScreen() {
 
       {streaks ? (
         <View style={[s.card, styles.streak]}>
-          <Text style={{ fontSize: 30 }}>{streaks.days >= 2 ? '🔥' : '🗓️'}</Text>
+          <Text style={{ fontSize: 28 }}>{streaks.days >= 2 ? '🔥' : '🗓️'}</Text>
           <View style={{ flex: 1 }}>
             <Text style={s.h2}>
               {streaks.days >= 2 ? `${streaks.days} days in a row!` : streaks.weeks >= 2 ? `${streaks.weeks} weeks in a row` : 'Start a streak'}
@@ -227,9 +228,9 @@ function GoalRow({ g, units, editing, onToggle, onChange }: {
     <Pressable onPress={onToggle} style={[s.card, { gap: 8 }]} accessibilityHint="Tap to change the goal">
       <View style={styles.goalHead}>
         <Ionicons name={g.done ? 'checkmark-circle' : t.icon} size={20} color={g.done ? colors.good : colors.accent} />
-        <Text style={[s.body, { flex: 1, fontWeight: '700' }]}>{t.title} {t.period}</Text>
+        <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>{t.title} {t.period}</Text>
         <Text style={s.body}>
-          <Text style={{ fontWeight: '800' }}>{fmtGoal(g.key, g.value, units)}</Text>
+          <Text style={{ fontWeight: '700' }}>{fmtGoal(g.key, g.value, units)}</Text>
           <Text style={s.muted}> / {fmtGoal(g.key, g.target, units)}</Text>
         </Text>
       </View>
@@ -274,9 +275,9 @@ function WeeklyRow({ w, units }: { w: WeeklyChallenge; units: Units }) {
     <View style={[s.card, { gap: 8 }]}>
       <View style={styles.goalHead}>
         <Text style={{ fontSize: 20 }}>{w.done ? '✅' : w.emoji}</Text>
-        <Text style={[s.body, { flex: 1, fontWeight: '700' }]}>{t.title}</Text>
+        <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>{t.title}</Text>
         <Text style={s.body}>
-          <Text style={{ fontWeight: '800' }}>{t.value}</Text>
+          <Text style={{ fontWeight: '700' }}>{t.value}</Text>
           <Text style={s.muted}> / {t.target}</Text>
         </Text>
       </View>
@@ -292,18 +293,18 @@ function BadgeTile({ b, onPress }: { b: Badge; onPress: () => void }) {
   const styles = useStyles(makeStyles);
   const got = b.earnedAt != null;
   return (
-    <Pressable
-      style={({ pressed }) => [s.card, styles.badge, !got && { opacity: 0.45 }, pressed && { transform: [{ scale: 0.96 }] }]}
+    <Tap
+      style={[s.card, styles.badge, !got && { opacity: 0.45 }]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${b.title}: ${b.description}${got ? ' Earned.' : ' Not earned yet.'} Tap for details.`}
     >
-      <Text style={{ fontSize: 30 }}>{got ? b.emoji : '🔒'}</Text>
+      <Text style={{ fontSize: 28 }}>{got ? b.emoji : '🔒'}</Text>
       <Text style={styles.badgeTitle} numberOfLines={1}>{b.title}</Text>
       <Text style={[s.muted, { fontSize: 11, textAlign: 'center' }]} numberOfLines={2}>
         {got ? fmtDate(b.earnedAt!).slice(4) : b.description}
       </Text>
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -313,10 +314,10 @@ function RecordRow({ icon, label, rec, fmt }: {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   return (
-    <Pressable
+    <Tap
       disabled={!rec}
       onPress={() => rec && router.push(`/day/${rec.dayId}`)}
-      style={({ pressed }) => [s.card, styles.record, pressed && { opacity: 0.85 }]}
+      style={[s.card, styles.record]}
     >
       <View style={styles.medal}><Ionicons name={icon} size={20} color={colors.warn} /></View>
       <View style={{ flex: 1 }}>
@@ -324,29 +325,29 @@ function RecordRow({ icon, label, rec, fmt }: {
         <Text style={styles.recValue}>{rec ? fmt(rec.value) : '–'}</Text>
       </View>
       {rec ? <Text style={s.muted}>{fmtDate(rec.date)}</Text> : null}
-    </Pressable>
+    </Tap>
   );
 }
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 32 },
-    pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
+    pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    pillText: { fontWeight: '700', color: colors.text },
+    pillText: { fontWeight: '600', color: colors.text },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-    big: { fontSize: 44, fontWeight: '900', color: colors.text },
+    big: { fontSize: 44, fontWeight: '700', color: colors.text },
     streak: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     goalHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     barTrack: { height: 8, borderRadius: 4, backgroundColor: colors.faint, overflow: 'hidden' },
     barFill: { height: 8, borderRadius: 4 },
     stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-    stepBtn: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+    stepBtn: { width: 48, height: 48, borderRadius: 16, borderWidth: 2, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
     badgeHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 },
-    badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    badge: { width: '31%', alignItems: 'center', gap: 2, paddingVertical: 12, paddingHorizontal: 6 },
-    badgeTitle: { fontSize: 13, fontWeight: '800', color: colors.text, textAlign: 'center' },
+    badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    badge: { width: '31%', alignItems: 'center', gap: 2, paddingVertical: 12, paddingHorizontal: 8 },
+    badgeTitle: { fontSize: 13, fontWeight: '700', color: colors.text, textAlign: 'center' },
     record: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    medal: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.warnSoft, alignItems: 'center', justifyContent: 'center' },
-    recValue: { fontSize: 20, fontWeight: '800', color: colors.text },
+    medal: { width: 40, height: 40, borderRadius: 16, backgroundColor: colors.warnSoft, alignItems: 'center', justifyContent: 'center' },
+    recValue: { fontSize: 20, fontWeight: '700', color: colors.text },
   });

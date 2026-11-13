@@ -1,3 +1,4 @@
+import { Tap } from '../../components/Tap';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { createBackup, importTracks, restoreBackup } from '../../days/files';
@@ -318,22 +319,22 @@ function Row({ label, onPress, danger, busy }: { label: string; onPress: () => v
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   return (
-    <Pressable onPress={onPress} disabled={busy} style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
-      <Text style={[s.body, { color: danger ? colors.danger : colors.accent, fontWeight: '700' }]}>{label}</Text>
+    <Tap onPress={onPress} disabled={busy} style={styles.row}>
+      <Text style={[s.body, { color: danger ? colors.danger : colors.accent, fontWeight: '600' }]}>{label}</Text>
       {busy ? <ActivityIndicator color={colors.accent} /> : null}
-    </Pressable>
+    </Tap>
   );
 }
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 32 },
-    section: { gap: 10 },
-    input: { fontSize: 17, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 6 },
-    segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 10, padding: 3 },
-    segBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+    section: { gap: 12 },
+    input: { fontSize: 17, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
+    segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 12, padding: 4 },
+    segBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
     segOn: { backgroundColor: colors.accent },
-    segText: { fontWeight: '700', color: colors.text },
+    segText: { fontWeight: '600', color: colors.text },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.faint },
   });

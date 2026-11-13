@@ -31,8 +31,8 @@ export function StatGrid({ children }: { children: React.ReactNode }) {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     tile: { flexBasis: '47%', flexGrow: 1, paddingVertical: 12, gap: 2 },
-    head: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    value: { fontSize: 24, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+    head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    value: { fontSize: 24, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
   });

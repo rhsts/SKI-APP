@@ -38,7 +38,7 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
       <View style={{ flex: 1, gap: 4 }}>
         <View style={styles.row}>
           <Text style={s.h2}>{title}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 1 }}>
             <Text style={[s.muted, { flexShrink: 1 }]} numberOfLines={1}>{fmtTimeOfDay(a.startTime)} · {fmtDuration(a.duration)}</Text>
             {isRun && onChallenge ? (
               <Pressable onPress={onChallenge} hitSlop={10} accessibilityLabel={`Make run ${number} a challenge`}>
@@ -53,12 +53,12 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
           </View>
         </View>
         {!isRun && !isTour && piste?.name ? (
-          <Text style={[s.body, { fontWeight: '700' }]} numberOfLines={1}>{piste.name}</Text>
+          <Text style={[s.body, { fontWeight: '600' }]} numberOfLines={1}>{piste.name}</Text>
         ) : null}
         {isRun && piste ? (
           <View style={styles.pisteRow}>
             <View style={[styles.dot, { backgroundColor: difficultyColor(piste.difficulty, dark) }]} />
-            <Text style={[s.body, { fontWeight: '700', flex: 1 }]} numberOfLines={1}>
+            <Text style={[s.body, { fontWeight: '600', flex: 1 }]} numberOfLines={1}>
               {piste.name ?? difficultyLabel(piste.difficulty) ?? 'Piste'}
               {piste.name && difficultyLabel(piste.difficulty) ? <Text style={s.muted}>  {difficultyLabel(piste.difficulty)}</Text> : null}
             </Text>
@@ -106,7 +106,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   const styles = useStyles(makeStyles);
   return (
     <View>
-      <Text style={[s.label, { fontSize: 10 }]}>{label}</Text>
+      <Text style={[s.label, { fontSize: 11 }]}>{label}</Text>
       <Text style={styles.metric}>{value}</Text>
     </View>
   );
@@ -127,12 +127,12 @@ export function BreakRow({ activity }: { activity: Activity }) {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     card: { flexDirection: 'row', gap: 12, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
-    icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    icon: { width: 40, height: 40, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
     // Wraps to a second line on narrow screens / big fonts instead of spilling past the card.
-    metrics: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12, rowGap: 6 },
-    metric: { fontSize: 14, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
-    pisteRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
-    breakRow: { flexDirection: 'row', gap: 6, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 2 },
+    metrics: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12, rowGap: 8 },
+    metric: { fontSize: 13, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
+    pisteRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    dot: { width: 10, height: 10, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
+    breakRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 2 },
   });

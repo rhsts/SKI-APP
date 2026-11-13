@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Appear } from '../components/Appear';
 import { ElevationChart } from '../components/ElevationChart';
 import { RouteMap } from '../components/RouteMap';
 import { SpeedChart } from '../components/SpeedChart';
@@ -118,11 +119,15 @@ export default function RunScreen() {
       <SpeedLegend />
       <Modal visible={!!shown} transparent animationType="fade" onRequestClose={() => setOpenPhoto(null)}>
         <Pressable style={styles.photoBack} onPress={() => setOpenPhoto(null)} accessibilityLabel="Close photo">
-          {shown ? <Image source={{ uri: shown.uri }} style={styles.photo} resizeMode="contain" /> : null}
+          {shown ? (
+            <Appear style={styles.photo}>
+              <Image source={{ uri: shown.uri }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+            </Appear>
+          ) : null}
         </Pressable>
       </Modal>
 
-      <View style={[s.card, { gap: 10 }]}>
+      <View style={[s.card, { gap: 12 }]}>
         <Text
           style={[s.body, { lineHeight: 20, minHeight: Math.max(20 * fontScale, readoutH) }]}
           onLayout={(e) => { const h = e.nativeEvent.layout.height; if (h > readoutH) setReadoutH(h); }}
@@ -184,12 +189,12 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     pisteRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    dot: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: colors.faint },
+    dot: { width: 14, height: 14, borderRadius: 8, borderWidth: 1, borderColor: colors.faint },
     nav: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-    navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: colors.accent },
-    navText: { color: colors.accent, fontWeight: '800' },
+    navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.accent },
+    navText: { color: colors.accent, fontWeight: '700' },
     legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
-    swatch: { width: 18, height: 6, borderRadius: 3 },
+    swatch: { width: 18, height: 6, borderRadius: 4 },
     photoBack: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
     photo: { width: '100%', height: '80%' },
   });

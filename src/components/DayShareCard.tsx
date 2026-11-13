@@ -137,11 +137,11 @@ function buildLines(points: TrackPoint[], speeds: number[], activities: Activity
 const styles = StyleSheet.create({
   // No borderRadius: this view is captured to PNG and rounded corners would come out transparent.
   card: { width: CARD_W, height: CARD_H, overflow: 'hidden', backgroundColor: '#081421' },
-  brand: { position: 'absolute', top: 18, left: PAD, color: '#7FB3E6', fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  title: { position: 'absolute', top: 32, left: PAD, right: PAD, color: '#FFFFFF', fontSize: 22, fontWeight: '900' },
-  date: { position: 'absolute', top: 17, right: PAD, color: '#9FB3C8', fontSize: 12, fontWeight: '600' },
-  grid: { position: 'absolute', left: PAD, right: PAD, bottom: PAD, flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
+  brand: { position: 'absolute', top: 18, left: PAD, color: '#7FB3E6', fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
+  title: { position: 'absolute', top: 32, left: PAD, right: PAD, color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
+  date: { position: 'absolute', top: 17, right: PAD, color: '#9FB3C8', fontSize: 12, fontWeight: '500' },
+  grid: { position: 'absolute', left: PAD, right: PAD, bottom: PAD, flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
   cell: { width: '33.33%' },
-  value: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  label: { color: '#9FB3C8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  value: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  label: { color: '#9FB3C8', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
 });

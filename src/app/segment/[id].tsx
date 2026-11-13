@@ -1,3 +1,4 @@
+import { Tap } from '../../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
@@ -114,18 +115,18 @@ export default function SegmentScreen() {
         )}
       </View>
 
-      <Pressable onPress={() => invite(false)} disabled={sharing} style={({ pressed }) => [styles.invite, pressed && { opacity: 0.85 }]}>
+      <Tap onPress={() => invite(false)} disabled={sharing} style={styles.invite}>
         {sharing ? <ActivityIndicator color={colors.onAccent} /> : (
           <>
             <Ionicons name="paper-plane" size={20} color={colors.onAccent} />
             <Text style={styles.inviteText}>{myBest && board.length > 1 && myBest.rank > 1 ? 'Send my time back' : 'Challenge a friend'}</Text>
           </>
         )}
-      </Pressable>
-      <Pressable onPress={() => invite(true)} disabled={sharing} style={({ pressed }) => [styles.group, pressed && { opacity: 0.7 }]}>
+      </Tap>
+      <Tap onPress={() => invite(true)} disabled={sharing} style={styles.group}>
         <Ionicons name="people" size={18} color={colors.accent} />
         <Text style={styles.groupText}>Share to a group chat</Text>
-      </Pressable>
+      </Tap>
       <Text style={[s.muted, { textAlign: 'center', marginTop: -4 }]}>
         Everyone who opens the link joins the same leaderboard (up to 20 skiers).
       </Text>
@@ -138,7 +139,7 @@ export default function SegmentScreen() {
           <View key={e.playerId} style={[s.card, styles.lbRow, me && { borderColor: colors.accent }]}>
             <Text style={styles.rank}>{MEDALS[e.rank - 1] ?? `#${e.rank}`}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[s.body, { fontWeight: '700' }]}>{me ? `${e.playerName} (you)` : e.playerName}</Text>
+              <Text style={[s.body, { fontWeight: '600' }]}>{me ? `${e.playerName} (you)` : e.playerName}</Text>
               <Text style={s.muted}>{fmtDate(e.at)}{e.attempts > 1 ? ` · ${e.attempts} runs` : ''}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -171,16 +172,16 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-    big: { fontSize: 44, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
+    big: { fontSize: 44, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
     group: {
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 14, borderWidth: 1.5, borderColor: colors.accent,
+      borderRadius: 12, borderWidth: 1, borderColor: colors.accent,
     },
-    groupText: { color: colors.accent, fontWeight: '800', fontSize: 16 },
-    invite: { flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16 },
-    inviteText: { color: colors.onAccent, fontSize: 18, fontWeight: '800' },
+    groupText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    invite: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16 },
+    inviteText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
     lbRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
-    rank: { fontSize: 22, width: 36, textAlign: 'center', fontWeight: '800', color: colors.muted },
-    lbTime: { fontSize: 18, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+    rank: { fontSize: 20, width: 36, textAlign: 'center', fontWeight: '700', color: colors.muted },
+    lbTime: { fontSize: 17, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
     attempt: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.faint },
   });

@@ -149,6 +149,6 @@ export const RouteMap = memo(function RouteMap({ points, speeds, activities, cur
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     wrap: { height: 280, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
-    photoPin: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.accent },
-    dot: { width: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, borderWidth: 3, borderColor: '#fff' },
+    photoPin: { width: 28, height: 28, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.accent },
+    dot: { width: 18, height: 18, borderRadius: 8, backgroundColor: colors.accent, borderWidth: 3, borderColor: '#fff' },
   });

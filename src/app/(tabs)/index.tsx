@@ -1,7 +1,9 @@
+import { Tap } from '../../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Appear } from '../../components/Appear';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { badgesEarnedBy } from '../../days/badges';
 import { fmtAir, fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtG, fmtJumpHeight, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
@@ -67,32 +69,32 @@ export default function RecordScreen() {
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
       {t.recovered ? (
-        <View style={[s.card, styles.banner]}>
+        <Appear style={[s.card, styles.banner]}>
           <Ionicons name="time-outline" size={20} color={colors.warn} />
           <Text style={[s.body, { flex: 1 }]}>
             Your day from {t.active ? fmtTimeOfDay(t.active.startedAt) : ''} wasn’t finished. Resume recording or finish it.
           </Text>
-        </View>
+        </Appear>
       ) : null}
 
-      {t.fallAlert ? <FallCard key={t.fallAlert.t} /> : null}
-      {t.finish ? <FinishCard f={t.finish} /> : null}
-      {t.race && t.status === 'recording' ? <RaceCard r={t.race} /> : null}
+      {t.fallAlert ? <Appear key={t.fallAlert.t}><FallCard /></Appear> : null}
+      {t.finish ? <Appear><FinishCard f={t.finish} /></Appear> : null}
+      {t.race && t.status === 'recording' ? <Appear><RaceCard r={t.race} /></Appear> : null}
       {t.newTop && t.status === 'recording' ? (
-        <View style={[s.card, styles.topFlash]}>
-          <Text style={{ fontSize: 26 }}>⚡</Text>
+        <Appear style={[s.card, styles.topFlash]}>
+          <Text style={{ fontSize: 24 }}>⚡</Text>
           <Text style={styles.topFlashText}>New top speed: {fmtSpeed(t.newTop.speed, units)}</Text>
-        </View>
+        </Appear>
       ) : null}
       {t.jump && t.status === 'recording' ? (
-        <View style={[s.card, styles.topFlash, { borderLeftColor: colors.good, backgroundColor: colors.accentSoft }]}>
-          <Text style={{ fontSize: 26 }}>🦘</Text>
+        <Appear style={[s.card, styles.topFlash, { backgroundColor: colors.accentSoft }]}>
+          <Text style={{ fontSize: 24 }}>🦘</Text>
           <Text style={styles.topFlashText}>
             Jump! {fmtAir(t.jump.airtime)} airtime · {fmtJumpHeight(jumpHeight(t.jump.airtime), units)} high
           </Text>
-        </View>
+        </Appear>
       ) : null}
-      {t.lastRun && t.status !== 'idle' && !t.race ? <RunCard r={t.lastRun} /> : null}
+      {t.lastRun && t.status !== 'idle' && !t.race ? <Appear key={t.lastRun.number}><RunCard r={t.lastRun} /></Appear> : null}
 
       <View style={[s.card, styles.hero]}>
         <View style={styles.heroTop}>
@@ -195,7 +197,7 @@ export default function RecordScreen() {
         ) : (
           <>
             {t.status === 'recording' ? (
-              <Button label="Pause" icon="pause" color={colors.warn} onPress={() => run(pauseDay)} />
+              <Button label="Pause" icon="pause" onPress={() => run(pauseDay)} />
             ) : (
               <Button label="Resume" icon="play" color={colors.accent} onPress={() => run(resumeDay)} />
             )}
@@ -263,7 +265,7 @@ function FinishCard({ f }: { f: RaceFinish }) {
         <Text style={s.body}>{line}</Text>
         {f.splitNote ? <Text style={s.muted}>{f.splitNote}</Text> : null}
         <Pressable onPress={() => router.push(`/segment/${f.segmentId}`)}>
-          <Text style={{ color: colors.accent, fontWeight: '700', marginTop: 4 }}>See leaderboard ›</Text>
+          <Text style={{ color: colors.accent, fontWeight: '600', marginTop: 4 }}>See leaderboard ›</Text>
         </Pressable>
       </View>
       <Pressable onPress={dismissFinish} hitSlop={10} accessibilityLabel="Dismiss">
@@ -303,7 +305,7 @@ function FallCard() {
         <Button label="Get help" icon="medkit" color={colors.danger} onPress={() => { dismissFall(); router.push('/sos'); }} />
       </View>
       <Pressable onPress={() => { notAFall().catch(() => undefined); }} hitSlop={8}>
-        <Text style={{ color: colors.accent, fontWeight: '700', textAlign: 'center' }}>That wasn’t a fall</Text>
+        <Text style={{ color: colors.accent, fontWeight: '600', textAlign: 'center' }}>That wasn’t a fall</Text>
       </Pressable>
     </View>
   );
@@ -342,7 +344,7 @@ function RunStat({ label, value }: { label: string; value: string }) {
   const styles = useStyles(makeStyles);
   return (
     <View style={{ alignItems: 'center', flex: 1 }}>
-      <Text style={[s.label, { fontSize: 10 }]}>{label}</Text>
+      <Text style={[s.label, { fontSize: 11 }]}>{label}</Text>
       <Text style={styles.runValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
     </View>
   );
@@ -351,67 +353,69 @@ function RunStat({ label, value }: { label: string; value: string }) {
 function Chip({ text, icon, color }: { text: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }) {
   const styles = useStyles(makeStyles);
   return (
-    <View style={[styles.chip, { borderColor: color }]}>
+    <View style={styles.chip}>
       <Ionicons name={icon} size={14} color={color} />
-      <Text style={[styles.chipText, { color }]}>{text}</Text>
+      <Text style={styles.chipText}>{text}</Text>
     </View>
   );
 }
 
 function Button({ label, icon, color, onPress, big }: {
-  label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string; onPress: () => void; big?: boolean;
+  label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color?: string; onPress: () => void; big?: boolean;
 }) {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
   return (
-    <Pressable
+    <Tap
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.button, big && styles.bigButton, { backgroundColor: color, opacity: pressed ? 0.8 : 1 }]}
+      style={[styles.button, big && styles.bigButton, color ? { backgroundColor: color } : styles.quietButton]}
     >
-      <Ionicons name={icon} size={big ? 30 : 26} color={colors.onAccent} />
-      <Text style={styles.buttonText}>{label}</Text>
-    </Pressable>
+      <Ionicons name={icon} size={big ? 28 : 24} color={color ? colors.onAccent : colors.text} />
+      <Text style={[styles.buttonText, !color && { color: colors.text }]}>{label}</Text>
+    </Tap>
   );
 }
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 32 },
-    banner: { flexDirection: 'row', gap: 10, alignItems: 'center', borderLeftWidth: 4, borderLeftColor: colors.warn },
+    banner: { flexDirection: 'row', gap: 12, alignItems: 'center' },
     hero: { alignItems: 'center', paddingVertical: 20, gap: 2 },
     heroTop: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 8, marginBottom: 4 },
     chipRow: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
-    sos: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-    sosText: { color: '#fff', fontWeight: '900', fontSize: 12 },
-    chip: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-    chipText: { fontSize: 13, fontWeight: '700', flexShrink: 1 },
-    speed: { fontSize: 96, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'], lineHeight: 104 },
-    speedUnit: { fontSize: 18, fontWeight: '700', color: colors.muted, marginTop: -6, marginBottom: 6 },
+    sos: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
+    sosText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+    chip: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.faint, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
+    chipText: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
+    speed: { fontSize: 96, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'], lineHeight: 104 },
+    speedUnit: { fontSize: 17, fontWeight: '600', color: colors.muted, marginTop: -6, marginBottom: 8 },
     race: { backgroundColor: colors.ink, gap: 8 },
-    raceHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    raceTitle: { color: colors.onInk, fontWeight: '800', fontSize: 15, flex: 1 },
+    raceHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    raceTitle: { color: colors.onInk, fontWeight: '700', fontSize: 15, flex: 1 },
     raceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-    raceTime: { color: colors.onInk, fontSize: 40, fontWeight: '900', fontVariant: ['tabular-nums'] },
-    raceDelta: { fontSize: 26, fontWeight: '900', fontVariant: ['tabular-nums'] },
-    raceSub: { color: colors.onInkMuted, fontSize: 13, fontWeight: '600' },
-    progressTrack: { height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
+    raceTime: { color: colors.onInk, fontSize: 40, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    raceDelta: { fontSize: 24, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    raceSub: { color: colors.onInkMuted, fontSize: 13, fontWeight: '500' },
+    progressTrack: { height: 6, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
     progressFill: { height: 6, backgroundColor: colors.good },
-    finish: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderLeftWidth: 4, borderLeftColor: colors.good },
-    finishTime: { fontSize: 26, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
-    batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-    topFlash: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.warnSoft, borderLeftWidth: 4, borderLeftColor: colors.warn },
-    topFlashText: { fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 },
-    fall: { gap: 10, borderWidth: 3, borderColor: colors.danger },
-    fallTitle: { fontSize: 26, fontWeight: '900', color: colors.danger },
-    fallCount: { fontSize: 22, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
-    runCard: { gap: 8, borderLeftWidth: 4, borderLeftColor: colors.run },
+    finish: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+    finishTime: { fontSize: 24, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+    topFlash: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.warnSoft },
+    topFlashText: { fontSize: 17, fontWeight: '700', color: colors.text, flex: 1 },
+    fall: { gap: 12, borderWidth: 2, borderColor: colors.danger },
+    fallTitle: { fontSize: 24, fontWeight: '700', color: colors.danger },
+    fallCount: { fontSize: 20, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    runCard: { gap: 8 },
     runHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     runStats: { flexDirection: 'row' },
-    runValue: { fontSize: 18, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+    runValue: { fontSize: 17, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
     buttons: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 4 },
     // Big targets: easy to hit with ski gloves on.
-    button: { flex: 1, flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', minHeight: 72, borderRadius: 18 },
+    button: { flex: 1, flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', minHeight: 72, borderRadius: 16 },
     bigButton: { minHeight: 88 },
-    buttonText: { color: colors.onAccent, fontSize: 22, fontWeight: '800' },
+    // Secondary action: one filled button per screen state.
+    quietButton: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
+    buttonText: { color: colors.onAccent, fontSize: 20, fontWeight: '700' },
   });

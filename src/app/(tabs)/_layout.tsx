@@ -23,7 +23,7 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: colors.bg },
         headerTintColor: colors.text,
         headerShadowVisible: false,
-        headerTitleStyle: { fontWeight: '800', color: colors.text },
+        headerTitleStyle: { fontWeight: '600', color: colors.text },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >

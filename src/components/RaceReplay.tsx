@@ -91,11 +91,11 @@ export function RaceReplay({ segment, attempts, playerId }: Props) {
   const splits = me && rival ? compareSplits(me.attempt.ghost, rival.attempt.ghost) : null;
 
   return (
-    <View style={{ gap: 10 }}>
+    <View style={{ gap: 12 }}>
       <SegmentMap path={segment.path} gateRadius={segment.gateRadius} markers={markers} />
 
       {runners.length ? (
-        <View style={[s.card, { gap: 10 }]}>
+        <View style={[s.card, { gap: 12 }]}>
           <View style={styles.playRow}>
             <Pressable
               onPress={() => {
@@ -143,7 +143,7 @@ export function RaceReplay({ segment, attempts, playerId }: Props) {
                   <Text style={[s.body, styles.splitName]}>{SECTION_NAMES[i][0].toUpperCase() + SECTION_NAMES[i].slice(1)}</Text>
                   <Text style={[s.body, styles.splitVal]}>{splits.mine[i].toFixed(1)}s</Text>
                   <Text style={[s.body, styles.splitVal]}>{splits.theirs[i].toFixed(1)}s</Text>
-                  <Text style={[s.body, styles.splitVal, { fontWeight: '800', color: d > 0.05 ? colors.danger : d < -0.05 ? colors.good : colors.muted }]}>
+                  <Text style={[s.body, styles.splitVal, { fontWeight: '700', color: d > 0.05 ? colors.danger : d < -0.05 ? colors.good : colors.muted }]}>
                     {fmtDelta(d)}
                   </Text>
                 </View>
@@ -164,11 +164,11 @@ export function RaceReplay({ segment, attempts, playerId }: Props) {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     playRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    play: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-    chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1.5, borderColor: colors.faint },
-    chipText: { fontWeight: '700', color: colors.text, fontSize: 13 },
+    play: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+    chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.faint },
+    chipText: { fontWeight: '600', color: colors.text, fontSize: 13 },
     splits: { gap: 2 },
-    splitRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6 },
+    splitRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8 },
     splitName: { flex: 1.2 },
     splitVal: { flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] },
   });

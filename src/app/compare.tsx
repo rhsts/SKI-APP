@@ -69,7 +69,7 @@ export default function CompareScreen() {
       </View>
 
       {shared.length ? (
-        <View style={[s.card, { gap: 10 }]}>
+        <View style={[s.card, { gap: 12 }]}>
           <Text style={s.label}>Challenges skied both days</Text>
           {shared.map((c) => {
             const d = c.b - c.a;
@@ -114,10 +114,10 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     headRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    vs: { fontSize: 16, fontWeight: '900', color: colors.muted },
+    vs: { fontSize: 15, fontWeight: '700', color: colors.muted },
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 8 },
     rowBorder: { borderTopWidth: 1, borderTopColor: colors.faint },
-    rowLabel: { flex: 1.2, textAlign: 'center', fontSize: 13, fontWeight: '600', color: colors.muted },
-    val: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
-    win: { color: colors.good, fontWeight: '900' },
+    rowLabel: { flex: 1.2, textAlign: 'center', fontSize: 13, fontWeight: '500', color: colors.muted },
+    val: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
+    win: { color: colors.good, fontWeight: '700' },
   });

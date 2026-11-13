@@ -1,3 +1,4 @@
+import { Tap } from '../../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
@@ -151,7 +152,7 @@ export default function GroupScreen() {
         options={{
           title: detail.name,
           headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: 18 }}>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
               <Pressable onPress={invite} hitSlop={10} accessibilityLabel="Invite friends">
                 <Ionicons name="person-add-outline" size={22} color={colors.accent} />
               </Pressable>
@@ -180,7 +181,7 @@ export default function GroupScreen() {
         ))}
       </ScrollView>
 
-      <View style={[s.card, { gap: 10 }]}>
+      <View style={[s.card, { gap: 12 }]}>
         <View style={styles.segment}>
           {METRICS.map((m) => (
             <Pressable key={m.key} onPress={() => setMetric(m.key)} style={[styles.segBtn, metric === m.key && styles.segOn]}>
@@ -205,7 +206,7 @@ export default function GroupScreen() {
               <Text style={styles.rank}>{r.rank == null ? '–' : MEDALS[r.rank - 1] ?? `${r.rank}`}</Text>
               <Avatar playerId={r.playerId} name={r.name} size={34} hasAvatar={!!avatarOf.get(r.playerId)} />
               <View style={{ flex: 1 }}>
-                <Text style={[s.body, { fontWeight: '800' }]} numberOfLines={1}>{r.playerId === playerId ? `${r.name} (you)` : r.name}</Text>
+                <Text style={[s.body, { fontWeight: '700' }]} numberOfLines={1}>{r.playerId === playerId ? `${r.name} (you)` : r.name}</Text>
                 {r.rank != null ? (
                   <Text style={s.muted} numberOfLines={1}>
                     {[
@@ -301,7 +302,7 @@ function ChallengeCard({ c, rows, groupId, ownerId, today, onRemoved, compact, o
         ranked.map((r) => (
           <View key={r.playerId} style={[styles.rankRow, r.playerId === playerId && styles.meRow]}>
             <Text style={styles.rank}>{MEDALS[r.rank - 1] ?? `${r.rank}`}</Text>
-            <Text style={[s.body, { flex: 1, fontWeight: '700' }]} numberOfLines={1}>{r.playerId === playerId ? 'You' : r.playerName}</Text>
+            <Text style={[s.body, { flex: 1, fontWeight: '600' }]} numberOfLines={1}>{r.playerId === playerId ? 'You' : r.playerName}</Text>
             {r.rank > 1 ? <Text style={[s.muted, { color: colors.danger }]}>{fmtDelta(r.time - ranked[0].time)}</Text> : null}
             <Text style={styles.value}>{fmtRaceTime(r.time)}</Text>
           </View>
@@ -339,7 +340,7 @@ function NewChallenge({ groupId, today, onDone }: { groupId: string; today: stri
   };
 
   return (
-    <View style={[s.card, { gap: 10 }]}>
+    <View style={[s.card, { gap: 12 }]}>
       <Text style={s.label}>Which day?</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
         {days.map((d) => (
@@ -357,11 +358,11 @@ function NewChallenge({ groupId, today, onDone }: { groupId: string; today: stri
         </Text>
       ) : (
         segments.map((seg) => (
-          <Pressable key={seg.id} onPress={() => pick(seg)} disabled={!!busy} style={({ pressed }) => [styles.rankRow, pressed && { opacity: 0.7 }]}>
+          <Tap key={seg.id} onPress={() => pick(seg)} disabled={!!busy} style={styles.rankRow}>
             <Ionicons name="flag-outline" size={18} color={colors.accent} />
-            <Text style={[s.body, { flex: 1, fontWeight: '700' }]} numberOfLines={1}>{seg.name}</Text>
+            <Text style={[s.body, { flex: 1, fontWeight: '600' }]} numberOfLines={1}>{seg.name}</Text>
             {busy === seg.id ? <ActivityIndicator color={colors.accent} /> : <Text style={s.muted}>{fmtDist(segLength(seg), units)}</Text>}
-          </Pressable>
+          </Tap>
         ))
       )}
     </View>
@@ -382,18 +383,18 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     codeCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    code: { fontSize: 26, fontWeight: '900', letterSpacing: 4, color: colors.text },
-    pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
+    code: { fontSize: 24, fontWeight: '700', letterSpacing: 4, color: colors.text },
+    pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    pillText: { fontWeight: '700', color: colors.text },
-    segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 10, padding: 3 },
-    segBtn: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center' },
+    pillText: { fontWeight: '600', color: colors.text },
+    segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 12, padding: 4 },
+    segBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
     segOn: { backgroundColor: colors.accent },
-    segText: { fontWeight: '700', color: colors.text },
-    rankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 8 },
+    segText: { fontWeight: '600', color: colors.text },
+    rankRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8 },
     meRow: { backgroundColor: colors.accentSoft },
-    rank: { width: 30, fontSize: 18, fontWeight: '900', color: colors.text, textAlign: 'center' },
-    value: { fontSize: 16, fontWeight: '900', color: colors.text, fontVariant: ['tabular-nums'] },
-    sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 10, justifyContent: 'space-between' },
-    link: { color: colors.accent, fontWeight: '800', fontSize: 15 },
+    rank: { width: 30, fontSize: 17, fontWeight: '700', color: colors.text, textAlign: 'center' },
+    value: { fontSize: 15, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'space-between' },
+    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
   });

@@ -155,9 +155,9 @@ export const ElevationChart = memo(function ElevationChart({
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    legend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 },
-    bubble: { position: 'absolute', top: 0, height: LABEL_H - 4, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.ink },
-    bubbleText: { color: colors.onInk, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    legend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
+    bubble: { position: 'absolute', top: 0, height: LABEL_H - 4, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: colors.ink },
+    bubbleText: { color: colors.onInk, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
     hintWrap: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
-    hint: { fontSize: 12, fontWeight: '600', color: colors.muted },
+    hint: { fontSize: 12, fontWeight: '500', color: colors.muted },
   });

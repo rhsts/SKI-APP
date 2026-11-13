@@ -1,8 +1,9 @@
+import { Tap } from '../../components/Tap';
 import Slider from '@react-native-community/slider';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { createChallenge } from '../../challenges/service';
 import { SegmentMap } from '../../components/SegmentMap';
 import { getPoints, getSession } from '../../db';
@@ -79,7 +80,7 @@ export default function NewChallengeScreen() {
 
         <SegmentMap path={path} context={context} />
 
-        <View style={[s.card, { gap: 6 }]}>
+        <View style={[s.card, { gap: 8 }]}>
           <Text style={s.label}>Start</Text>
           <Slider
             minimumValue={range.lo}
@@ -116,18 +117,18 @@ export default function NewChallengeScreen() {
           ) : null}
         </View>
 
-        <View style={[s.card, { gap: 6 }]}>
+        <View style={[s.card, { gap: 8 }]}>
           <Text style={s.label}>Name</Text>
           <TextInput value={name} onChangeText={setName} style={styles.input} maxLength={30} placeholder="e.g. Black Diamond Dash" />
         </View>
 
-        <Pressable
+        <Tap
           onPress={save}
           disabled={saving || tooShort}
-          style={({ pressed }) => [styles.save, (tooShort || saving) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
+          style={[styles.save, (tooShort || saving) && { opacity: 0.5 }]}
         >
           {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.saveText}>Create challenge</Text>}
-        </Pressable>
+        </Tap>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -148,8 +149,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     facts: { flexDirection: 'row', marginTop: 8 },
-    factValue: { fontSize: 18, fontWeight: '800', color: colors.text },
-    input: { fontSize: 18, fontWeight: '600', color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 6 },
-    save: { backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-    saveText: { color: colors.onAccent, fontSize: 18, fontWeight: '800' },
+    factValue: { fontSize: 17, fontWeight: '700', color: colors.text },
+    input: { fontSize: 17, fontWeight: '500', color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
+    save: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+    saveText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
   });
