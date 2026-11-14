@@ -1,21 +1,23 @@
 import * as Battery from 'expo-battery';
-import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSyncExternalStore } from 'react';
 import {
   createSession, deleteMotionEvent, deleteSession, finishSession, getPoints, getSession, insertMotionEvents, insertPoints, kvGet, kvSet,
-  listAttempts, listMotionEvents, listSegments, upsertAttempts,
+  listAttempts, listMotionEvents, listSegments, listTrailMaps, upsertAttempts,
 } from '../db';
 import { EMPTY_MOTION, summariseMotion, type MotionEvent, type MotionSummary } from '../lib/motion';
 import { startMotion, stopMotion } from './motion';
 import { setNewSegmentsHandler, syncFriends } from '../friends/sync';
 import { simulateDay } from '../lib/sim';
 import { cleanTrack, completedRuns, computeStats, smoothedSpeeds } from '../lib/stats';
-import type { DayStats, TrackPoint } from '../lib/types';
+import type { Activity, DayStats, TrackPoint } from '../lib/types';
+import { matchRunsToPistes, type PisteMatch } from '../lib/pistes';
+import { mapFor } from '../lib/trailmap';
 import { matchSession, myAttempt } from '../challenges/service';
 import { ghostTimeAt, leaderboard, pickTarget, Racer } from '../lib/segments';
 import { getSettings } from '../settings';
+import { haptic } from '../haptics';
 import { compareSplits, SECTION_NAMES } from '../lib/ghost';
 import { AUTO_PAUSE_MS, batteryHoursLeft, restingFor } from '../lib/power';
 import type { Sport } from '../lib/sport';
@@ -74,6 +76,8 @@ export interface RunSummary {
   verticalDown: number;
   distance: number;
   duration: number;
+  /** The piste the run followed: known when this area's trail map is saved on the phone. */
+  piste?: PisteMatch;
 }
 
 export interface LiveRace {
@@ -184,17 +188,6 @@ function resetMoments(stats: DayStats | null) {
 }
 
 
-function buzz(kind: 'success' | 'tap' | 'warning') {
-  // A fall warning always buzzes: it's a safety check, not a gimmick.
-  if (!getSettings().vibrate && kind !== 'warning') return;
-  const p = kind === 'success'
-    ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    : kind === 'warning'
-      ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
-      : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  p.catch(() => undefined);
-}
-
 // ---------- jumps and falls ----------
 
 let jumpTimer: ReturnType<typeof setTimeout> | null = null;
@@ -236,13 +229,13 @@ async function onMotion(e: MotionEvent, sessionId: string, pos?: { lat: number; 
     m.totalAir += e.value;
     m.bestAir = Math.max(m.bestAir, e.value);
     set({ motion: m, jump: { airtime: e.value, at: e.t } });
-    buzz('tap');
+    haptic('jump');
     if (jumpTimer) clearTimeout(jumpTimer);
     jumpTimer = setTimeout(() => set({ jump: null }), 6000);
   } else {
     m.falls++;
     set({ motion: m, fallAlert: getSettings().fallCheck ? { t: e.t, peak: e.value } : state.fallAlert });
-    buzz('warning');
+    haptic('fall');
   }
 }
 
@@ -282,7 +275,8 @@ function checkMoments(stats: DayStats) {
     set({
       lastRun: { number: done.length, topSpeed: r.topSpeed, verticalDown: r.verticalDown, distance: r.distance, duration: r.duration },
     });
-    buzz('tap');
+    haptic('runDone');
+    Promise.resolve().then(() => namePiste(r, done.length)).catch(() => undefined);
   }
   // A new top speed: only once it beats the old one by ~1 km/h, and not for slow starts.
   if (stats.topSpeed > bestTop + 0.3 && stats.topSpeed > 8) {
@@ -290,13 +284,22 @@ function checkMoments(stats: DayStats) {
     bestTop = stats.topSpeed;
     if (!first) {
       set({ newTop: { speed: stats.topSpeed, at: Date.now() } });
-      buzz('success');
+      haptic('topSpeed');
       if (newTopTimer) clearTimeout(newTopTimer);
       newTopTimer = setTimeout(() => set({ newTop: null }), 8000);
     }
   } else if (stats.topSpeed > bestTop) {
     bestTop = stats.topSpeed;
   }
+}
+
+/** Names the run after the piste it followed, from the offline trail map (no signal needed). */
+async function namePiste(run: Activity, number: number) {
+  const pts = cleanTrack(state.points);
+  const start = pts[run.startIndex];
+  const map = start ? mapFor(await listTrailMaps(), start) : null;
+  const piste = map ? matchRunsToPistes(pts, [run], map.pistes)[String(run.startTime)] : undefined;
+  if (piste && state.lastRun?.number === number) set({ lastRun: { ...state.lastRun, piste } });
 }
 
 export function dismissLastRun() {

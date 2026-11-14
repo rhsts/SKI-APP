@@ -13,6 +13,7 @@ import { cachedChallenges, cachedGroups, syncFriends, type CachedChallenge } fro
 import type { Group } from '../../lib/groups';
 import { localDate } from '../../lib/groups';
 import { useTheme, useStyles, type Palette } from '../../theme';
+import { useTabBarSpace } from '../../components/TabBar';
 
 interface Row {
   segment: Segment;
@@ -25,6 +26,7 @@ interface Row {
 export default function ChallengesScreen() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
+  const tabSpace = useTabBarSpace();
   const { units, playerId, serverUrl } = useSettings();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -80,7 +82,7 @@ export default function ChallengesScreen() {
   return (
     <FlatList
       style={s.screen}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { paddingBottom: tabSpace }]}
       data={rows}
       keyExtractor={(r) => r.segment.id}
       ListHeaderComponent={

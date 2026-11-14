@@ -4,6 +4,10 @@ import '../tracking/task';
 // Same for the task that looks up piste names while the app is closed.
 import { registerPistesTask } from '../mountain/pistes-task';
 
+import { Inter_300Light } from '@expo-google-fonts/inter/300Light';
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { useFonts } from 'expo-font';
 import Stack from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -13,7 +17,7 @@ import { lookupStalePistes } from '../mountain/pistes';
 import { getSettings, initSettings, useSettings } from '../settings';
 import { LockScreen } from '../components/LockScreen';
 import { checkServer } from '../friends/api';
-import { useTheme } from '../theme';
+import { font, size, useTheme } from '../theme';
 // Importing this also registers the ski-area reminder (geofence) task.
 import { setupNotifications } from '../tracking/geofence';
 import { recoverActiveDay } from '../tracking/tracker';
@@ -24,6 +28,9 @@ setupNotifications();
 export default function RootLayout() {
   const { colors, dark } = useTheme();
   const [ready, setReady] = useState(false);
+  // If a font fails to load the app still opens, in the system font.
+  const [fontsLoaded, fontsFailed] = useFonts({ Inter_300Light, Inter_400Regular, Inter_500Medium });
+  const fontsDone = fontsLoaded || !!fontsFailed;
   const { unlocked, account, devSkip } = useSettings();
   // Private app: a server + password, then an account. (Expo Go can skip it for development.)
   const locked = !unlocked || (!account && !(__DEV__ && devSkip));
@@ -50,7 +57,11 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
-  // The navigator is always mounted so an invite link that launches the app is
+  // Nothing is drawn until the fonts are in (a few frames): Android measures text once, so a
+  // screen laid out in the fallback font keeps those widths and clips its labels in Inter.
+  if (!fontsDone) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+
+  // From then on the navigator is always mounted so an invite link that launches the app is
   // routed correctly; a cover hides the screens until the database is ready.
   return (
     <>
@@ -61,6 +72,7 @@ export default function RootLayout() {
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
           headerShadowVisible: false,
+          headerTitleStyle: { fontFamily: font.medium, fontSize: size.body },
           headerBackTitle: 'Back',
         }}
       >

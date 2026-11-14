@@ -3,7 +3,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import MapView, { Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { TrailMap } from '../lib/trailmap';
 import type { TrackPoint } from '../lib/types';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { radius, useStyles, useTheme, type Palette } from '../theme';
 import { TrailOverlay } from './TrailOverlay';
 import { mapsAvailable } from '../lib/mapsAvailable';
 import { MapPlaceholder } from './MapPlaceholder';
@@ -49,5 +49,5 @@ export function LiveMap({ points, trail, center }: { points: TrackPoint[]; trail
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    wrap: { height: 320, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
+    wrap: { height: 320, borderRadius: radius.card, overflow: 'hidden', backgroundColor: colors.faint },
   });
