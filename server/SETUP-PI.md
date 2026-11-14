@@ -428,6 +428,15 @@ cat .env
 
 **Write the password down** in your note from Part 0.
 
+> **Forgot the password?** It's always saved on the Pi. Log in (`ssh pi@skipi.local`, or the remote shell in
+> Raspberry Pi Connect) and run this from any folder:
+>
+> ```bash
+> cat ~/SKI-APP/server/.env
+> ```
+>
+> It prints `SERVER_PASSWORD=...`; everything after the `=` is your password.
+
 > **Changing it later:** run the `echo` command again with the new password, then
 > `docker compose up -d` to apply it. Everyone then enters the new password in the app.
 
