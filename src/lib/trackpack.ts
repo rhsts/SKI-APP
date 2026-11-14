@@ -6,6 +6,7 @@ import type { TrackPoint } from './types';
 /**
  * A day as stored in your online backup: the GPS track and jumps/falls,
  * JSON → gzip → base64. A full day of 1 Hz GPS becomes a few hundred KB.
+ * (gzip level 6: several times faster than 9 on a phone, for a file barely bigger.)
  */
 
 export interface PackedDay {
@@ -22,29 +23,42 @@ export interface PackedDay {
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 export function toBase64(bytes: Uint8Array): string {
-  let out = '';
+  // Built in pieces: adding four characters at a time to one multi-MB string is slow.
+  const parts: string[] = [];
+  let chunk = '';
   let i = 0;
   for (; i + 2 < bytes.length; i += 3) {
     const n = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + B64[(n >> 6) & 63] + B64[n & 63];
+    chunk += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + B64[(n >> 6) & 63] + B64[n & 63];
+    if (chunk.length >= 8192) {
+      parts.push(chunk);
+      chunk = '';
+    }
   }
   const rest = bytes.length - i;
   if (rest === 1) {
     const n = bytes[i] << 16;
-    out += `${B64[(n >> 18) & 63]}${B64[(n >> 12) & 63]}==`;
+    chunk += `${B64[(n >> 18) & 63]}${B64[(n >> 12) & 63]}==`;
   } else if (rest === 2) {
     const n = (bytes[i] << 16) | (bytes[i + 1] << 8);
-    out += `${B64[(n >> 18) & 63]}${B64[(n >> 12) & 63]}${B64[(n >> 6) & 63]}=`;
+    chunk += `${B64[(n >> 18) & 63]}${B64[(n >> 12) & 63]}${B64[(n >> 6) & 63]}=`;
   }
-  return out;
+  parts.push(chunk);
+  return parts.join('');
 }
 
+/** Character code -> 6-bit value, -1 for anything that isn't base64. */
+const B64_VALUE = new Int8Array(128).fill(-1);
+for (let i = 0; i < B64.length; i++) B64_VALUE[B64.charCodeAt(i)] = i;
+
 export function fromBase64(s: string): Uint8Array {
-  const clean = s.replace(/[^A-Za-z0-9+/]/g, '');
-  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
+  const out = new Uint8Array(Math.floor((s.length * 3) / 4));
   let o = 0, buf = 0, bits = 0;
-  for (let i = 0; i < clean.length; i++) {
-    buf = (buf << 6) | B64.indexOf(clean[i]);
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    const v = c < 128 ? B64_VALUE[c] : -1;
+    if (v < 0) continue; // padding, line breaks
+    buf = ((buf << 6) | v) & 0xffffff;
     bits += 6;
     if (bits >= 8) {
       bits -= 8;
@@ -56,7 +70,7 @@ export function fromBase64(s: string): Uint8Array {
 
 export function packDay(d: Omit<PackedDay, 'v'>): string {
   const json = JSON.stringify({ ...d, v: 1, points: packPoints(d.points) });
-  return toBase64(gzipSync(strToU8(json), { level: 9 }));
+  return toBase64(gzipSync(strToU8(json), { level: 6 }));
 }
 
 export function unpackDay(data: string): PackedDay {

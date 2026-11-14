@@ -73,6 +73,10 @@ describe('group leaderboards', () => {
       expect(Array.from(fromBase64(toBase64(bytes)))).toEqual(Array.from(bytes));
     }
     expect(toBase64(new Uint8Array([104, 105]))).toBe('aGk=');
+    // Big enough to be built in several pieces, and the same as Node's own base64.
+    const big = Uint8Array.from({ length: 50001 }, (_, i) => (i * 131) % 256);
+    expect(toBase64(big)).toBe(Buffer.from(big).toString('base64'));
+    expect(Array.from(fromBase64(`${toBase64(big).slice(0, 100)}\n${toBase64(big).slice(100)}`))).toEqual(Array.from(big));
     expect(() => unpackDay('bm90IGd6aXA=')).toThrow('damaged');
   });
 

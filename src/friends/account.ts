@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import { matchSession } from '../challenges/service';
 import {
-  deleteSession, getPoints, insertMotionEvents, insertPoints, insertSessionRaw, kvGet, kvSet, listAttempts, listMotionEvents,
+  countPoints, deleteSession, getPoints, insertMotionEvents, insertPoints, insertSessionRaw, kvGet, kvSet, listAttempts, listMotionEvents,
   listSessions, reassignPlayer,
 } from '../db';
 import { computeBadges } from '../lib/goals';
@@ -133,9 +133,10 @@ export async function backupDays({ all = false } = {}): Promise<BackupResult> {
   for (const day of await listSessions()) {
     if (day.isDemo) continue;
     try {
-      const points = await getPoints(day.id);
-      if (points.length < 2) continue;
-      const sig = `${points.length}:${day.endedAt}:${day.place}:${day.sport}`;
+      // Only the count: loading every day's whole track on every sync is slow.
+      const n = await countPoints(day.id);
+      if (n < 2) continue;
+      const sig = `${n}:${day.endedAt}:${day.place}:${day.sport}`;
       const key = `backup:${day.id}`;
       if ((await kvGet(key)) === sig) continue;
       // Not tried again until the day changes (e.g. trimmed).
@@ -144,6 +145,7 @@ export async function backupDays({ all = false } = {}): Promise<BackupResult> {
         r.tooBig++;
         continue;
       }
+      const points = await getPoints(day.id);
       const motion = await listMotionEvents(day.id);
       const data = packDay({ startedAt: day.startedAt, endedAt: day.endedAt, place: day.place, sport: day.sport, isDemo: false, points, motion });
       try {

@@ -5,12 +5,14 @@
 const mockKv = new Map<string, string>();
 const mockSessions: { id: string; startedAt: number; endedAt: number; place: string | null; sport: string; isDemo: boolean }[] = [];
 const mockSettings: Record<string, unknown> = {};
+const mockGetPoints = jest.fn(async (..._a: unknown[]) => [{ t: 1 }, { t: 2 }]);
 jest.mock('../src/db', () => ({
   kvGet: async (k: string) => mockKv.get(k) ?? null,
   kvSet: async (k: string, v: string | null) => { if (v == null) mockKv.delete(k); else mockKv.set(k, v); },
   listSessions: async () => [...mockSessions],
   deleteSession: async (id: string) => { mockSessions.splice(mockSessions.findIndex((s) => s.id === id), 1); },
-  getPoints: async () => [{ t: 1 }, { t: 2 }],
+  getPoints: (...a: unknown[]) => mockGetPoints(...a),
+  countPoints: async () => 2,
   listMotionEvents: async () => [],
   getDb: () => ({ runAsync: async () => undefined }),
 }));
@@ -60,6 +62,14 @@ describe('online backup', () => {
     m.putTrack.mockClear().mockResolvedValue({ ok: true });
     expect(await backupDays()).toEqual({ uploaded: 1, failed: 0, tooBig: 1 });
     expect(m.putTrack.mock.calls.map((c) => c[0])).toEqual(['a']);
+  });
+
+  it('doesn’t load the GPS track of a day that is already backed up', async () => {
+    m.putTrack.mockResolvedValue({ ok: true });
+    await backupDays();
+    mockGetPoints.mockClear();
+    expect(await backupDays()).toEqual({ uploaded: 0, failed: 0, tooBig: 1 });
+    expect(mockGetPoints).not.toHaveBeenCalled();
   });
 
   it('a deleted day is removed online, retried when offline, and never offered back', async () => {

@@ -15,6 +15,8 @@ import type { DayStats, TrackPoint, Units } from '../lib/types';
  */
 
 const SCHEMA_VERSION = 8;
+/** A day with fewer GPS fixes than this is too short to save. */
+export const MIN_POINTS_TO_KEEP = 20;
 let db: SQLite.SQLiteDatabase | null = null;
 
 export function getDb(): SQLite.SQLiteDatabase {
@@ -113,6 +115,19 @@ function migrateV1(d: SQLite.SQLiteDatabase) {
     );
     CREATE INDEX IF NOT EXISTS attempts_segment ON attempts(segment_id, time);
   `);
+}
+
+/**
+ * expo-sqlite's withTransactionAsync isn't exclusive: a second one started while the first
+ * is still open fails on its BEGIN and then rolls the first one back too. That would lose
+ * a batch of GPS fixes when, say, a jump is saved at the same moment. So every write
+ * transaction waits its turn here.
+ */
+let writeQueue: Promise<unknown> = Promise.resolve();
+function writeTx(task: () => Promise<void>): Promise<void> {
+  const run = writeQueue.then(() => getDb().withTransactionAsync(task));
+  writeQueue = run.catch(() => undefined);
+  return run;
 }
 
 export function newId(): string {
@@ -324,7 +339,7 @@ export async function listSessions(): Promise<SessionRow[]> {
 
 export async function deleteSession(id: string) {
   const d = getDb();
-  await d.withTransactionAsync(async () => {
+  await writeTx(async () => {
     await d.runAsync('DELETE FROM points WHERE session_id = ?', id);
     await d.runAsync('DELETE FROM attempts WHERE session_id = ?', id);
     await d.runAsync('DELETE FROM photos WHERE session_id = ?', id);
@@ -333,9 +348,19 @@ export async function deleteSession(id: string) {
   });
 }
 
+/**
+ * Days that were started but never finished and aren't the one being recorded (a start that
+ * was interrupted) are in no list, so they'd stay on the phone for ever.
+ */
+export async function deleteUnfinishedSessions(keepId: string | null): Promise<void> {
+  const rows = await getDb().getAllAsync<{ id: string }>('SELECT id FROM sessions WHERE ended_at IS NULL AND id != ?', keepId ?? '');
+  // Only ones too short to ever be saved: never throw away a real track.
+  for (const r of rows) if ((await countPoints(r.id)) < MIN_POINTS_TO_KEEP) await deleteSession(r.id);
+}
+
 export async function deleteAllData() {
   const d = getDb();
-  await d.withTransactionAsync(async () => {
+  await writeTx(async () => {
     for (const t of ['points', 'sessions', 'attempts', 'segments', 'photos', 'motion_events']) await d.runAsync(`DELETE FROM ${t}`);
     await d.runAsync("DELETE FROM kv WHERE key != 'settings'");
   });
@@ -343,9 +368,10 @@ export async function deleteAllData() {
 
 export async function deleteDemoData() {
   const d = getDb();
-  await d.withTransactionAsync(async () => {
+  await writeTx(async () => {
     await d.runAsync('DELETE FROM points WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
     await d.runAsync('DELETE FROM attempts WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
+    await d.runAsync('DELETE FROM photos WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
     await d.runAsync('DELETE FROM motion_events WHERE session_id IN (SELECT id FROM sessions WHERE is_demo = 1)');
     await d.runAsync('DELETE FROM sessions WHERE is_demo = 1');
   });
@@ -356,7 +382,7 @@ export async function deleteDemoData() {
 export async function insertPoints(sessionId: string, pts: TrackPoint[]): Promise<void> {
   if (!pts.length) return;
   const d = getDb();
-  await d.withTransactionAsync(async () => {
+  await writeTx(async () => {
     const stmt = await d.prepareAsync(
       'INSERT INTO points (session_id, t, lat, lon, alt, acc, spd, pres) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     );
@@ -374,6 +400,12 @@ export async function getPoints(sessionId: string, afterT = -1): Promise<TrackPo
     'SELECT t, lat, lon, alt, acc, spd, pres FROM points WHERE session_id = ? AND t > ? ORDER BY t',
     sessionId, afterT,
   );
+}
+
+/** How many points a session has, without loading them. */
+export async function countPoints(sessionId: string): Promise<number> {
+  const r = await getDb().getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM points WHERE session_id = ?', sessionId);
+  return r?.n ?? 0;
 }
 
 // ---------- challenges ----------
@@ -422,7 +454,7 @@ export async function renameSegment(id: string, name: string) {
 
 export async function deleteSegment(id: string) {
   const d = getDb();
-  await d.withTransactionAsync(async () => {
+  await writeTx(async () => {
     await d.runAsync('DELETE FROM attempts WHERE segment_id = ?', id);
     await d.runAsync('DELETE FROM segments WHERE id = ?', id);
   });
@@ -456,7 +488,7 @@ function toAttempt(r: RawAttempt): Attempt {
 export async function upsertAttempts(attempts: Attempt[]): Promise<void> {
   if (!attempts.length) return;
   const d = getDb();
-  await d.withTransactionAsync(async () => {
+  await writeTx(async () => {
     for (const a of attempts) {
       await d.runAsync(
         `INSERT INTO attempts (id, segment_id, session_id, player_id, player_name, time, at, ghost_json)
@@ -563,7 +595,7 @@ export interface MotionRow extends MotionEvent {
 export async function insertMotionEvents(sessionId: string, events: MotionRow[]): Promise<void> {
   if (!events.length) return;
   const d = getDb();
-  await d.withTransactionAsync(async () => {
+  await writeTx(async () => {
     for (const e of events) {
       await d.runAsync(
         'INSERT OR REPLACE INTO motion_events (session_id, t, kind, value, lat, lon) VALUES (?, ?, ?, ?, ?, ?)',

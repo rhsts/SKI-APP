@@ -37,8 +37,9 @@ export async function readPressure(timeoutMs = 400): Promise<number | null> {
       if (done) return;
       done = true;
       once.remove();
-      latest = { hPa: m.pressure, at: Date.now() };
-      resolve(Number.isFinite(m.pressure) ? m.pressure : null);
+      const ok = Number.isFinite(m.pressure);
+      if (ok) latest = { hPa: m.pressure, at: Date.now() };
+      resolve(ok ? m.pressure : null);
     });
     setTimeout(() => {
       if (done) return;

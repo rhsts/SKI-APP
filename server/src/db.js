@@ -49,6 +49,8 @@ export function openDb(file) {
       PRIMARY KEY (player_id, day_id)
     );
     CREATE INDEX IF NOT EXISTS days_date ON days(date);
+    -- A player's days by date: profiles, a group's dates and the daily board.
+    CREATE INDEX IF NOT EXISTS days_player_date ON days(player_id, date);
 
     CREATE TABLE IF NOT EXISTS challenges (
       id TEXT PRIMARY KEY NOT NULL,

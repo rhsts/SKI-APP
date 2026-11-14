@@ -155,3 +155,21 @@ test('rejects junk', async () => {
   assert.equal((await call(anna, 'GET', '/v1/groups/x/board?date=yesterday')).status, 404);
   assert.equal((await call(anna, 'GET', '/v1/whatever')).status, 404);
 });
+
+test('a broken address is a 400, not a server error', async () => {
+  const r = await call(anna, 'GET', '/v1/groups/%zz');
+  assert.equal(r.status, 400);
+  assert.equal(r.json.error, 'Invalid address');
+});
+
+test('an upload that is too big gets an answer, not a dropped connection', async () => {
+  const res = await fetch(`${base}/v1/me/avatar`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: anna.auth },
+    body: JSON.stringify({ jpeg: 'A'.repeat(9 * 1024 * 1024) }),
+  });
+  assert.equal(res.status, 413);
+  assert.equal((await res.json()).error, 'Request too large');
+  // The server still works afterwards.
+  assert.equal((await call(anna, 'GET', '/v1/me')).status, 200);
+});

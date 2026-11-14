@@ -123,10 +123,10 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
   const tooMany = 'Too many wrong passwords. Try again in 15 minutes.';
   const ipFails = failLimit(SERVER_PW_FAILS_PER_IP, LOGIN_WINDOW_MS, clock, tooMany);
   const allFails = failLimit(SERVER_PW_FAILS_TOTAL, LOGIN_WINDOW_MS, clock, tooMany);
-  function checkPassword(given, ip, authHeader) {
+  function checkPassword(given, ip, known) {
     if (!passwordHash) return;
     // Phones already set up on this server aren't locked out by someone else's guessing.
-    if (!knownDevice(authHeader)) {
+    if (!known) {
       ipFails.check(ip);
       allFails.check('');
     }
@@ -237,27 +237,29 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
                        WHERE a.segment_id = ? AND a.date = ? ORDER BY a.time`),
   };
 
-  /** True when the header names an existing phone with its right secret. */
-  function knownDevice(header) {
-    const m = /^Bearer ([A-Za-z0-9._-]{1,80}):([A-Za-z0-9_-]{16,128})$/.exec(header ?? '');
-    const dev = m && stmt.device.get(m[1]);
-    if (!dev) return false;
-    const a = Buffer.from(dev.secret_hash, 'hex'), b = Buffer.from(sha(m[2]), 'hex');
+  const sameHash = (x, y) => {
+    const a = Buffer.from(x, 'hex'), b = Buffer.from(y, 'hex');
     return a.length === b.length && timingSafeEqual(a, b);
+  };
+
+  /** Reads the Authorization header and looks the phone up, once per request. */
+  function credentials(header) {
+    const m = /^Bearer ([A-Za-z0-9._-]{1,80}):([A-Za-z0-9_-]{16,128})$/.exec(header ?? '');
+    if (!m) return null;
+    const hash = sha(m[2]);
+    const dev = stmt.device.get(m[1]);
+    // known: an existing phone with its right secret.
+    return { deviceId: m[1], hash, dev, known: !!dev && sameHash(dev.secret_hash, hash) };
   }
 
-  function auth(header) {
-    const m = /^Bearer ([A-Za-z0-9._-]{1,80}):([A-Za-z0-9_-]{16,128})$/.exec(header ?? '');
-    if (!m) throw new HttpError(401, 'Missing or invalid Authorization header');
-    const [, deviceId, secret] = m;
-    const hash = sha(secret);
-    const dev = stmt.device.get(deviceId);
+  function auth(cred) {
+    if (!cred) throw new HttpError(401, 'Missing or invalid Authorization header');
+    const { deviceId, hash, dev } = cred;
     if (!dev) {
       if (stmt.removedDevice.get(deviceId)) throw new HttpError(401, 'This phone was removed from the server');
       const out = stmt.loggedOutDevice.get(deviceId);
       if (out) {
-        const a = Buffer.from(out.secret_hash, 'hex'), b = Buffer.from(hash, 'hex');
-        if (a.length !== b.length || !timingSafeEqual(a, b)) throw new HttpError(401, 'This player id belongs to another phone');
+        if (!sameHash(out.secret_hash, hash)) throw new HttpError(401, 'This player id belongs to another phone');
         // Told once; the app then starts again with a fresh id.
         stmt.forgetLoggedOut.run(deviceId);
         throw new HttpError(401, 'Your password was changed on another phone. Log in again.', 'logged_out');
@@ -270,8 +272,7 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
       });
       return { id: deviceId, deviceId, name: 'Skier', username: null, isAdmin: false };
     }
-    const a = Buffer.from(dev.secret_hash, 'hex'), b = Buffer.from(hash, 'hex');
-    if (a.length !== b.length || !timingSafeEqual(a, b)) throw new HttpError(401, 'This player id belongs to another phone');
+    if (!cred.known) throw new HttpError(401, 'This player id belongs to another phone');
     const p = stmt.player.get(dev.player_id);
     if (!p) throw new HttpError(401, 'This account was removed');
     if (!p.last_seen || now() - p.last_seen > 5 * 60 * 1000) stmt.touch.run(now(), p.id);
@@ -652,7 +653,12 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
 
   /** Handles one request; returns [status, json]. */
   function handle(method, url, headers, body, ip = '') {
-    const u = new URL(url, 'http://x');
+    let u;
+    try {
+      u = new URL(url, 'http://x');
+    } catch {
+      throw new HttpError(400, 'Invalid address');
+    }
     if (method === 'GET' && u.pathname === '/v1/health') {
       return [200, { ok: true, app: 'ski-tracker-friends', v: 2, accounts: true, password: !!passwordHash }];
     }
@@ -661,9 +667,16 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
       const match = re.exec(u.pathname);
       if (!match) continue;
       // Behind Cloudflare Tunnel the socket is always cloudflared, so use the real client IP it passes on.
-      checkPassword(headers['x-server-password'], String(headers['cf-connecting-ip'] || ip), headers.authorization);
-      const me = auth(headers.authorization);
-      return [200, fn(me, match.slice(1).map(decodeURIComponent), body, u.searchParams)];
+      let params;
+      try {
+        params = match.slice(1).map(decodeURIComponent);
+      } catch {
+        throw new HttpError(400, 'Invalid address'); // e.g. /v1/groups/%zz
+      }
+      const cred = credentials(headers.authorization);
+      checkPassword(headers['x-server-password'], String(headers['cf-connecting-ip'] || ip), !!cred?.known);
+      const me = auth(cred);
+      return [200, fn(me, params, body, u.searchParams)];
     }
     throw new HttpError(404, 'Not found');
   }
@@ -676,15 +689,21 @@ export function listener(api, log = () => undefined) {
   return (req, res) => {
     const chunks = [];
     let size = 0;
+    let tooLarge = false;
     req.on('data', (c) => {
+      if (tooLarge) return; // the rest is read and thrown away
       size += c.length;
       if (size > MAX_BODY) {
-        res.writeHead(413, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Request too large' }));
-        req.destroy();
+        // Answer, then let the upload run out: cutting the connection here would
+        // leave the app with a network error instead of this message.
+        tooLarge = true;
+        chunks.length = 0;
+        res.writeHead(413, { 'content-type': 'application/json', connection: 'close' }).end(JSON.stringify({ error: 'Request too large' }));
       } else {
         chunks.push(c);
       }
     });
+    req.on('error', () => undefined); // the client hung up halfway
     req.on('end', () => {
       if (res.writableEnded) return;
       let status = 200, out, delay = 0;
