@@ -1,4 +1,5 @@
 import { Tap } from '../../components/Tap';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -16,7 +17,6 @@ import { useTabBarSpace } from '../../components/TabBar';
 type Period = 'season' | 'allTime';
 type Loaded = { season: FriendTotals[]; allTime: FriendTotals[]; seasonKey: string };
 
-const MEDALS = ['🥇', '🥈', '🥉'];
 const SHOWN = 5;
 
 function fmt(kind: StatKind, v: number, units: Units): string {
@@ -60,7 +60,7 @@ export default function LeaderboardScreen() {
   // Challenges have no tab of their own any more: they open from here, with or without a server.
   const challenges = (
     <Rows>
-      <Row label="Challenges" value="Timed runs and groups" onPress={() => router.push('/challenges')} />
+      <Row label="Challenges" onPress={() => router.push('/challenges')} />
     </Rows>
   );
 
@@ -81,9 +81,9 @@ export default function LeaderboardScreen() {
       <View style={[s.screen, styles.aside]}>
         {challenges}
         <View style={styles.empty}>
-        <Text style={{ fontSize: 48 }}>🏆</Text>
+        <Ionicons name="trophy-outline" size={44} color={colors.accent} />
         <Text style={s.h2}>Race your friends</Text>
-        <Text style={[s.muted, { textAlign: 'center' }]}>Set up a friends server in Profile and join a group to see who rules the mountain.</Text>
+        <Text style={[s.muted, { textAlign: 'center' }]}>Needs a friends server and a group.</Text>
         <Pressable onPress={() => router.push('/profile')} style={styles.cta}>
           <Text style={styles.ctaText}>Go to Profile</Text>
         </Pressable>
@@ -117,12 +117,12 @@ export default function LeaderboardScreen() {
       </View>
 
       <View style={[s.card, styles.hero]}>
-        <Text style={{ fontSize: 40 }}>{myCrowns ? '👑' : '🎿'}</Text>
+        <Ionicons name={myCrowns ? 'trophy' : 'trophy-outline'} size={36} color={myCrowns ? colors.warn : colors.muted} />
         <Text style={s.h2}>
-          {myCrowns ? `You lead ${myCrowns} of ${CATEGORIES.length} boards` : 'No crowns yet'}
+          {myCrowns ? `You lead ${myCrowns} of ${CATEGORIES.length} boards` : 'No boards led yet'}
         </Text>
         <Text style={s.muted}>
-          {friends.length > 1 ? `${friends.length} skiers in your groups` : 'Invite friends to a group to compete'}
+          {friends.length > 1 ? `${friends.length} skiers` : 'Invite friends to a group'}
         </Text>
       </View>
 
@@ -134,7 +134,7 @@ export default function LeaderboardScreen() {
         return (
           <View key={cat.id} style={[s.card, { gap: 8 }]}>
             <View style={styles.catHead}>
-              <Text style={{ fontSize: 24 }}>{cat.emoji}</Text>
+              <Ionicons name={cat.icon} size={24} color={colors.accent} />
               <View style={{ flex: 1 }}>
                 <Text style={s.h2}>{cat.title}</Text>
                 <Text style={s.muted}>{cat.blurb}</Text>
@@ -149,7 +149,7 @@ export default function LeaderboardScreen() {
                   style={[styles.row, isMe && styles.rowMe]}
                   accessibilityLabel={`${r.rank}. ${r.friend.name}, ${fmt(cat.kind, r.value, units)}`}
                 >
-                  <Text style={styles.rank}>{MEDALS[r.rank - 1] ?? r.rank}</Text>
+                  <Text style={styles.rank}>{r.rank}</Text>
                   <Avatar playerId={r.friend.id} name={r.friend.name} size={30} hasAvatar={r.friend.hasAvatar} />
                   <Text style={[s.body, { flex: 1, fontWeight: isMe ? '800' : '600' }]} numberOfLines={1}>
                     {isMe ? 'You' : r.friend.name}
@@ -157,7 +157,7 @@ export default function LeaderboardScreen() {
                   <Text style={styles.value}>{fmt(cat.kind, r.value, units)}</Text>
                 </Tap>
               );
-            }) : <Text style={s.muted}>Nobody yet. Go ski!</Text>}
+            }) : <Text style={s.muted}>Nobody yet.</Text>}
             {!expanded && mine && mine.rank > SHOWN ? (
               <Text style={s.muted}>You: #{mine.rank} · {fmt(cat.kind, mine.value, units)}</Text>
             ) : null}

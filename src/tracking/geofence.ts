@@ -29,7 +29,7 @@ if (!TaskManager.isTaskDefined(GEOFENCE_TASK)) {
       await kvSet(key, String(Date.now()));
       const name = id.split('|')[0];
       await Notifications.scheduleNotificationAsync({
-        content: { title: `At ${name}? 🎿`, body: 'Tap to start recording your ski day.' },
+        content: { title: `At ${name}?`, body: 'Tap to start recording your ski day.' },
         trigger: null,
       });
     },

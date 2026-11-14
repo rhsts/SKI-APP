@@ -3,7 +3,8 @@ import Slider from '@react-native-community/slider';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { createChallenge } from '../../challenges/service';
 import { SegmentMap } from '../../components/SegmentMap';
 import { getPoints, getSession } from '../../db';
@@ -64,7 +65,7 @@ export default function NewChallengeScreen() {
       await refreshRacers();
       router.replace(`/segment/${seg.id}`);
     } catch (e) {
-      Alert.alert('Couldn’t save the challenge', String(e));
+      dialog('Couldn’t save the challenge', String(e));
       setSaving(false);
     }
   };
@@ -74,8 +75,7 @@ export default function NewChallengeScreen() {
     <KeyboardAvoidingView style={s.screen} behavior="padding" keyboardVerticalOffset={headerHeight}>
       <ScrollView style={s.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={s.muted}>
-          Pick the stretch to race. Timing starts when you leave the green start circle and stops when you reach the
-          finish circle. Anyone who skis it, including you next time, gets a time.
+          Pick the stretch to race. Timing runs from the start circle to the finish circle.
         </Text>
 
         <SegmentMap path={path} context={context} />

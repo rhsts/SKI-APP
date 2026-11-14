@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../dialog';
 import type { PhotoRow } from '../db';
 import { Appear } from './Appear';
 import { fmtTimeOfDay } from '../lib/format';
@@ -40,7 +41,7 @@ export function PhotoStrip({ photos, open, onOpen, onAdd, onRemove, busy }: Prop
           ))}
         </ScrollView>
       ) : (
-        <Text style={s.muted}>Pick photos from this day: they’re pinned on the map of the run you took them on.</Text>
+        <Text style={s.muted}>Photos from this day get pinned on the map.</Text>
       )}
 
       <Modal visible={!!current} transparent animationType="fade" onRequestClose={() => onOpen(null)}>
@@ -60,7 +61,7 @@ export function PhotoStrip({ photos, open, onOpen, onAdd, onRemove, busy }: Prop
               accessibilityLabel="Remove photo"
               onPress={() =>
                 current &&
-                Alert.alert('Remove this photo from the day?', 'It stays in your gallery.', [
+                dialog('Remove this photo from the day?', 'It stays in your gallery.', [
                   { text: 'Cancel', style: 'cancel' },
                   { text: 'Remove', style: 'destructive', onPress: () => { onRemove(current); onOpen(null); } },
                 ])

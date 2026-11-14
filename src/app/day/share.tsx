@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { captureRef } from 'react-native-view-shot';
 import { DayShareCard } from '../../components/DayShareCard';
 import { getPoints, getSession, type SessionRow } from '../../db';
@@ -41,7 +42,7 @@ export default function ShareDayScreen() {
       const uri = await captureRef(card, { format: 'png', quality: 1, result: 'tmpfile', width: 1080, height: 1350 });
       await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share your ski day' });
     } catch (e) {
-      Alert.alert('Couldn’t create the image', e instanceof Error ? e.message : String(e));
+      dialog('Couldn’t create the image', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -68,7 +69,6 @@ export default function ShareDayScreen() {
           </>
         )}
       </Tap>
-      <Text style={[s.muted, { textAlign: 'center' }]}>Post it to Instagram, WhatsApp or anywhere else.</Text>
     </ScrollView>
   );
 }

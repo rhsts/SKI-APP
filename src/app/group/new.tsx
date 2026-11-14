@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { api } from '../../friends/api';
 import { syncFriends } from '../../friends/sync';
 import { cleanCode } from '../../lib/groups';
@@ -28,7 +29,7 @@ export default function NewGroupScreen() {
       await syncFriends().catch(() => undefined);
       router.replace(`/group/${g.id}`);
     } catch (e) {
-      Alert.alert(kind === 'create' ? 'Couldn’t make the group' : 'Couldn’t join', e instanceof Error ? e.message : String(e));
+      dialog(kind === 'create' ? 'Couldn’t make the group' : 'Couldn’t join', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }
@@ -41,7 +42,7 @@ export default function NewGroupScreen() {
           <Ionicons name="server-outline" size={36} color={colors.accent} />
           <Text style={s.h2}>Set up your friends server first</Text>
           <Text style={[s.muted, { textAlign: 'center' }]}>
-            Groups live on a small server (for example a Raspberry Pi). Enter its address under Profile → Friends server.
+            Enter its address in Profile.
           </Text>
           <Pressable onPress={() => router.navigate('/profile')}>
             <Text style={styles.link}>Open Profile</Text>

@@ -103,7 +103,7 @@ export default function SeasonScreen() {
       </ScrollView>
 
       <View style={[s.card, styles.hero]}>
-        <Text style={s.label}>{allTime ? 'Vertical, all time' : 'Vertical this season'}</Text>
+        <Text style={s.label}>Vertical</Text>
         <Text style={styles.big}>{fmtAlt(season.verticalDown, units)}</Text>
         <Text style={s.muted}>
           {season.days} {season.days === 1 ? 'day' : 'days'}
@@ -112,7 +112,7 @@ export default function SeasonScreen() {
         </Text>
         {Object.keys(season.sports).length > 1 || (Object.keys(season.sports)[0] ?? 'ski') !== 'ski' ? (
           <Text style={s.muted}>
-            {SPORTS.filter((sp) => season.sports[sp.id]).map((sp) => `${sp.emoji} ${season.sports[sp.id]}`).join('   ')}
+            {SPORTS.filter((sp) => season.sports[sp.id]).map((sp) => `${sp.label} ${season.sports[sp.id]}`).join(' · ')}
           </Text>
         ) : null}
       </View>
@@ -131,29 +131,28 @@ export default function SeasonScreen() {
 
       {streaks ? (
         <View style={[s.card, styles.streak]}>
-          <Text style={{ fontSize: 28 }}>{streaks.days >= 2 ? '🔥' : '🗓️'}</Text>
+          <Ionicons name={streaks.days >= 2 ? 'flame-outline' : 'calendar-outline'} size={28} color={colors.accent} />
           <View style={{ flex: 1 }}>
             <Text style={s.h2}>
-              {streaks.days >= 2 ? `${streaks.days} days in a row!` : streaks.weeks >= 2 ? `${streaks.weeks} weeks in a row` : 'Start a streak'}
+              {streaks.days >= 2 ? `${streaks.days} days in a row` : streaks.weeks >= 2 ? `${streaks.weeks} weeks in a row` : 'No streak yet'}
             </Text>
-            <Text style={s.muted}>
-              {streaks.bestDays > 0
-                ? `Best: ${streaks.bestDays} ${streaks.bestDays === 1 ? 'day' : 'days'} in a row · ${streaks.bestWeeks} ${streaks.bestWeeks === 1 ? 'week' : 'weeks'} in a row`
-                : 'Ski days in a row (and weeks in a row) show up here.'}
-            </Text>
+            {streaks.bestDays > 0 ? (
+              <Text style={s.muted}>
+                Best: {streaks.bestDays} {streaks.bestDays === 1 ? 'day' : 'days'} · {streaks.bestWeeks} {streaks.bestWeeks === 1 ? 'week' : 'weeks'}
+              </Text>
+            ) : null}
           </View>
         </View>
       ) : null}
 
       <View style={styles.badgeHead}>
-        <Text style={s.h2}>This week’s challenges</Text>
+        <Text style={s.h2}>This week</Text>
         <Text style={s.muted}>{weekly.filter((w) => w.done).length} of {weekly.length}</Text>
       </View>
       {weekly.map((w) => <WeeklyRow key={w.kind} w={w} units={units} />)}
-      <Text style={[s.muted, { fontSize: 12 }]}>New challenges every Monday, based on your own days. Finish all three for the Weekly hero badge.</Text>
 
       <DifficultyBar shares={shares} units={units} title={allTime ? 'Pistes, all time' : 'Pistes this season'} />
-      {waiting ? <Text style={[s.muted, { fontSize: 12 }]}>Looking up the pistes for {waiting} {waiting === 1 ? 'day' : 'days'} (needs internet); they’re added as they come in.</Text> : null}
+      {waiting ? <Text style={[s.muted, { fontSize: 12 }]}>Looking up pistes for {waiting} {waiting === 1 ? 'day' : 'days'}…</Text> : null}
 
       <Text style={[s.h2, { marginTop: 8 }]}>Goals</Text>
       {progress.map((g) => (
@@ -276,7 +275,7 @@ function WeeklyRow({ w, units }: { w: WeeklyChallenge; units: Units }) {
   return (
     <View style={[s.card, { gap: 8 }]}>
       <View style={styles.goalHead}>
-        <Text style={{ fontSize: 20 }}>{w.done ? '✅' : w.emoji}</Text>
+        <Ionicons name={w.done ? 'checkmark-circle' : w.icon} size={20} color={w.done ? colors.good : colors.accent} />
         <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>{t.title}</Text>
         <Text style={s.body}>
           <Text style={{ fontWeight: '700' }}>{t.value}</Text>
@@ -291,7 +290,7 @@ function WeeklyRow({ w, units }: { w: WeeklyChallenge; units: Units }) {
 }
 
 function BadgeTile({ b, onPress }: { b: Badge; onPress: () => void }) {
-  const { s } = useTheme();
+  const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const got = b.earnedAt != null;
   return (
@@ -301,7 +300,7 @@ function BadgeTile({ b, onPress }: { b: Badge; onPress: () => void }) {
       accessibilityRole="button"
       accessibilityLabel={`${b.title}: ${b.description}${got ? ' Earned.' : ' Not earned yet.'} Tap for details.`}
     >
-      <Text style={{ fontSize: 28 }}>{got ? b.emoji : '🔒'}</Text>
+      <Ionicons name={got ? b.icon : 'lock-closed-outline'} size={28} color={got ? colors.accent : colors.muted} />
       <Text style={styles.badgeTitle} numberOfLines={1}>{b.title}</Text>
       <Text style={[s.muted, { fontSize: 11, textAlign: 'center' }]} numberOfLines={2}>
         {got ? fmtDate(b.earnedAt!).slice(4) : b.description}

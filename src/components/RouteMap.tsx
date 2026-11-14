@@ -1,5 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { memo, useMemo, useRef } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle, Text } from 'react-native';
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { simplify } from '../lib/geo';
 import type { TrailMap } from '../lib/trailmap';
@@ -133,7 +134,7 @@ export const RouteMap = memo(function RouteMap({ points, speeds, activities, cur
             onPress={() => onPhotoPress?.(p.id)}
             zIndex={4}
           >
-            <View style={styles.photoPin}><Text style={{ fontSize: 13 }}>📷</Text></View>
+            <View style={styles.photoPin}><Ionicons name="camera" size={14} color={colors.accent} /></View>
           </ViewMarker>
         ))}
         {c ? (

@@ -58,7 +58,7 @@ export function SegmentMap({ path, gateRadius = 30, context, style, markers }: P
         </ViewMarker>
         {last ? (
           <ViewMarker coordinate={last} anchor={{ x: 0.5, y: 1 }}>
-            <View style={[styles.flag, { backgroundColor: '#0E1B2C' }]}><Text style={styles.flagText}>🏁 FINISH</Text></View>
+            <View style={[styles.flag, { backgroundColor: '#0E1B2C' }]}><Text style={styles.flagText}>FINISH</Text></View>
           </ViewMarker>
         ) : null}
         {markers?.map((m) => (

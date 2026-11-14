@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { APP_DOWNLOAD_URL } from '../../config';
 import { listSegments } from '../../db';
 import { api } from '../../friends/api';
@@ -17,7 +18,6 @@ import { useSettings } from '../../settings';
 import { Avatar } from '../../components/Avatar';
 import { useStyles, useTheme, type Palette } from '../../theme';
 
-const MEDALS = ['🥇', '🥈', '🥉'];
 const METRICS: { key: BoardMetric; label: string }[] = [
   { key: 'vertical', label: 'Vertical' },
   { key: 'topSpeed', label: 'Top speed' },
@@ -118,7 +118,7 @@ export default function GroupScreen() {
     });
 
   const leave = () =>
-    Alert.alert(`Leave “${detail.name}”?`, 'Your days stay on your phone. You can join again with the code.', [
+    dialog(`Leave “${detail.name}”?`, 'Your days stay on your phone. You can join again with the code.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Leave',
@@ -129,7 +129,7 @@ export default function GroupScreen() {
             await syncFriends().catch(() => undefined);
             router.back();
           } catch (e) {
-            Alert.alert('Couldn’t leave', e instanceof Error ? e.message : String(e));
+            dialog('Couldn’t leave', e instanceof Error ? e.message : String(e));
           }
         },
       },
@@ -203,7 +203,7 @@ export default function GroupScreen() {
               style={[styles.rankRow, r.playerId === playerId && styles.meRow, r.rank == null && { opacity: 0.45 }]}
               accessibilityLabel={`${r.name}’s profile`}
             >
-              <Text style={styles.rank}>{r.rank == null ? '–' : MEDALS[r.rank - 1] ?? `${r.rank}`}</Text>
+              <Text style={styles.rank}>{r.rank ?? '–'}</Text>
               <Avatar playerId={r.playerId} name={r.name} size={34} hasAvatar={!!avatarOf.get(r.playerId)} />
               <View style={{ flex: 1 }}>
                 <Text style={[s.body, { fontWeight: '700' }]} numberOfLines={1}>{r.playerId === playerId ? `${r.name} (you)` : r.name}</Text>
@@ -247,7 +247,7 @@ export default function GroupScreen() {
       ) : null}
       {!detail.challenges.length && !picking ? (
         <Text style={s.muted}>
-          Pick a stretch and a day: everyone in the group who skis it that day is timed automatically, and the ranking shows up here.
+          Set a challenge: everyone who skis it that day is timed.
         </Text>
       ) : null}
       {dayChallenges.map((c) => (
@@ -273,19 +273,19 @@ function ChallengeCard({ c, rows, groupId, ownerId, today, onRemoved, compact, o
   const canRemove = c.createdBy === playerId || ownerId === playerId;
 
   const remove = () =>
-    Alert.alert(`Remove “${c.segment.name}”?`, 'It stops being a group challenge. Times already set stay on everyone’s phone.', [
+    dialog(`Remove “${c.segment.name}”?`, 'It stops being a group challenge. Times already set stay on everyone’s phone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => api.removeChallenge(groupId, c.id).then(onRemoved).catch((e) => Alert.alert('Couldn’t remove', String(e?.message ?? e))),
+        onPress: () => api.removeChallenge(groupId, c.id).then(onRemoved).catch((e) => dialog('Couldn’t remove', String(e?.message ?? e))),
       },
     ]);
 
   return (
     <Pressable onPress={compact ? onOpen : () => router.push(`/segment/${c.segmentId}`)} onLongPress={canRemove ? remove : undefined} style={[s.card, { gap: 8 }]}>
       <View style={styles.sectionHead}>
-        <Text style={{ fontSize: 20 }}>🏁</Text>
+        <Ionicons name="flag-outline" size={20} color={colors.accent} />
         <View style={{ flex: 1 }}>
           <Text style={s.h2} numberOfLines={1}>{c.segment.name}</Text>
           <Text style={s.muted}>{dayLabel(c.date, today)} · set by {c.createdBy === playerId ? 'you' : c.createdByName}</Text>
@@ -301,7 +301,7 @@ function ChallengeCard({ c, rows, groupId, ownerId, today, onRemoved, compact, o
       ) : (
         ranked.map((r) => (
           <View key={r.playerId} style={[styles.rankRow, r.playerId === playerId && styles.meRow]}>
-            <Text style={styles.rank}>{MEDALS[r.rank - 1] ?? `${r.rank}`}</Text>
+            <Text style={styles.rank}>{r.rank}</Text>
             <Text style={[s.body, { flex: 1, fontWeight: '600' }]} numberOfLines={1}>{r.playerId === playerId ? 'You' : r.playerName}</Text>
             {r.rank > 1 ? <Text style={[s.muted, { color: colors.danger }]}>{fmtDelta(r.time - ranked[0].time)}</Text> : null}
             <Text style={styles.value}>{fmtRaceTime(r.time)}</Text>
@@ -333,7 +333,7 @@ function NewChallenge({ groupId, today, onDone }: { groupId: string; today: stri
     try {
       onDone(await api.addChallenge(groupId, day, seg));
     } catch (e) {
-      Alert.alert('Couldn’t set the challenge', e instanceof Error ? e.message : String(e));
+      dialog('Couldn’t set the challenge', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }
@@ -354,7 +354,7 @@ function NewChallenge({ groupId, today, onDone }: { groupId: string; today: stri
         <ActivityIndicator color={colors.accent} />
       ) : !segments.length ? (
         <Text style={s.muted}>
-          You don’t have any challenges yet. Open a ski day, tap the flag on a run to make one, then come back here.
+          No challenges yet. Tap the flag on a run in Days to make one.
         </Text>
       ) : (
         segments.map((seg) => (

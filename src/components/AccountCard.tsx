@@ -2,7 +2,8 @@ import { Tap } from './Tap';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { dialog } from '../dialog';
 import {
   backupDays, backupStatus, changePassword, logOut, missingBackups, pickAvatar, removeAvatar, restoreDays,
 } from '../friends/account';
@@ -39,7 +40,7 @@ export function AccountCard() {
     try {
       await fn();
     } catch (e) {
-      Alert.alert('Something went wrong', e instanceof Error ? e.message : String(e));
+      dialog('Something went wrong', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
       refresh();
@@ -47,19 +48,19 @@ export function AccountCard() {
   };
 
   const picture = () =>
-    Alert.alert('Profile picture', undefined, [
+    dialog('Profile picture', undefined, [
       { text: 'Choose a picture', onPress: () => run('pic', pickAvatar) },
       ...(myPic ? [{ text: 'Remove picture', style: 'destructive' as const, onPress: () => run('pic', removeAvatar) }] : []),
       { text: 'Cancel', style: 'cancel' },
     ]);
 
   const out = () =>
-    Alert.alert('Log out?', 'Your days are saved to your account, then removed from this phone. Log in again to get them back.', [
+    dialog('Log out?', 'Your days are saved to your account and removed from this phone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log out', style: 'destructive', onPress: () => run('out', async () => {
         const { unsaved } = await logOut();
         if (!unsaved) return;
-        Alert.alert(
+        dialog(
           `${unsaved} ${unsaved === 1 ? 'day' : 'days'} can’t be saved`,
           `${unsaved === 1 ? 'This day is' : 'These days are'} too big to back up to your account. Logging out removes ${unsaved === 1 ? 'it' : 'them'} from this phone for good.`,
           [
@@ -85,7 +86,7 @@ export function AccountCard() {
           <Text style={s.h2}>{settings.name || account.username}</Text>
           <Text style={s.muted}>@{account.username}{account.isAdmin ? ' · admin' : ''}</Text>
           <Pressable onPress={() => router.push(`/player/${settings.playerId}`)} hitSlop={6}>
-            <Text style={styles.link}>See my profile as friends do ›</Text>
+            <Text style={styles.link}>View my profile</Text>
           </Pressable>
         </View>
       </View>
@@ -94,7 +95,7 @@ export function AccountCard() {
         <View style={{ flex: 1 }}>
           <Text style={s.body}>Back up my days online</Text>
           <Text style={s.muted}>
-            Your days, GPS tracks included, are kept in your account on the friends server, so a new phone gets them back.
+            Keeps your days and tracks in your account.
             {status && settings.backupDays ? ` ${status.backedUp} of ${status.total} backed up.` : ''}
           </Text>
         </View>
@@ -110,7 +111,7 @@ export function AccountCard() {
         <Row label="Back up now" busy={busy === 'backup'} onPress={() => run('backup', async () => {
           const { uploaded: n, failed, tooBig } = await backupDays();
           const bad = failed + tooBig;
-          Alert.alert('Backup', [
+          dialog('Backup', [
             n ? `${n} ${n === 1 ? 'day' : 'days'} backed up.` : bad ? '' : 'Everything was already backed up.',
             bad ? `${bad} ${bad === 1 ? 'day' : 'days'} couldn’t be backed up${tooBig ? ' (too big)' : ''}.` : '',
           ].filter(Boolean).join(' '));
@@ -122,7 +123,7 @@ export function AccountCard() {
           busy={busy === 'restore'}
           onPress={() => run('restore', async () => {
             const n = await restoreDays();
-            Alert.alert('Days restored', `${n} ${n === 1 ? 'day' : 'days'} added. You’ll find them under Days.`);
+            dialog('Days restored', `${n} ${n === 1 ? 'day' : 'days'} added.`);
           })}
         />
       ) : null}
@@ -139,7 +140,7 @@ export function AccountCard() {
               setPwOpen(false);
               setOldPw('');
               setNewPw('');
-              Alert.alert('Password changed');
+              dialog('Password changed');
             })}
           />
         </View>
@@ -157,7 +158,7 @@ function Row({ label, onPress, danger, busy }: { label: string; onPress: () => v
   const styles = useStyles(makeStyles);
   return (
     <Tap onPress={onPress} disabled={busy} style={styles.row}>
-      <Text style={[s.body, { color: danger ? colors.danger : colors.accent, fontWeight: '600' }]}>{label}</Text>
+      <Text style={[s.control, { color: danger ? colors.danger : colors.accent }]}>{label}</Text>
       {busy ? <ActivityIndicator color={colors.accent} /> : null}
     </Tap>
   );

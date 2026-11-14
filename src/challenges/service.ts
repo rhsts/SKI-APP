@@ -103,9 +103,9 @@ export async function shareChallenge(segmentId: string, opts: { group?: boolean 
 
   let line: string;
   if (opts.group) {
-    const top = board.slice(0, 5).map((e, i) => `${['🥇', '🥈', '🥉'][i] ?? `${i + 1}.`} ${e.playerName} ${fmtRaceTime(e.time)}`).join('\n');
+    const top = board.slice(0, 5).map((e, i) => `${i + 1}. ${e.playerName} ${fmtRaceTime(e.time)}`).join('\n');
     const message =
-      `⛷️ Group challenge: “${segment.name}”! Ski it and get on the leaderboard.` +
+      `Group challenge: “${segment.name}”! Ski it and get on the leaderboard.` +
       (top ? `\n\n${top}` : '') +
       `\n\nOpen the challenge:\n${link}`;
     await Share.share({ message, title: `Group ski challenge: ${segment.name}` });
@@ -117,6 +117,6 @@ export async function shareChallenge(segmentId: string, opts: { group?: boolean 
   else line = `Race me on “${segment.name}”!`;
 
   const message =
-    `⛷️ ${line}\n\nSee the route and the time to beat:\n${link}`;
+    `${line}\n\nSee the route and the time to beat:\n${link}`;
   await Share.share({ message, title: `Ski challenge: ${segment.name}` });
 }

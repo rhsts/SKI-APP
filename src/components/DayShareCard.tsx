@@ -65,7 +65,7 @@ export function DayShareCard({ points, speeds, stats, place, startedAt, units, r
         </G>
       </Svg>
 
-      <Text allowFontScaling={false} style={styles.brand}>⛷️  SKI TRACKER</Text>
+      <Text allowFontScaling={false} style={styles.brand}>SKI TRACKER</Text>
       <Text allowFontScaling={false} style={styles.title} numberOfLines={1}>{place ?? 'Ski day'}</Text>
       <Text allowFontScaling={false} style={styles.date}>{fmtDate(startedAt)}</Text>
 

@@ -76,7 +76,7 @@ export default function CompareScreen() {
             return (
               <Pressable key={c.segmentId} onPress={() => router.push(`/segment/${c.segmentId}`)} style={styles.row}>
                 <Text style={[styles.val, d > 0 && styles.win]}>{fmtRaceTime(c.a)}</Text>
-                <Text style={styles.rowLabel} numberOfLines={1}>🏁 {c.name}</Text>
+                <Text style={styles.rowLabel} numberOfLines={1}>{c.name}</Text>
                 <Text style={[styles.val, { textAlign: 'right' }, d < 0 && styles.win]}>
                   {fmtRaceTime(c.b)}{'\n'}
                   <Text style={[s.muted, { color: d < 0 ? colors.good : colors.danger }]}>{fmtDelta(d)}</Text>

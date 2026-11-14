@@ -34,7 +34,7 @@ export function Setup() {
         <View style={styles.head}>
           <Text style={s.label}>Welcome</Text>
           <Text style={s.h1} accessibilityRole="header">Set up Ski Tracker</Text>
-          <Text style={s.body}>A few choices before your first day. You can change them later under You.</Text>
+          <Text style={s.body}>You can change these later under You.</Text>
         </View>
 
         <View style={styles.group}>
@@ -59,13 +59,13 @@ export function Setup() {
           />
           <Toggle
             label="Jumps and falls"
-            hint="Uses the motion sensor while the app is open on screen."
+            hint="Counted while the app is on screen."
             value={st.motion}
             onChange={(motion) => updateSettings({ motion })}
           />
           <Toggle
             label="Fall check"
-            hint="After a hard fall, asks if you’re OK. No answer opens the SOS screen."
+            hint="No answer after a hard fall opens SOS."
             value={st.fallCheck && st.motion}
             disabled={!st.motion}
             onChange={(fallCheck) => updateSettings({ fallCheck })}

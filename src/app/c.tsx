@@ -71,13 +71,13 @@ export default function InviteScreen() {
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
       <View style={[s.card, styles.hero]}>
-        <Text style={{ fontSize: 40 }}>⛷️</Text>
+        <Ionicons name="flag-outline" size={40} color={colors.accent} />
         <Text style={[s.h1, { textAlign: 'center' }]}>
           {have ? `New times on “${segment.name}”` : `${fromName ?? 'A friend'} challenges you!`}
         </Text>
         <Text style={[s.muted, { textAlign: 'center' }]}>
           {have
-            ? `${fromName ?? 'Your friend'} sent their latest times. Add them to your leaderboard.`
+            ? `Latest times from ${fromName ?? 'your friend'}.`
             : `Ski “${segment.name}” faster than ${leader ? fmtRaceTime(leader.time) : 'them'}.`}
         </Text>
       </View>
@@ -99,13 +99,13 @@ export default function InviteScreen() {
         </View>
       ) : null}
 
-      {fromMe ? <Text style={[s.muted, { textAlign: 'center' }]}>This is your own invite: it only has your times.</Text> : null}
+      {fromMe ? <Text style={[s.muted, { textAlign: 'center' }]}>Your own invite.</Text> : null}
 
       <Tap onPress={accept} disabled={saving || have === null} style={styles.accept}>
         {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.acceptText}>{have ? 'Update leaderboard' : 'Accept challenge'}</Text>}
       </Tap>
       <Text style={[s.muted, { textAlign: 'center' }]}>
-        After you accept, just record your ski day. When you ski through the start and finish, you’re timed automatically.
+        Record a day and ski it: timing is automatic.
       </Text>
     </ScrollView>
   );

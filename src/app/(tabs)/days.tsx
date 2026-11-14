@@ -7,7 +7,7 @@ import { listSessions, type SessionRow } from '../../db';
 import { fmtAlt, fmtDate, fmtDuration, fmtSpeed } from '../../lib/format';
 import { sportInfo } from '../../lib/sport';
 import { useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, size, useTheme, useStyles, type Palette } from '../../theme';
 import { useTabBarSpace } from '../../components/TabBar';
 import { addDemoDay } from '../../tracking/demo';
 
@@ -63,7 +63,7 @@ export default function DaysScreen() {
           <Ionicons name="snow-outline" size={40} color={colors.accent} />
           <Text style={s.h2}>No ski days yet</Text>
           <Text style={[s.muted, { textAlign: 'center' }]}>
-            Record a day from the Record tab, or add a demo day to see what it looks like.
+            Record one, or add a demo day.
           </Text>
           <Pressable
             style={styles.demo}
@@ -95,7 +95,7 @@ export default function DaysScreen() {
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={s.h2} numberOfLines={1}>{item.place ?? 'Ski day'}</Text>
               <Text style={s.muted}>
-                {fmtDate(item.startedAt)}{item.sport !== 'ski' ? ` · ${sportInfo(item.sport).label}` : ''}{item.isDemo ? ' · demo' : ''}
+                {fmtDate(item.startedAt)}{item.sport !== 'ski' ? ` · ${sportInfo(item.sport).label}` : ''}{item.isDemo ? ' · Demo' : ''}
               </Text>
               {st ? (
                 <View style={styles.metrics}>
@@ -134,11 +134,11 @@ const makeStyles = (colors: Palette) =>
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
       borderRadius: 12, borderWidth: 1, borderColor: colors.accent, marginBottom: 2,
     },
-    compareText: { color: colors.accent, fontWeight: '600', fontSize: 15 },
+    compareText: { fontFamily: font.medium, fontSize: size.body, color: colors.accent },
     metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 },
     metric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    metricText: { fontSize: 13, fontWeight: '600', color: colors.text },
+    metricText: { fontFamily: font.medium, fontSize: size.caption, color: colors.text, fontVariant: ['tabular-nums'] },
     empty: { alignItems: 'center', gap: 12, paddingVertical: 32 },
     demo: { backgroundColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8, minWidth: 160, alignItems: 'center' },
-    demoText: { color: colors.onAccent, fontWeight: '700', fontSize: 15 },
+    demoText: { fontFamily: font.medium, fontSize: size.body, color: colors.onAccent },
   });

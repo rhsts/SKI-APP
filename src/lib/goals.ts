@@ -1,5 +1,6 @@
 import { seasonOf, type DaySummary } from './season';
 import type { MotionSummary } from './motion';
+import type { IconName } from './types';
 import { leaderboard, type Attempt } from './segments';
 import { computeStreaks, heroWeeks } from './streaks';
 
@@ -48,7 +49,7 @@ export function goalProgress(days: DaySummary[], goals: Goals, now = Date.now())
 
 export interface Badge {
   id: string;
-  emoji: string;
+  icon: IconName;
   title: string;
   description: string;
   /** The day that earned it (null if not earned yet). */
@@ -58,7 +59,7 @@ export interface Badge {
 
 interface BadgeDef {
   id: string;
-  emoji: string;
+  icon: IconName;
   title: string;
   description: string;
   /** Does this single day earn it? */
@@ -74,39 +75,39 @@ const hourOf = (ms: number) => new Date(ms).getHours() + new Date(ms).getMinutes
 const runs = (d: DaySummary) => d.stats.activities.filter((a) => a.kind === 'run');
 
 const DEFS: BadgeDef[] = [
-  { id: 'first-tracks', emoji: '🎿', title: 'First tracks', description: 'Record your first ski day.', day: () => true },
-  { id: 'speed-60', emoji: '💨', title: 'Fast lane', description: 'Hit 60 km/h.', day: (d) => d.stats.topSpeed >= 60 * KMH },
-  { id: 'speed-80', emoji: '🚀', title: 'Speed demon', description: 'Hit 80 km/h.', day: (d) => d.stats.topSpeed >= 80 * KMH },
-  { id: 'speed-100', emoji: '⚡', title: 'Ton up', description: 'Hit 100 km/h.', day: (d) => d.stats.topSpeed >= 100 * KMH },
-  { id: 'vert-5k', emoji: '⛰️', title: 'Big day', description: 'Ski 5,000 m of vertical in one day.', day: (d) => d.stats.verticalDown >= 5000 },
-  { id: 'vert-10k', emoji: '🏔️', title: 'Leg burner', description: 'Ski 10,000 m of vertical in one day.', day: (d) => d.stats.verticalDown >= 10000 },
-  { id: 'runs-20', emoji: '🔁', title: 'Lap machine', description: 'Ski 20 runs in one day.', day: (d) => d.stats.runCount >= 20 },
-  { id: 'early-bird', emoji: '🌅', title: 'Early bird', description: 'Start a run before 9:00.', day: (d) => runs(d).some((r) => hourOf(r.startTime) < 9) },
-  { id: 'last-chair', emoji: '🌇', title: 'Last chair', description: 'Finish a run after 16:00.', day: (d) => runs(d).some((r) => hourOf(r.endTime) >= 16) },
-  { id: 'days-10', emoji: '📅', title: 'Ten days', description: 'Ski 10 days in one season.',
+  { id: 'first-tracks', icon: 'snow-outline', title: 'First tracks', description: 'Record your first ski day.', day: () => true },
+  { id: 'speed-60', icon: 'speedometer-outline', title: 'Fast lane', description: 'Hit 60 km/h.', day: (d) => d.stats.topSpeed >= 60 * KMH },
+  { id: 'speed-80', icon: 'rocket-outline', title: 'Speed demon', description: 'Hit 80 km/h.', day: (d) => d.stats.topSpeed >= 80 * KMH },
+  { id: 'speed-100', icon: 'flash-outline', title: 'Ton up', description: 'Hit 100 km/h.', day: (d) => d.stats.topSpeed >= 100 * KMH },
+  { id: 'vert-5k', icon: 'trending-down-outline', title: 'Big day', description: 'Ski 5,000 m of vertical in one day.', day: (d) => d.stats.verticalDown >= 5000 },
+  { id: 'vert-10k', icon: 'triangle-outline', title: 'Leg burner', description: 'Ski 10,000 m of vertical in one day.', day: (d) => d.stats.verticalDown >= 10000 },
+  { id: 'runs-20', icon: 'repeat-outline', title: 'Lap machine', description: 'Ski 20 runs in one day.', day: (d) => d.stats.runCount >= 20 },
+  { id: 'early-bird', icon: 'sunny-outline', title: 'Early bird', description: 'Start a run before 9:00.', day: (d) => runs(d).some((r) => hourOf(r.startTime) < 9) },
+  { id: 'last-chair', icon: 'moon-outline', title: 'Last chair', description: 'Finish a run after 16:00.', day: (d) => runs(d).some((r) => hourOf(r.endTime) >= 16) },
+  { id: 'days-10', icon: 'calendar-outline', title: 'Ten days', description: 'Ski 10 days in one season.',
     cumulative: (sofar) => {
       const key = seasonOf(sofar[sofar.length - 1].startedAt).key;
       return new Set(sofar.filter((d) => seasonOf(d.startedAt).key === key).map((d) => new Date(d.startedAt).toDateString())).size >= 10;
     } },
-  { id: 'season-50k', emoji: '🗻', title: 'Everest ×5', description: 'Ski 50,000 m of vertical in one season.',
+  { id: 'season-50k', icon: 'earth-outline', title: 'Everest ×5', description: 'Ski 50,000 m of vertical in one season.',
     cumulative: (sofar) => {
       const key = seasonOf(sofar[sofar.length - 1].startedAt).key;
       return sofar.filter((d) => seasonOf(d.startedAt).key === key).reduce((s, d) => s + d.stats.verticalDown, 0) >= 50000;
     } },
-  { id: 'turns-300', emoji: '🌀', title: 'Turn machine', description: 'Make 300 turns in one day.', day: (d) => (d.stats.turns ?? 0) >= 300 },
-  { id: 'carver', emoji: '🔪', title: 'Carver', description: 'Pull 1 g in a turn.', day: (d) => (d.stats.maxG ?? 0) >= 1 },
-  { id: 'air-half', emoji: '🦘', title: 'Airborne', description: 'Half a second of airtime on a jump.', motion: (m) => m.bestAir >= 0.5 },
-  { id: 'air-1', emoji: '🛫', title: 'Big air', description: 'A full second of airtime on a jump.', motion: (m) => m.bestAir >= 1 },
-  { id: 'streak-3', emoji: '🔥', title: 'On fire', description: 'Ski 3 days in a row.', cumulative: (sofar) => computeStreaks(sofar).bestDays >= 3 },
-  { id: 'streak-5', emoji: '☄️', title: 'Unstoppable', description: 'Ski 5 days in a row.', cumulative: (sofar) => computeStreaks(sofar).bestDays >= 5 },
-  { id: 'explorer', emoji: '🧭', title: 'Explorer', description: 'Ski at 3 different places.',
+  { id: 'turns-300', icon: 'sync-outline', title: 'Turn machine', description: 'Make 300 turns in one day.', day: (d) => (d.stats.turns ?? 0) >= 300 },
+  { id: 'carver', icon: 'cut-outline', title: 'Carver', description: 'Pull 1 g in a turn.', day: (d) => (d.stats.maxG ?? 0) >= 1 },
+  { id: 'air-half', icon: 'arrow-up-outline', title: 'Airborne', description: 'Half a second of airtime on a jump.', motion: (m) => m.bestAir >= 0.5 },
+  { id: 'air-1', icon: 'airplane-outline', title: 'Big air', description: 'A full second of airtime on a jump.', motion: (m) => m.bestAir >= 1 },
+  { id: 'streak-3', icon: 'flame-outline', title: 'On fire', description: 'Ski 3 days in a row.', cumulative: (sofar) => computeStreaks(sofar).bestDays >= 3 },
+  { id: 'streak-5', icon: 'infinite-outline', title: 'Unstoppable', description: 'Ski 5 days in a row.', cumulative: (sofar) => computeStreaks(sofar).bestDays >= 5 },
+  { id: 'explorer', icon: 'compass-outline', title: 'Explorer', description: 'Ski at 3 different places.',
     cumulative: (sofar) => new Set(sofar.map((d) => d.place).filter(Boolean)).size >= 3 },
 ];
 
-const CHALLENGE_BADGES = [
-  { id: 'weekly-hero', emoji: '🗓️', title: 'Weekly hero', description: 'Finish all 3 weekly challenges in one week.' },
-  { id: 'challenger', emoji: '🏁', title: 'Challenger', description: 'Set a time on a challenge.' },
-  { id: 'champion', emoji: '🏆', title: 'Champion', description: 'Lead a challenge with at least 2 skiers.' },
+const CHALLENGE_BADGES: BadgeDef[] = [
+  { id: 'weekly-hero', icon: 'ribbon-outline', title: 'Weekly hero', description: 'Finish all 3 weekly challenges in one week.' },
+  { id: 'challenger', icon: 'flag-outline', title: 'Challenger', description: 'Set a time on a challenge.' },
+  { id: 'champion', icon: 'trophy-outline', title: 'Champion', description: 'Lead a challenge with at least 2 skiers.' },
 ];
 
 /** A little extra on how a badge is earned, shown when you tap it. */
@@ -135,9 +136,9 @@ const TIPS: Record<string, string> = {
 };
 
 /** Title, description and tip of a badge by id (for badges shown on a friend's profile). */
-export function badgeInfo(id: string): { emoji: string; title: string; description: string; tip: string | null } | null {
+export function badgeInfo(id: string): { icon: IconName; title: string; description: string; tip: string | null } | null {
   const def = [...DEFS, ...CHALLENGE_BADGES].find((d) => d.id === id);
-  return def ? { emoji: def.emoji, title: def.title, description: def.description, tip: TIPS[id] ?? null } : null;
+  return def ? { icon: def.icon, title: def.title, description: def.description, tip: TIPS[id] ?? null } : null;
 }
 
 /**
@@ -181,6 +182,6 @@ export function computeBadges(
 
   return [...DEFS, ...CHALLENGE_BADGES].map((def) => {
     const e = earned.get(def.id);
-    return { id: def.id, emoji: def.emoji, title: def.title, description: def.description, dayId: e?.dayId ?? null, earnedAt: e?.at ?? null };
+    return { id: def.id, icon: def.icon, title: def.title, description: def.description, dayId: e?.dayId ?? null, earnedAt: e?.at ?? null };
   });
 }

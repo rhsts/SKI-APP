@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../dialog';
 import { listTrailMaps, sessionStarts } from '../db';
 import { areaAt, skiAreas, type SkiArea } from '../lib/areas';
 import type { Place } from '../lib/geocode';
@@ -101,9 +102,9 @@ export function useMountain(points: TrackPoint[], place: Place | null = null): M
       const map = await downloadTrailMap(pos.lat, pos.lon);
       if (map) {
         setTrail({ at: here, data: map });
-        Alert.alert('Trail map saved', `${map.pistes.length} pistes and ${map.lifts.length} lifts here are now on your phone, also without signal.`);
+        dialog('Trail map saved', `${map.pistes.length} pistes and ${map.lifts.length} lifts, available without signal.`);
       } else {
-        Alert.alert('Couldn’t download', 'No connection to the map server. Try again with signal or Wi-Fi.');
+        dialog('Couldn’t download', 'No connection. Try again with signal.');
       }
     } finally {
       setDownloading(false);
@@ -155,7 +156,7 @@ export function MountainIntro({ m, units }: { m: Mountain; units: Units }) {
     return (
       <Pressable style={styles.intro} onPress={() => m.locate().catch(() => undefined)} accessibilityRole="button">
         <Text style={s.h1}>Ready</Text>
-        <Text style={s.body}>Allow location, or search a place, to see the snow and the trail map.</Text>
+        <Text style={s.body}>Allow location or find a place to see the snow.</Text>
       </Pressable>
     );
   }
@@ -165,7 +166,7 @@ export function MountainIntro({ m, units }: { m: Mountain; units: Units }) {
       <Text style={s.h1} numberOfLines={1}>{m.name ?? 'Ready'}</Text>
       {w
         ? <Text style={[s.body, styles.figures]} numberOfLines={2}>{conditions(w, units)}</Text>
-        : m.pos ? <Text style={s.muted}>Snow and weather load when you have signal.</Text> : null}
+        : m.pos ? <Text style={s.muted}>Snow and weather need signal.</Text> : null}
       {w ? <Text style={[s.muted, styles.figures]} numberOfLines={2}>{detail(w, units)}</Text> : null}
     </View>
   );
@@ -176,7 +177,7 @@ export function MountainDetails({ m, points, units }: { m: Mountain; points: Tra
   const { colors, s } = useTheme();
   const themed = useStyles(makeStyles);
   const { pos, weather: w, trail } = m;
-  if (!pos) return <Text style={s.body}>Search a resort or place, or allow location, to see the snow and the trail map here.</Text>;
+  if (!pos) return <Text style={s.body}>Allow location or find a place to see the snow.</Text>;
 
   return (
     <>
@@ -204,7 +205,7 @@ export function MountainDetails({ m, points, units }: { m: Mountain; points: Tra
           </View>
         </>
       ) : (
-        <Text style={s.muted}>Snow and weather load when you have signal.</Text>
+        <Text style={s.muted}>Snow and weather need signal.</Text>
       )}
 
       {/* A searched place can be far away: the map stays on it instead of following the phone. */}
@@ -213,7 +214,7 @@ export function MountainDetails({ m, points, units }: { m: Mountain; points: Tra
         <Text style={[s.muted, styles.grow]}>
           {trail
             ? `${trail.pistes.length} pistes, ${trail.lifts.length} lifts · saved ${new Date(trail.fetchedAt).toLocaleDateString()}`
-            : 'Save the pistes and lifts here to use the map without signal.'}
+            : 'Download to use the map without signal.'}
         </Text>
         <Pressable
           onPress={m.download}

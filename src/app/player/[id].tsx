@@ -2,12 +2,14 @@ import { Tap } from '../../components/Tap';
 import { useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useEffect, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { BadgeSheet, type BadgeView } from '../../components/BadgeSheet';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { api, type PlayerProfile } from '../../friends/api';
 import { fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed } from '../../lib/format';
+import { badgeInfo } from '../../lib/goals';
 import { dateToMs } from '../../lib/groups';
 import { useSettings } from '../../settings';
 import { useStyles, useTheme, type Palette } from '../../theme';
@@ -81,12 +83,12 @@ export default function PlayerScreen() {
           {p.badges.map((b) => (
             <Tap
               key={b.id}
-              onPress={() => setOpenBadge({ id: b.id, emoji: b.emoji, title: b.title, earnedAt: b.at })}
+              onPress={() => setOpenBadge({ id: b.id, title: b.title, earnedAt: b.at })}
               style={[s.card, styles.badge]}
               accessibilityRole="button"
               accessibilityLabel={`${b.title}. Tap for details.`}
             >
-              <Text style={{ fontSize: 28 }}>{b.emoji}</Text>
+              <Ionicons name={badgeInfo(b.id)?.icon ?? 'ribbon-outline'} size={28} color={colors.accent} />
               <Text style={styles.badgeTitle} numberOfLines={1}>{b.title}</Text>
             </Tap>
           ))}

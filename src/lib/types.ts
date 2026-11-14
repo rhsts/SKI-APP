@@ -1,3 +1,9 @@
+import type { Ionicons } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
+
+/** The name of an icon in the one icon set the app draws with. */
+export type IconName = ComponentProps<typeof Ionicons>['name'];
+
 /** One GPS fix. `t` is epoch milliseconds, `alt` metres, `acc` horizontal accuracy (m), `spd` m/s. */
 export interface TrackPoint {
   t: number;

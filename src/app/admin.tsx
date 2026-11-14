@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../dialog';
 import { Avatar } from '../components/Avatar';
 import { api, type AdminPlayer } from '../friends/api';
 import { fmtDate } from '../lib/format';
@@ -45,7 +46,7 @@ export default function AdminScreen() {
   if (!people) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
 
   const remove = (p: AdminPlayer) =>
-    Alert.alert(
+    dialog(
       `Remove ${p.name}${p.username ? ` (@${p.username})` : ''}?`,
       'Their account, groups memberships, shared days, challenge times and online backup are deleted, and their phone can’t get back in. This can’t be undone.',
       [
@@ -53,15 +54,15 @@ export default function AdminScreen() {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => api.adminRemove(p.id).then(load).catch((e) => Alert.alert('Couldn’t remove', String(e?.message ?? e))),
+          onPress: () => api.adminRemove(p.id).then(load).catch((e) => dialog('Couldn’t remove', String(e?.message ?? e))),
         },
       ],
     );
 
   const toggleAdmin = (p: AdminPlayer) =>
-    Alert.alert(p.isAdmin ? `Take admin away from ${p.name}?` : `Make ${p.name} an admin?`, 'Admins can see and remove everyone.', [
+    dialog(p.isAdmin ? `Take admin away from ${p.name}?` : `Make ${p.name} an admin?`, 'Admins can see and remove everyone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'OK', onPress: () => api.adminSetAdmin(p.id, !p.isAdmin).then(load).catch((e) => Alert.alert('Couldn’t change', String(e?.message ?? e))) },
+      { text: 'OK', onPress: () => api.adminSetAdmin(p.id, !p.isAdmin).then(load).catch((e) => dialog('Couldn’t change', String(e?.message ?? e))) },
     ]);
 
   const accounts = people.filter((p) => p.username).length;
@@ -85,7 +86,7 @@ export default function AdminScreen() {
           </Pressable>
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={s.h2} numberOfLines={1}>
-              {p.name}{p.id === playerId ? ' (you)' : ''}{p.isAdmin ? ' 👑' : ''}
+              {p.name}{p.id === playerId ? ' (you)' : ''}{p.isAdmin ? ' · admin' : ''}
             </Text>
             <Text style={s.muted} numberOfLines={1}>{p.username ? `@${p.username}` : 'No account'} · seen {ago(p.lastSeen, now)}</Text>
             <Text style={s.muted} numberOfLines={1}>

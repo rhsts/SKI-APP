@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../dialog';
 import { listTrailMaps } from '../db';
 import { emergencyNumbers, formatCoords } from '../lib/emergency';
 import { mapFor, nearestFeature } from '../lib/trailmap';
@@ -56,7 +57,7 @@ export default function SosScreen() {
   }, [fix]);
 
   const c = fix ? formatCoords(fix.lat, fix.lon) : null;
-  const call = (n: string) => Linking.openURL(`tel:${n}`).catch(() => Alert.alert('Can’t start a call', `Dial ${n} yourself.`));
+  const call = (n: string) => Linking.openURL(`tel:${n}`).catch(() => dialog('Can’t start a call', `Dial ${n} yourself.`));
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
@@ -82,7 +83,7 @@ export default function SosScreen() {
             <Text selectable style={[s.body, { fontVariant: ['tabular-nums'] }]}>{c.dms}</Text>
             {near ? (
               <Text style={[s.body, { fontWeight: '600' }]}>
-                {near.kind === 'lift' ? '🚡' : '⛷️'} {near.meters < 30 ? 'On' : `${near.meters} m from`} {near.kind === 'lift' ? 'lift' : 'piste'} “{near.name}”
+                {near.meters < 30 ? 'On' : `${near.meters} m from`} {near.kind === 'lift' ? 'lift' : 'piste'} “{near.name}”
               </Text>
             ) : null}
             <Text style={s.muted}>
@@ -95,7 +96,7 @@ export default function SosScreen() {
                 style={styles.btn}
                 onPress={async () => {
                   await Clipboard.setStringAsync(`${c.decimal} (${c.dms})`);
-                  Alert.alert('Copied', 'Coordinates copied. Paste them into a message.');
+                  dialog('Copied', 'Coordinates copied. Paste them into a message.');
                 }}
               >
                 <Ionicons name="copy-outline" size={18} color={colors.accent} />

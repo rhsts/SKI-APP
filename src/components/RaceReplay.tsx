@@ -151,7 +151,7 @@ export function RaceReplay({ segment, attempts, playerId }: Props) {
               {splits.worst != null ? (
                 <Text style={s.muted}>You lose the most time in the {SECTION_NAMES[splits.worst]} section.</Text>
               ) : (
-                <Text style={s.muted}>You’re faster in every section. 💪</Text>
+                <Text style={s.muted}>You’re faster in every section.</Text>
               )}
             </View>
           ) : null}

@@ -15,6 +15,7 @@ import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { getDb, listSessions } from '../db';
 import { lookupStalePistes } from '../mountain/pistes';
 import { getSettings, initSettings, useSettings } from '../settings';
+import { DialogHost } from '../components/DialogHost';
 import { LockScreen } from '../components/LockScreen';
 import { Setup } from '../components/Setup';
 import { checkServer } from '../friends/api';
@@ -99,6 +100,7 @@ export default function RootLayout() {
           <ActivityIndicator color={colors.accent} />
         </View>
       ) : null}
+      <DialogHost />
     </>
   );
 }

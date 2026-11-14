@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Appear } from './Appear';
 import { badgeInfo } from '../lib/goals';
@@ -6,7 +7,6 @@ import { useStyles, useTheme, type Palette } from '../theme';
 
 export interface BadgeView {
   id: string;
-  emoji: string;
   title: string;
   /** When it was earned (epoch ms), or null if not yet. */
   earnedAt: number | null;
@@ -35,8 +35,7 @@ export function BadgeSheet({ badge, onClose, onOpenDay, whose = 'you' }: {
           <Appear>
           <Pressable style={[styles.sheet, { backgroundColor: colors.card }]} onPress={() => undefined}>
             <View style={[styles.medal, { backgroundColor: got ? colors.warnSoft : colors.faint }]}>
-              <Text style={[styles.emoji, !got && { opacity: 0.4 }]}>{badge.emoji}</Text>
-              {!got ? <Text style={styles.lock}>🔒</Text> : null}
+              <Ionicons name={got ? info?.icon ?? 'ribbon-outline' : 'lock-closed-outline'} size={44} color={got ? colors.warn : colors.muted} />
             </View>
             <Text style={[s.h1, { textAlign: 'center' }]}>{badge.title}</Text>
             <Text style={[s.body, { textAlign: 'center', fontWeight: '600' }]}>
@@ -47,7 +46,7 @@ export function BadgeSheet({ badge, onClose, onOpenDay, whose = 'you' }: {
               <Text style={[s.body, { textAlign: 'center' }]}>
                 {got
                   ? `${whose === 'you' ? 'You' : whose} earned it on ${fmtDate(badge.earnedAt!)}.`
-                  : whose === 'you' ? 'Not earned yet. Go get it!' : `${whose} hasn’t earned it yet.`}
+                  : whose === 'you' ? 'Not earned yet.' : `${whose} hasn’t earned it yet.`}
               </Text>
             </View>
             {got && onOpenDay ? (
@@ -71,8 +70,6 @@ const makeStyles = (_: Palette) =>
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 },
     sheet: { borderRadius: 16, padding: 24, gap: 12, alignItems: 'stretch' },
     medal: { alignSelf: 'center', width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
-    emoji: { fontSize: 52 },
-    lock: { position: 'absolute', right: 2, bottom: 2, fontSize: 20 },
     status: { borderRadius: 12, padding: 12 },
     btn: { borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
     btnText: { fontWeight: '700', fontSize: 15 },

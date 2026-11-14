@@ -1,4 +1,5 @@
 import type { PlayerTotals } from '../friends/api';
+import type { IconName } from './types';
 
 /** One friend with the totals the friends server shares (season or all time). */
 export interface FriendTotals {
@@ -12,7 +13,7 @@ export type StatKind = 'alt' | 'speed' | 'dist' | 'count' | 'hours' | 'everest';
 
 export interface Category {
   id: string;
-  emoji: string;
+  icon: IconName;
   title: string;
   blurb: string;
   kind: StatKind;
@@ -23,14 +24,14 @@ export interface Category {
 export const EVEREST_M = 8849;
 
 export const CATEGORIES: Category[] = [
-  { id: 'vertical', emoji: '🏔️', title: 'Vert Monster', blurb: 'Most vertical skied', kind: 'alt', value: (t) => t.vertical },
-  { id: 'everest', emoji: '🗻', title: 'Everest Collector', blurb: 'Everests skied down', kind: 'everest', value: (t) => t.vertical / EVEREST_M },
-  { id: 'speed', emoji: '⚡', title: 'Speed Demon', blurb: 'Fastest top speed', kind: 'speed', value: (t) => t.topSpeed },
-  { id: 'days', emoji: '🐀', title: 'Mountain Rat', blurb: 'Most days on the hill', kind: 'count', value: (t) => t.days },
-  { id: 'runs', emoji: '🔁', title: 'Lap Machine', blurb: 'Most runs', kind: 'count', value: (t) => t.runs },
-  { id: 'grinder', emoji: '💪', title: 'The Grinder', blurb: 'Most vertical per day', kind: 'alt', value: (t) => (t.days ? t.vertical / t.days : 0) },
-  { id: 'cruiser', emoji: '🛣️', title: 'Long Hauler', blurb: 'Longest average run', kind: 'dist', value: (t) => (t.runs ? t.distance / t.runs : 0) },
-  { id: 'time', emoji: '⏱️', title: 'Never Goes Home', blurb: 'Most time skiing', kind: 'hours', value: (t) => t.skiTime },
+  { id: 'vertical', icon: 'trending-down-outline', title: 'Vert Monster', blurb: 'Most vertical skied', kind: 'alt', value: (t) => t.vertical },
+  { id: 'everest', icon: 'triangle-outline', title: 'Everest Collector', blurb: 'Everests skied down', kind: 'everest', value: (t) => t.vertical / EVEREST_M },
+  { id: 'speed', icon: 'flash-outline', title: 'Speed Demon', blurb: 'Fastest top speed', kind: 'speed', value: (t) => t.topSpeed },
+  { id: 'days', icon: 'calendar-outline', title: 'Mountain Rat', blurb: 'Most days on the hill', kind: 'count', value: (t) => t.days },
+  { id: 'runs', icon: 'repeat-outline', title: 'Lap Machine', blurb: 'Most runs', kind: 'count', value: (t) => t.runs },
+  { id: 'grinder', icon: 'barbell-outline', title: 'The Grinder', blurb: 'Most vertical per day', kind: 'alt', value: (t) => (t.days ? t.vertical / t.days : 0) },
+  { id: 'cruiser', icon: 'resize-outline', title: 'Long Hauler', blurb: 'Longest average run', kind: 'dist', value: (t) => (t.runs ? t.distance / t.runs : 0) },
+  { id: 'time', icon: 'time-outline', title: 'Never Goes Home', blurb: 'Most time skiing', kind: 'hours', value: (t) => t.skiTime },
 ];
 
 export interface Ranked {
