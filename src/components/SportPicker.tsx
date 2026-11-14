@@ -1,33 +1,38 @@
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { haptic } from '../haptics';
 import { SPORTS, type Sport } from '../lib/sport';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { space, target, useTheme } from '../theme';
 
-/** A row of chips: Ski, Snowboard, Telemark, Sit-ski, Ski touring. */
+/** Ski, Snowboard, Telemark, Sit-ski, Ski touring: plain words, the chosen one underlined. */
 export function SportPicker({ value, onChange }: { value: Sport; onChange: (s: Sport) => void }) {
-  const { colors } = useTheme();
-  const styles = useStyles(makeStyles);
+  const { colors, s } = useTheme();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+    <View style={styles.wrap} accessibilityRole="radiogroup">
       {SPORTS.map((sp) => {
         const on = sp.id === value;
         return (
           <Pressable
             key={sp.id}
-            onPress={() => onChange(sp.id)}
-            style={[styles.chip, on && { backgroundColor: colors.accent, borderColor: colors.accent }]}
+            onPress={() => {
+              if (!on) haptic('select');
+              onChange(sp.id);
+            }}
+            style={styles.option}
             accessibilityRole="radio"
             accessibilityState={{ selected: on }}
+            accessibilityLabel={sp.label}
           >
-            <Text style={[styles.text, on && { color: colors.onAccent }]}>{sp.emoji} {sp.label}</Text>
+            <Text style={[on ? s.control : s.body, !on && { color: colors.muted }]}>{sp.label}</Text>
+            <View style={[styles.mark, on && { backgroundColor: colors.ice }]} />
           </Pressable>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
-const makeStyles = (colors: Palette) =>
-  StyleSheet.create({
-    chip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 999, borderWidth: 1, borderColor: colors.faint, backgroundColor: colors.card },
-    text: { fontWeight: '600', color: colors.text, fontSize: 15 },
-  });
+const styles = StyleSheet.create({
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space.xl },
+  option: { minHeight: target.min, justifyContent: 'center', gap: space.xs },
+  mark: { height: 2 },
+});

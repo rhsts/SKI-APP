@@ -10,6 +10,8 @@ import { CATEGORIES, crowns, rank, type FriendTotals, type StatKind } from '../.
 import type { Units } from '../../lib/types';
 import { useSettings } from '../../settings';
 import { useStyles, useTheme, type Palette } from '../../theme';
+import { Row, Rows } from '../../components/Row';
+import { useTabBarSpace } from '../../components/TabBar';
 
 type Period = 'season' | 'allTime';
 type Loaded = { season: FriendTotals[]; allTime: FriendTotals[]; seasonKey: string };
@@ -54,6 +56,13 @@ export default function LeaderboardScreen() {
   const [period, setPeriod] = useState<Period>('season');
   const [refreshing, setRefreshing] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const tabSpace = useTabBarSpace();
+  // Challenges have no tab of their own any more: they open from here, with or without a server.
+  const challenges = (
+    <Rows>
+      <Row label="Challenges" value="Timed runs and groups" onPress={() => router.push('/challenges')} />
+    </Rows>
+  );
 
   const load = useCallback(() => {
     if (!serverUrl) return Promise.resolve();
@@ -69,18 +78,21 @@ export default function LeaderboardScreen() {
 
   if (!serverUrl) {
     return (
-      <View style={[s.screen, styles.empty]}>
+      <View style={[s.screen, styles.aside]}>
+        {challenges}
+        <View style={styles.empty}>
         <Text style={{ fontSize: 48 }}>🏆</Text>
         <Text style={s.h2}>Race your friends</Text>
         <Text style={[s.muted, { textAlign: 'center' }]}>Set up a friends server in Profile and join a group to see who rules the mountain.</Text>
         <Pressable onPress={() => router.push('/profile')} style={styles.cta}>
           <Text style={styles.ctaText}>Go to Profile</Text>
         </Pressable>
+        </View>
       </View>
     );
   }
-  if (!data && error) return <Text style={[s.body, { padding: 24, color: colors.danger, textAlign: 'center' }]}>{error}</Text>;
-  if (!data) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
+  if (!data && error) return <View style={[s.screen, styles.aside]}>{challenges}<Text style={[s.body, { padding: 24, color: colors.danger, textAlign: 'center' }]}>{error}</Text></View>;
+  if (!data) return <View style={[s.screen, styles.aside]}>{challenges}<ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} /></View>;
 
   const refresh = () => {
     setRefreshing(true);
@@ -90,9 +102,10 @@ export default function LeaderboardScreen() {
   return (
     <ScrollView
       style={s.screen}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabSpace }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
     >
+      {challenges}
       <View style={styles.pills}>
         {(['season', 'allTime'] as const).map((p) => (
           <Pressable key={p} onPress={() => setPeriod(p)} style={[styles.pill, p === period && styles.pillOn]}>
@@ -164,6 +177,7 @@ export default function LeaderboardScreen() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 32 },
+    aside: { padding: 16 },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
     cta: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 999, backgroundColor: colors.accent },
     ctaText: { color: colors.onAccent, fontWeight: '700' },

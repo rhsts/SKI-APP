@@ -1,33 +1,94 @@
-import { Tap } from '../../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useBatteryLevel } from 'expo-battery';
+import { router, useIsFocused } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, {
+  cancelAnimation, Easing, SlideInDown, SlideOutDown, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Appear } from '../../components/Appear';
-import { StatGrid, StatTile } from '../../components/StatTile';
-import { badgesEarnedBy } from '../../days/badges';
-import { fmtAir, fmtAlt, fmtClock, fmtDelta, fmtDist, fmtDuration, fmtG, fmtJumpHeight, fmtRaceTime, fmtTimeOfDay, speedUnit, speedValue, fmtSpeed } from '../../lib/format';
-import { jumpHeight } from '../../lib/motion';
-import { liveStatus } from '../../lib/stats';
-import { updateSettings, useSettings } from '../../settings';
-import { MountainCard } from '../../components/MountainCard';
+import { MountainIntro, MountainRows, useMountain } from '../../components/Mountain';
+import { RollingNumber } from '../../components/RollingNumber';
+import { Row, Rows } from '../../components/Row';
 import { SportPicker } from '../../components/SportPicker';
-import { useTheme, useStyles, type Palette } from '../../theme';
-import { dismissFall, dismissFinish, dismissLastRun, notAFall, pauseDay, resumeDay, startDay, stopDay, useTracker, type LiveRace, type RaceFinish, type RunSummary } from '../../tracking/tracker';
+import { Figure } from '../../components/StatTile';
+import { useTabBarSpace } from '../../components/TabBar';
+import { Tap } from '../../components/Tap';
+import { badgesEarnedBy } from '../../days/badges';
+import { haptic } from '../../haptics';
+import {
+  fmtAir, fmtAlt, fmtClock, fmtDate, fmtDelta, fmtDist, fmtDuration, fmtG, fmtJumpHeight, fmtRaceTime, fmtSpeed, fmtTimeOfDay, speedUnit, speedValue,
+} from '../../lib/format';
+import { jumpHeight } from '../../lib/motion';
+import { difficultyColor, difficultyLabel } from '../../lib/pistes';
+import { sportInfo } from '../../lib/sport';
+import { liveStatus } from '../../lib/stats';
+import type { Units } from '../../lib/types';
+import { updateSettings, useSettings } from '../../settings';
+import { chromeShadow, font, motion, radius, size, space, target, useStyles, useTheme, type Palette } from '../../theme';
+import {
+  dismissFall, dismissFinish, dismissLastRun, notAFall, pauseDay, resumeDay, startDay, stopDay, useTracker,
+  type LiveRace, type RaceFinish, type RunSummary, type TrackerState,
+} from '../../tracking/tracker';
 
-const statusLabels = (colors: Palette) => ({
-  skiing: { text: 'Skiing', icon: 'trending-down', color: colors.run },
-  lift: { text: 'On a lift', icon: 'arrow-up', color: colors.lift },
-  stopped: { text: 'Stopped', icon: 'pause', color: colors.muted },
-  moving: { text: 'Moving', icon: 'walk', color: colors.good },
-}) as const;
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+type Mode = 'speed' | 'vertical' | 'time';
+const MODES: { id: Mode; label: string }[] = [
+  { id: 'speed', label: 'Speed' },
+  { id: 'vertical', label: 'Vertical' },
+  { id: 'time', label: 'Time' },
+];
+const easeOut = Easing.bezier(...motion.easeOut);
+
+/** The one small text label that says what the tracker is doing. */
+function stateOf(t: TrackerState): { text: string; dot: 'live' | 'hollow' | 'quiet' } {
+  const demo = t.active?.source === 'sim' ? ' · Demo' : '';
+  if (t.status === 'paused') return { text: `Paused${demo}`, dot: 'quiet' };
+  if (t.autoPaused) return { text: `Auto-paused · break${demo}`, dot: 'quiet' };
+  if (!t.points.length || !t.stats) return { text: `Waiting for GPS${demo}`, dot: 'quiet' };
+  switch (liveStatus(t.stats, t.currentSpeed)) {
+    case 'skiing': return { text: `Skiing${t.stats.runCount ? ` · run ${t.stats.runCount}` : ''}${demo}`, dot: 'live' };
+    case 'lift': return { text: `On a lift${demo}`, dot: 'hollow' };
+    case 'moving': return { text: `Moving${demo}`, dot: 'quiet' };
+    default: return { text: `Stopped${demo}`, dot: 'quiet' };
+  }
+}
+
+/** The big figure for the chosen metric. */
+function heroOf(mode: Mode, t: TrackerState, units: Units): { value: string; unit: string } {
+  const st = t.stats;
+  if (mode === 'vertical') return { value: fmtAlt(st?.verticalDown ?? 0, units, false), unit: units === 'metric' ? 'm' : 'ft' };
+  if (mode === 'time') {
+    const d = st?.duration ?? 0;
+    return d < 3600
+      ? { value: fmtClock(d), unit: 'min' }
+      : { value: `${Math.floor(d / 3600)}:${String(Math.floor((d % 3600) / 60)).padStart(2, '0')}`, unit: 'h' };
+  }
+  const waiting = t.status === 'recording' && !t.points.length;
+  return { value: waiting ? '–' : t.status === 'recording' ? speedValue(t.currentSpeed, units).toFixed(0) : '0', unit: speedUnit(units) };
+}
+
+function fmtHours(h: number): string {
+  if (h >= 24) return '24 h+';
+  return h >= 1 ? `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}` : `${Math.round(h * 60)} min`;
+}
 
 export default function RecordScreen() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
+  const insets = useSafeAreaInsets();
+  const tabSpace = useTabBarSpace();
   const t = useTracker();
   const { units, simulate, sport } = useSettings();
+  const m = useMountain(t.points);
+  // Before you start there is no drain to measure yet, so idle shows the level only (-1: unknown).
+  const batteryLevel = useBatteryLevel();
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<Mode>('speed');
+  const [open, setOpen] = useState<'sport' | 'figures' | null>(null);
+  const [footerHeight, setFooterHeight] = useState(tabSpace + target.control + space.md);
+  const [today] = useState(() => fmtDate(Date.now()).replace(/ \d{4}$/, ''));
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -39,237 +100,467 @@ export default function RecordScreen() {
   };
 
   const finish = () =>
+    run(async () => {
+      haptic('record');
+      const id = await stopDay();
+      if (!id) {
+        Alert.alert('Too short to save', 'Record at least a minute of GPS to save a day.');
+        return;
+      }
+      router.push(`/day/${id}`);
+      const fresh = await badgesEarnedBy(id).catch(() => []);
+      if (fresh.length) {
+        Alert.alert(
+          fresh.length === 1 ? 'New badge' : `${fresh.length} new badges`,
+          fresh.map((b) => `${b.title}: ${b.description}`).join('\n'),
+        );
+      }
+    });
+
+  // A tap asks first; holding the button for a second is the confirmation.
+  const confirmFinish = () =>
     Alert.alert('Finish your day?', 'Your day will be saved to Days.', [
       { text: 'Keep going', style: 'cancel' },
-      {
-        text: 'Finish',
-        style: 'destructive',
-        onPress: () =>
-          run(async () => {
-            const id = await stopDay();
-            if (id) {
-              router.push(`/day/${id}`);
-              const fresh = await badgesEarnedBy(id).catch(() => []);
-              if (fresh.length) {
-                Alert.alert(
-                  fresh.length === 1 ? '🏅 New badge!' : `🏅 ${fresh.length} new badges!`,
-                  fresh.map((b) => `${b.emoji} ${b.title}: ${b.description}`).join('\n'),
-                );
-              }
-            }
-            else Alert.alert('Too short to save', 'Record at least a minute of GPS to save a day.');
-          }),
-      },
+      { text: 'Finish', style: 'destructive', onPress: finish },
     ]);
 
   const st = t.stats;
-  const waiting = t.status === 'recording' && t.points.length === 0;
-  const live = t.status === 'recording' && st ? statusLabels(colors)[liveStatus(st, t.currentSpeed)] : null;
+  const idle = t.status === 'idle';
+  const state = idle ? null : stateOf(t);
+  const flash = t.newTop && t.status === 'recording' ? t.newTop : null;
+  const hero = flash ? { value: fmtSpeed(flash.speed, units, false), unit: speedUnit(units) } : heroOf(mode, t, units);
+  const lowBattery = !!t.battery && t.battery.level < 0.2;
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={styles.content}>
-      {t.recovered ? (
-        <Appear style={[s.card, styles.banner]}>
-          <Ionicons name="time-outline" size={20} color={colors.warn} />
-          <Text style={[s.body, { flex: 1 }]}>
-            Your day from {t.active ? fmtTimeOfDay(t.active.startedAt) : ''} wasn’t finished. Resume recording or finish it.
-          </Text>
-        </Appear>
-      ) : null}
-
-      {t.fallAlert ? <Appear key={t.fallAlert.t}><FallCard /></Appear> : null}
-      {t.finish ? <Appear><FinishCard f={t.finish} /></Appear> : null}
-      {t.race && t.status === 'recording' ? <Appear><RaceCard r={t.race} /></Appear> : null}
-      {t.newTop && t.status === 'recording' ? (
-        <Appear style={[s.card, styles.topFlash]}>
-          <Text style={{ fontSize: 24 }}>⚡</Text>
-          <Text style={styles.topFlashText}>New top speed: {fmtSpeed(t.newTop.speed, units)}</Text>
-        </Appear>
-      ) : null}
-      {t.jump && t.status === 'recording' ? (
-        <Appear style={[s.card, styles.topFlash, { backgroundColor: colors.accentSoft }]}>
-          <Text style={{ fontSize: 24 }}>🦘</Text>
-          <Text style={styles.topFlashText}>
-            Jump! {fmtAir(t.jump.airtime)} airtime · {fmtJumpHeight(jumpHeight(t.jump.airtime), units)} high
-          </Text>
-        </Appear>
-      ) : null}
-      {t.lastRun && t.status !== 'idle' && !t.race ? <Appear key={t.lastRun.number}><RunCard r={t.lastRun} /></Appear> : null}
-
-      <View style={[s.card, styles.hero]}>
-        <View style={styles.heroTop}>
-          <View style={styles.chipRow}>
-            {t.status === 'idle' ? (
-              <Chip text={simulate ? 'Ready · simulated GPS' : 'Ready'} icon="snow" color={colors.accent} />
-            ) : t.status === 'paused' ? (
-              <Chip text="Paused" icon="pause" color={colors.warn} />
-            ) : t.autoPaused ? (
-              <Chip text="Auto-paused · break" icon="cafe" color={colors.warn} />
-            ) : waiting ? (
-              <Chip text="Waiting for GPS…" icon="locate" color={colors.muted} />
-            ) : live ? (
-              <Chip text={live.text} icon={live.icon} color={live.color} />
-            ) : null}
-            {t.active?.source === 'sim' ? <Chip text="Demo" icon="flask-outline" color={colors.muted} /> : null}
+    <View style={[s.screen, { paddingTop: insets.top }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: idle ? tabSpace : space.xl }]}>
+        <View style={styles.top}>
+          <View style={styles.state} accessible accessibilityLabel={state ? state.text : today}>
+            {state ? <View style={[styles.dot, state.dot === 'hollow' && styles.dotHollow, state.dot === 'quiet' && styles.dotQuiet]} /> : null}
+            <Text style={[s.label, state && { color: colors.text }]} numberOfLines={1}>
+              {state ? state.text : simulate ? `${today} · Simulated GPS` : today}
+            </Text>
           </View>
           <Pressable
             onPress={() => router.push('/sos')}
             style={styles.sos}
-            hitSlop={12}
+            hitSlop={space.sm}
+            accessibilityRole="button"
             accessibilityLabel="Emergency: call for help and show my coordinates"
           >
-            <Ionicons name="medkit" size={14} color="#fff" />
+            <Ionicons name="medkit-outline" size={20} color={colors.danger} />
             <Text style={styles.sosText}>SOS</Text>
           </Pressable>
         </View>
-        <Text style={styles.speed} adjustsFontSizeToFit numberOfLines={1}>
-          {t.status === 'recording' ? speedValue(t.currentSpeed, units).toFixed(0) : '0'}
-        </Text>
-        <Text style={styles.speedUnit}>{speedUnit(units)}</Text>
-        <Text style={s.muted}>
-          {st ? `${fmtClock(st.duration)} on the mountain` : 'Tap start when you reach the slopes'}
-        </Text>
-        {t.battery && t.status !== 'idle' ? (
-          <View style={styles.batteryRow}>
-            <Ionicons
-              name={t.battery.level < 0.2 ? 'battery-dead' : t.battery.level < 0.5 ? 'battery-half' : 'battery-full'}
-              size={16}
-              color={t.battery.level < 0.2 ? colors.danger : colors.muted}
-            />
-            <Text style={[s.muted, t.battery.level < 0.2 && { color: colors.danger }]}>
-              {Math.round(t.battery.level * 100)}%
-              {t.battery.hoursLeft != null ? ` · about ${fmtHours(t.battery.hoursLeft)} of tracking left` : ''}
-            </Text>
-          </View>
-        ) : null}
-      </View>
 
-      {t.status !== 'recording' || t.points.length ? <MountainCard points={t.points} units={units} /> : null}
-
-      {st || t.status !== 'idle' ? (
-        <StatGrid>
-          <StatTile label="Top speed" value={fmtSpeed(st?.topSpeed ?? 0, units)} />
-          <StatTile label="Vertical ↓" value={fmtAlt(st?.verticalDown ?? 0, units)} />
-          <StatTile label="Runs" value={String(st?.runCount ?? 0)} sub={`${st?.liftCount ?? 0} lifts`} />
-          <StatTile label="Ski time" value={fmtDuration(st?.skiTime ?? 0)} sub={`Lifts ${fmtDuration(st?.liftTime ?? 0)} · line ${fmtDuration(st?.liftWaitTime ?? 0)}`} />
-          <StatTile label="Distance" value={fmtDist(st?.distance ?? 0, units)} sub={`Skied ${fmtDist(st?.skiDistance ?? 0, units)}`} />
-          <StatTile label="Altitude" value={fmtAlt(t.points.length ? t.points[t.points.length - 1].alt : null, units)} sub={st?.maxAlt != null ? `Max ${fmtAlt(st.maxAlt, units)}` : undefined} />
-          <StatTile label="Turns" value={String(st?.turns ?? 0)} sub={st?.maxG ? `Strongest ${fmtG(st.maxG)}` : undefined} />
-          <StatTile
-            label="Jumps"
-            value={String(t.motion.jumps)}
-            sub={`${t.motion.bestAir ? `Best ${fmtAir(t.motion.bestAir)} · ` : ''}${t.motion.falls} ${t.motion.falls === 1 ? 'fall' : 'falls'}`}
-          />
-        </StatGrid>
-      ) : (
-        <View style={[s.card, { gap: 8 }]}>
-          <Text style={s.h2}>How it works</Text>
-          <Text style={s.body}>
-            Start recording at the lift and put your phone in your pocket. Every run and lift ride is detected
-            automatically: top speed, vertical, distance and time on the snow.
+        {idle ? null : (
+          <Text style={[s.muted, styles.tabular]}>
+            {m.area ? `${m.area.name} · ` : ''}{fmtClock(st?.duration ?? 0)} on the mountain
           </Text>
-          {simulate ? (
-            <Text style={s.muted}>Simulated GPS is on (Profile): a fake ski day plays at 20× speed.</Text>
-          ) : null}
-        </View>
-      )}
+        )}
 
-      {t.foregroundOnly && t.status === 'recording' ? (
-        <Text style={[s.muted, { textAlign: 'center' }]}>
-          Background location isn’t allowed, so keep the app open. Allow location “All the time” to track with the screen off.
-        </Text>
-      ) : null}
-      {t.motionLive && t.status === 'recording' && !t.foregroundOnly ? (
-        <Text style={[s.muted, { textAlign: 'center' }]}>
-          Jumps and falls are picked up while the app is open on screen.
-        </Text>
-      ) : null}
-      {t.error ? <Text style={[s.body, { color: colors.danger, textAlign: 'center' }]}>{t.error}</Text> : null}
+        {t.fallAlert ? <Appear key={t.fallAlert.t}><FallCheck /></Appear> : null}
+        {t.recovered ? (
+          <Appear style={styles.block}>
+            <Text style={s.label}>Unfinished day</Text>
+            <Text style={s.body}>
+              Your day from {t.active ? fmtTimeOfDay(t.active.startedAt) : ''} wasn’t finished. Resume recording or finish it.
+            </Text>
+          </Appear>
+        ) : null}
+        {t.finish ? <Appear><FinishNote f={t.finish} /></Appear> : null}
+        {t.race && t.status === 'recording' ? <Appear><GhostBar r={t.race} /></Appear> : null}
+        {t.jump && t.status === 'recording' ? (
+          <Appear style={styles.block}>
+            <Text style={s.label}>Jump</Text>
+            <Text style={[s.body, styles.tabular]}>
+              {fmtAir(t.jump.airtime)} airtime · {fmtJumpHeight(jumpHeight(t.jump.airtime), units)} high
+            </Text>
+          </Appear>
+        ) : null}
 
-      {t.status === 'idle' && !busy ? (
-        <SportPicker value={sport} onChange={(sp) => updateSettings({ sport: sp })} />
-      ) : null}
-      <View style={styles.buttons}>
-        {busy ? (
-          <ActivityIndicator color={colors.accent} size="large" />
-        ) : t.status === 'idle' ? (
-          <Button label="Start day" icon="play" color={colors.accent} big onPress={() => run(() => startDay(simulate, sport))} />
+        {idle ? (
+          <>
+            <View style={styles.intro}><MountainIntro m={m} units={units} /></View>
+            <Rows>
+              <MountainRows m={m} points={t.points} units={units} />
+              <Row label="Sport" value={sportInfo(sport).label} onPress={() => setOpen(open === 'sport' ? null : 'sport')} open={open === 'sport'}>
+                <SportPicker value={sport} onChange={(sp) => updateSettings({ sport: sp })} />
+              </Row>
+            </Rows>
+            <View style={styles.startArea}>
+              {busy ? <ActivityIndicator color={colors.accent} size="large" /> : (
+                <StartButton
+                  onPress={() => {
+                    haptic('record');
+                    run(() => startDay(simulate, sport));
+                  }}
+                />
+              )}
+            </View>
+            {batteryLevel >= 0 ? (
+              <View style={[styles.battery, styles.centerSelf]} accessible accessibilityLabel={`Battery ${Math.round(batteryLevel * 100)} percent`}>
+                <Ionicons name={batteryLevel < 0.2 ? 'battery-dead-outline' : batteryLevel < 0.5 ? 'battery-half-outline' : 'battery-full-outline'} size={20} color={colors.muted} />
+                <Text style={[s.muted, styles.tabular]}>{Math.round(batteryLevel * 100)}% battery</Text>
+              </View>
+            ) : null}
+            <Text style={[s.muted, styles.hint]}>
+              {simulate
+                ? 'Simulated GPS is on (You): a demo ski day plays at 20× speed.'
+                : 'Put your phone in your pocket. Runs and lifts are detected by themselves.'}
+            </Text>
+          </>
         ) : (
           <>
-            {t.status === 'recording' ? (
-              <Button label="Pause" icon="pause" onPress={() => run(pauseDay)} />
-            ) : (
-              <Button label="Resume" icon="play" color={colors.accent} onPress={() => run(resumeDay)} />
-            )}
-            <Button label="Finish" icon="stop" color={colors.danger} onPress={finish} />
+            <View style={styles.hero}>
+              {flash ? (
+                <View style={styles.pick}><View style={styles.pickItem}><Text style={[s.label, { color: colors.accent }]}>New top speed</Text></View></View>
+              ) : (
+                <MetricPick mode={mode} onChange={setMode} />
+              )}
+              <HeroFigure
+                label={flash ? 'New top speed' : MODES.find((x) => x.id === mode)!.label}
+                value={hero.value}
+                unit={hero.unit}
+                color={flash ? colors.accent : colors.text}
+              />
+              {flash ? <Appear key={flash.at}><View style={styles.rule} /></Appear> : null}
+            </View>
+
+            <View style={styles.trio}>
+              <Figure style={styles.third} label="Top speed" value={fmtSpeed(st?.topSpeed ?? 0, units, false)} unit={speedUnit(units)} />
+              <Figure style={styles.third} label="Vertical" value={fmtAlt(st?.verticalDown ?? 0, units, false)} unit={units === 'metric' ? 'm' : 'ft'} />
+              <Figure style={styles.third} label="Runs" value={String(st?.runCount ?? 0)} sub={`${st?.liftCount ?? 0} ${st?.liftCount === 1 ? 'lift' : 'lifts'}`} />
+            </View>
+
+            <View style={styles.rows}>
+              <Rows>
+                <Row label="Distance" value={fmtDist(st?.distance ?? 0, units)} strong />
+                <Row label="Altitude" value={fmtAlt(t.points.length ? t.points[t.points.length - 1].alt : null, units)} strong />
+                <MountainRows m={m} points={t.points} units={units} live />
+                <Row label="All figures" value="Ski time, turns, jumps" onPress={() => setOpen(open === 'figures' ? null : 'figures')} open={open === 'figures'}>
+                  <View>
+                    <Detail label="Ski time" value={fmtDuration(st?.skiTime ?? 0)} />
+                    <Detail label="Lift time" value={fmtDuration(st?.liftTime ?? 0)} />
+                    <Detail label="Lift lines" value={fmtDuration(st?.liftWaitTime ?? 0)} />
+                    <Detail label="Skied distance" value={fmtDist(st?.skiDistance ?? 0, units)} />
+                    <Detail label="Highest point" value={fmtAlt(st?.maxAlt, units)} />
+                    <Detail label="Turns" value={String(st?.turns ?? 0)} />
+                    {st?.maxG ? <Detail label="Strongest turn" value={fmtG(st.maxG)} /> : null}
+                    <Detail label="Jumps" value={String(t.motion.jumps)} />
+                    {t.motion.bestAir ? <Detail label="Longest air" value={fmtAir(t.motion.bestAir)} /> : null}
+                    <Detail label="Falls" value={String(t.motion.falls)} />
+                  </View>
+                </Row>
+              </Rows>
+            </View>
+
+            {t.battery ? (
+              <View style={styles.battery} accessible>
+                <Ionicons
+                  name={lowBattery ? 'battery-dead-outline' : t.battery.level < 0.5 ? 'battery-half-outline' : 'battery-full-outline'}
+                  size={20}
+                  color={lowBattery ? colors.text : colors.muted}
+                />
+                {/* Low battery reads in graphite and a heavier weight: red stays with SOS and falls. */}
+                <Text style={[lowBattery ? s.control : s.muted, styles.tabular]}>
+                  {Math.round(t.battery.level * 100)}%
+                  {t.battery.hoursLeft != null ? ` · about ${fmtHours(t.battery.hoursLeft)} of tracking left` : ''}
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.notes}>
+              {t.foregroundOnly && t.status === 'recording' ? (
+                <Text style={s.muted}>
+                  Background location isn’t allowed, so keep the app open. Allow location “All the time” to track with the screen off.
+                </Text>
+              ) : null}
+              {t.motionLive && t.status === 'recording' && !t.foregroundOnly ? (
+                <Text style={s.muted}>Jumps and falls are picked up while the app is open on screen.</Text>
+              ) : null}
+            </View>
           </>
         )}
-      </View>
-    </ScrollView>
+        {t.error ? <Text style={[s.control, styles.error]}>{t.error}</Text> : null}
+      </ScrollView>
+
+      {!idle ? (
+        <View style={[styles.footer, { paddingBottom: tabSpace }]} onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}>
+          {busy ? <View style={styles.spinner}><ActivityIndicator color={colors.accent} size="large" /></View> : (
+            <View style={styles.buttons}>
+              {t.status === 'recording'
+                ? <Button label="Pause" icon="pause-outline" onPress={() => run(pauseDay)} />
+                : <Button label="Resume" icon="play-outline" solid onPress={() => run(resumeDay)} />}
+              <HoldButton label="Hold to finish" icon="stop-outline" onHeld={finish} onTap={confirmFinish} />
+            </View>
+          )}
+        </View>
+      ) : null}
+
+      {t.lastRun && !idle && !t.race && !t.fallAlert ? <RunDone key={t.lastRun.number} r={t.lastRun} units={units} bottom={footerHeight + space.md} /> : null}
+    </View>
   );
 }
 
-/** Live challenge: elapsed time, progress, and gap to the ghost you're chasing. */
-function RaceCard({ r }: { r: LiveRace }) {
+/** Speed, Vertical or Time: the underline slides from the label you tapped. */
+function MetricPick({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
-  const ahead = r.delta != null && r.delta < 0;
-  const deltaColor = r.delta == null ? colors.muted : ahead ? colors.good : colors.danger;
+  const [spots, setSpots] = useState<Partial<Record<Mode, { x: number; w: number }>>>({});
+  const x = useSharedValue(0);
+  const w = useSharedValue(0);
+  const placed = useRef(false);
+  const spot = spots[mode];
+  useEffect(() => {
+    if (!spot) return;
+    const centre = spot.x + spot.w / 2;
+    if (placed.current) {
+      x.value = withTiming(centre, { duration: motion.micro, easing: easeOut });
+      w.value = withTiming(spot.w, { duration: motion.micro, easing: easeOut });
+    } else {
+      x.value = centre;
+      w.value = spot.w;
+      placed.current = true;
+    }
+  }, [spot, x, w]);
+  const line = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { scaleX: w.value }] }));
   return (
-    <View style={[s.card, styles.race]}>
-      <View style={styles.raceHead}>
-        <Ionicons name="flag" size={16} color={colors.onInk} />
-        <Text style={styles.raceTitle} numberOfLines={1}>{r.name}</Text>
-      </View>
-      <View style={styles.raceRow}>
-        <Text style={styles.raceTime}>{fmtRaceTime(r.elapsed)}</Text>
-        {r.delta != null ? (
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={[styles.raceDelta, { color: deltaColor }]}>{fmtDelta(r.delta)}</Text>
-            <Text style={styles.raceSub}>vs {r.rivalIsMe ? 'your best' : r.rivalName}</Text>
-          </View>
-        ) : (
-          <Text style={styles.raceSub}>First time: set the time to beat!</Text>
-        )}
-      </View>
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${Math.round(r.progress * 100)}%` }]} />
+    <View style={styles.pick} accessibilityRole="tablist">
+      {MODES.map((mo) => {
+        const on = mo.id === mode;
+        return (
+          <Pressable
+            key={mo.id}
+            style={styles.pickItem}
+            onLayout={(e) => {
+              const { x: left, width } = e.nativeEvent.layout;
+              setSpots((p) => ({ ...p, [mo.id]: { x: left, w: width } }));
+            }}
+            onPress={() => {
+              if (!on) haptic('select');
+              onChange(mo.id);
+            }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={mo.label}
+          >
+            <Text style={[s.label, on && { color: colors.text }]}>{mo.label}</Text>
+          </Pressable>
+        );
+      })}
+      <Animated.View style={[styles.pickLine, line]} />
+    </View>
+  );
+}
+
+/** One very large, light figure with its unit small beside it. Shrinks to fit long values. */
+function HeroFigure({ label, value, unit, color }: { label: string; value: string; unit: string; color: string }) {
+  const styles = useStyles(makeStyles);
+  const { width } = useWindowDimensions();
+  // Tabular digits are about 0.64 em wide, separators about half that.
+  const ems = value.split('').reduce((n, c) => n + (c >= '0' && c <= '9' ? 0.64 : 0.32), 0);
+  const fontSize = Math.max(size.figure, Math.min(size.hero, Math.floor((width - 2 * space.xl - space.xxxl - space.lg) / Math.max(ems, 1))));
+  return (
+    <View style={styles.bigBox} accessible accessibilityLabel={`${label}: ${value} ${unit}`}>
+      <View style={styles.big} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        <RollingNumber
+          value={value}
+          height={Math.round(fontSize * 1.1)}
+          style={[styles.heroText, { fontSize, letterSpacing: -0.02 * fontSize, color }]}
+        />
+        <Text style={styles.heroUnit} maxFontSizeMultiplier={1.2}>{unit}</Text>
       </View>
     </View>
   );
 }
 
-/** What to say when you cross the finish line. */
+/** The one solid control on the tab, glove-sized, with a slow breathing ring: the only motion while idle. */
+function StartButton({ onPress }: { onPress: () => void }) {
+  const styles = useStyles(makeStyles);
+  const focused = useIsFocused();
+  const breath = useSharedValue(0);
+  useEffect(() => {
+    if (!focused) return;
+    breath.value = withRepeat(withTiming(1, { duration: 2500, easing: Easing.inOut(Easing.quad) }), -1, true);
+    return () => cancelAnimation(breath);
+  }, [focused, breath]);
+  const inner = useAnimatedStyle(() => ({ opacity: 0.3 + 0.7 * breath.value, transform: [{ scale: 0.97 + 0.06 * breath.value }] }));
+  const outer = useAnimatedStyle(() => ({ opacity: 0.15 + 0.45 * breath.value, transform: [{ scale: 0.97 + 0.06 * breath.value }] }));
+  return (
+    <View style={styles.startWrap}>
+      <Animated.View style={[styles.ring, styles.ringOuter, outer]} />
+      <Animated.View style={[styles.ring, styles.ringInner, inner]} />
+      <Tap onPress={onPress} style={styles.start} accessibilityRole="button" accessibilityLabel="Start recording your day">
+        <Text style={styles.startText} maxFontSizeMultiplier={1.4}>Start</Text>
+      </Tap>
+    </View>
+  );
+}
+
+function Button({ label, icon, onPress, solid, danger }: { label: string; icon?: IconName; onPress: () => void; solid?: boolean; danger?: boolean }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
+  const ink = danger || solid ? colors.bg : colors.text;
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[styles.button, solid && styles.buttonSolid, danger && { backgroundColor: colors.danger }]}
+    >
+      {icon ? <Ionicons name={icon} size={24} color={ink} /> : null}
+      <Text style={[s.control, { color: ink }]} maxFontSizeMultiplier={1.4}>{label}</Text>
+    </Tap>
+  );
+}
+
+/** Finishing needs a held press: the button fills from the left while you hold, and lets go faster than it fills. */
+function HoldButton({ label, icon, onHeld, onTap }: { label: string; icon: IconName; onHeld: () => void; onTap: () => void }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
+  const [width, setWidth] = useState(0);
+  const fill = useSharedValue(0);
+  const fillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: (fill.value - 1) * width }] }));
+  return (
+    <Pressable
+      style={styles.button}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      onPressIn={() => { fill.value = withTiming(1, { duration: motion.hold, easing: Easing.linear }); }}
+      onPressOut={() => { fill.value = withTiming(0, { duration: motion.micro, easing: easeOut }); }}
+      delayLongPress={motion.hold}
+      onLongPress={onHeld}
+      onPress={onTap}
+      accessibilityRole="button"
+      accessibilityLabel="Finish your day"
+      accessibilityHint="Hold for one second, or tap and confirm"
+    >
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.holdFill, fillStyle]} />
+      <Ionicons name={icon} size={24} color={colors.text} />
+      <Text style={s.control} maxFontSizeMultiplier={1.4}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
+  return (
+    <View style={styles.detail} accessible accessibilityLabel={`${label}, ${value}`}>
+      <Text style={[s.body, { color: colors.muted }]}>{label}</Text>
+      <Text style={[s.body, styles.tabular]}>{value}</Text>
+    </View>
+  );
+}
+
+/**
+ * The run you just finished, shown while you ride the next lift. It floats above the
+ * controls instead of covering the screen, so Pause, Finish and SOS stay reachable.
+ */
+function RunDone({ r, units, bottom }: { r: RunSummary; units: Units; bottom: number }) {
+  const { s, dark } = useTheme();
+  const styles = useStyles(makeStyles);
+  const drag = useSharedValue(0);
+  // The card follows your finger down; let go past a third of it and it leaves, otherwise it settles back.
+  const pan = useMemo(
+    () => PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => g.dy > 6 && g.dy > Math.abs(g.dx),
+      onPanResponderMove: (_e, g) => { drag.set(Math.max(0, g.dy)); },
+      onPanResponderRelease: (_e, g) => {
+        if (g.dy > 96) dismissLastRun();
+        else drag.set(withSpring(0, motion.spring));
+      },
+      onPanResponderTerminate: () => { drag.set(withSpring(0, motion.spring)); },
+    }),
+    [drag],
+  );
+  const dragStyle = useAnimatedStyle(() => ({ transform: [{ translateY: drag.value }] }));
+  const name = r.piste?.name ?? `Run ${r.number}`;
+  const grade = r.piste ? difficultyLabel(r.piste.difficulty) : null;
+  return (
+    <Animated.View
+      entering={SlideInDown.springify().damping(motion.spring.damping).stiffness(motion.spring.stiffness).mass(motion.spring.mass)}
+      exiting={SlideOutDown.duration(motion.enter).easing(easeOut)}
+      style={[styles.sheetWrap, { bottom }]}
+      pointerEvents="box-none"
+    >
+      <Animated.View {...pan.panHandlers} style={[styles.sheet, { boxShadow: chromeShadow(dark) }, dragStyle]}>
+        <View style={styles.grab} />
+        <Text
+          style={s.label}
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={`Run done. ${name}, ${fmtClock(r.duration)}, ${fmtAlt(r.verticalDown, units)} down.`}
+        >
+          {r.piste?.name ? `Run ${r.number} done` : 'Run done'}
+        </Text>
+        <View style={styles.title}>
+          {r.piste?.difficulty ? <View style={[styles.pisteDot, { backgroundColor: difficultyColor(r.piste.difficulty, dark) }]} /> : null}
+          <Text style={[s.h1, styles.grow]} numberOfLines={1}>{name}</Text>
+        </View>
+        <Text style={[s.muted, styles.tabular]}>{[grade ? `${grade} piste` : null, fmtDist(r.distance, units)].filter(Boolean).join(' · ')}</Text>
+        <View style={styles.trio}>
+          <Figure style={styles.third} label="Time" value={fmtClock(r.duration)} />
+          <Figure style={styles.third} label="Top speed" value={fmtSpeed(r.topSpeed, units, false)} unit={speedUnit(units)} />
+          <Figure style={styles.third} label="Vertical" value={fmtAlt(r.verticalDown, units, false)} unit={units === 'metric' ? 'm' : 'ft'} />
+        </View>
+        <View style={styles.close}><Button label="Close" onPress={dismissLastRun} /></View>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/** Live challenge: your time, and a thin bar that reads ahead (glacier) or behind (muted). */
+function GhostBar({ r }: { r: LiveRace }) {
+  const { colors, s } = useTheme();
+  const styles = useStyles(makeStyles);
+  const ahead = r.delta != null && r.delta < 0;
+  const tone = ahead ? colors.accent : colors.muted;
+  return (
+    <View style={styles.block} accessible>
+      <Text style={s.label} numberOfLines={1}>
+        {r.name}{r.delta != null ? ` · vs ${r.rivalIsMe ? 'your best' : r.rivalName}` : ''}
+      </Text>
+      <View style={styles.between}>
+        <Text style={s.figure}>{fmtRaceTime(r.elapsed)}</Text>
+        {r.delta != null
+          ? <Text style={[s.figure, { color: tone }]}>{fmtDelta(r.delta)}</Text>
+          : <Text style={s.muted}>First time. Set the time to beat.</Text>}
+      </View>
+      <View style={styles.track}>
+        <View style={[styles.trackFill, { width: `${Math.round(r.progress * 100)}%`, backgroundColor: tone }]} />
+      </View>
+    </View>
+  );
+}
+
+/** What to say when you cross the finish line: short, warm, precise. */
 function finishMessage(f: RaceFinish): string {
   const gap = f.rivalGap != null ? Math.abs(f.rivalGap).toFixed(1) : '';
   if (f.rivalName && f.rivalGap != null) {
-    if (f.rivalIsMe) return f.rivalGap < 0 ? `New personal best, ${gap}s faster! 🔥` : `${fmtDelta(f.rivalGap)} off your best. Go again!`;
-    if (f.rivalGap < 0) return `You beat ${f.rivalName} by ${gap}s${f.rank === 1 ? ' and took the lead! 🏆' : '!'}`;
-    return `${fmtDelta(f.rivalGap)} behind ${f.rivalName}${f.isPersonalBest && f.previousBest != null ? ', but a new personal best!' : '. Go again!'}`;
+    if (f.rivalIsMe) return f.rivalGap < 0 ? `New personal best, ${gap}s faster.` : `${fmtDelta(f.rivalGap)} off your best.`;
+    if (f.rivalGap < 0) return `You beat ${f.rivalName} by ${gap}s${f.rank === 1 ? ' and took the lead.' : '.'}`;
+    return `${fmtDelta(f.rivalGap)} behind ${f.rivalName}${f.isPersonalBest && f.previousBest != null ? ', and a new personal best.' : '.'}`;
   }
-  if (f.previousBest == null) return 'Your first time! Now challenge a friend to beat it.';
-  return f.isPersonalBest ? `New personal best! (was ${fmtRaceTime(f.previousBest)})` : 'Go again!';
+  if (f.previousBest == null) return 'Your first time. Challenge a friend to beat it.';
+  return f.isPersonalBest ? `New personal best. It was ${fmtRaceTime(f.previousBest)}.` : 'Not your best. Go again.';
 }
 
-function FinishCard({ f }: { f: RaceFinish }) {
+function FinishNote({ f }: { f: RaceFinish }) {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
-  const headline = f.of > 1 ? `${fmtRaceTime(f.time)}  ·  #${f.rank} of ${f.of}` : fmtRaceTime(f.time);
-  const line = finishMessage(f);
   return (
-    <View style={[s.card, styles.finish]}>
-      <Text style={{ fontSize: 28 }}>🏁</Text>
-      <View style={{ flex: 1 }}>
-        <Text style={s.label}>{f.name}</Text>
-        <Text style={styles.finishTime}>{headline}</Text>
-        <Text style={s.body}>{line}</Text>
-        {f.splitNote ? <Text style={s.muted}>{f.splitNote}</Text> : null}
-        <Pressable onPress={() => router.push(`/segment/${f.segmentId}`)}>
-          <Text style={{ color: colors.accent, fontWeight: '600', marginTop: 4 }}>See leaderboard ›</Text>
+    <View style={styles.block}>
+      <View style={styles.between}>
+        <Text style={[s.label, styles.grow]} numberOfLines={1}>{f.name}</Text>
+        <Pressable onPress={dismissFinish} style={styles.icon} accessibilityRole="button" accessibilityLabel="Dismiss">
+          <Ionicons name="close-outline" size={24} color={colors.muted} />
         </Pressable>
       </View>
-      <Pressable onPress={dismissFinish} hitSlop={10} accessibilityLabel="Dismiss">
-        <Ionicons name="close" size={20} color={colors.muted} />
+      <Text style={s.figure}>{f.of > 1 ? `${fmtRaceTime(f.time)} · ${f.rank} of ${f.of}` : fmtRaceTime(f.time)}</Text>
+      <Text style={s.body}>{finishMessage(f)}</Text>
+      {f.splitNote ? <Text style={s.muted}>{f.splitNote}</Text> : null}
+      <Pressable onPress={() => router.push(`/segment/${f.segmentId}`)} style={styles.link} accessibilityRole="link">
+        <Text style={[s.control, { color: colors.accent }]}>See the leaderboard</Text>
       </Pressable>
     </View>
   );
@@ -277,8 +568,8 @@ function FinishCard({ f }: { f: RaceFinish }) {
 
 const FALL_CHECK_SECONDS = 60;
 
-/** After a fall: are you OK? No answer opens the SOS screen. */
-function FallCard() {
+/** After a fall: are you OK? No answer opens the SOS screen. Clarity comes before style here. */
+function FallCheck() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const [left, setLeft] = useState(FALL_CHECK_SECONDS);
@@ -294,128 +585,95 @@ function FallCard() {
   }, [left]);
 
   return (
-    <View style={[s.card, styles.fall]}>
-      <View style={styles.runHead}>
-        <Text style={styles.fallTitle}>Are you OK?</Text>
-        <Text style={styles.fallCount}>{left}s</Text>
+    <View style={styles.fall}>
+      <View style={styles.between}>
+        <Text style={[s.h1, { color: colors.danger }]}>Are you OK?</Text>
+        <Text style={s.figure}>{left} s</Text>
       </View>
       <Text style={s.body}>That looked like a hard fall. If you don’t answer, the SOS screen opens with your position.</Text>
       <View style={styles.buttons}>
-        <Button label="I’m OK" icon="checkmark" color={colors.good} onPress={dismissFall} />
-        <Button label="Get help" icon="medkit" color={colors.danger} onPress={() => { dismissFall(); router.push('/sos'); }} />
+        <Button label="I’m OK" icon="checkmark-outline" solid onPress={dismissFall} />
+        <Button label="Get help" icon="medkit-outline" danger onPress={() => { dismissFall(); router.push('/sos'); }} />
       </View>
-      <Pressable onPress={() => { notAFall().catch(() => undefined); }} hitSlop={8}>
-        <Text style={{ color: colors.accent, fontWeight: '600', textAlign: 'center' }}>That wasn’t a fall</Text>
+      <Pressable onPress={() => { notAFall().catch(() => undefined); }} style={[styles.link, styles.centerSelf]} accessibilityRole="button">
+        <Text style={[s.control, { color: colors.accent }]}>That wasn’t a fall</Text>
       </Pressable>
     </View>
   );
 }
 
-function fmtHours(h: number): string {
-  if (h >= 24) return '24h+';
-  return h >= 1 ? `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}m` : `${Math.round(h * 60)} min`;
-}
-
-/** The run you just finished, shown while you ride the next lift. */
-function RunCard({ r }: { r: RunSummary }) {
-  const { colors, s } = useTheme();
-  const styles = useStyles(makeStyles);
-  const { units } = useSettings();
-  return (
-    <View style={[s.card, styles.runCard]}>
-      <View style={styles.runHead}>
-        <Text style={s.label}>Run {r.number} done</Text>
-        <Pressable onPress={dismissLastRun} hitSlop={12} accessibilityLabel="Dismiss">
-          <Ionicons name="close" size={20} color={colors.muted} />
-        </Pressable>
-      </View>
-      <View style={styles.runStats}>
-        <RunStat label="Top" value={fmtSpeed(r.topSpeed, units)} />
-        <RunStat label="Vertical" value={fmtAlt(r.verticalDown, units)} />
-        <RunStat label="Distance" value={fmtDist(r.distance, units)} />
-        <RunStat label="Time" value={fmtClock(r.duration)} />
-      </View>
-    </View>
-  );
-}
-
-function RunStat({ label, value }: { label: string; value: string }) {
-  const { s } = useTheme();
-  const styles = useStyles(makeStyles);
-  return (
-    <View style={{ alignItems: 'center', flex: 1 }}>
-      <Text style={[s.label, { fontSize: 11 }]}>{label}</Text>
-      <Text style={styles.runValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-    </View>
-  );
-}
-
-function Chip({ text, icon, color }: { text: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }) {
-  const styles = useStyles(makeStyles);
-  return (
-    <View style={styles.chip}>
-      <Ionicons name={icon} size={14} color={color} />
-      <Text style={styles.chipText}>{text}</Text>
-    </View>
-  );
-}
-
-function Button({ label, icon, color, onPress, big }: {
-  label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color?: string; onPress: () => void; big?: boolean;
-}) {
-  const { colors } = useTheme();
-  const styles = useStyles(makeStyles);
-  return (
-    <Tap
-      onPress={onPress}
-      accessibilityRole="button"
-      style={[styles.button, big && styles.bigButton, color ? { backgroundColor: color } : styles.quietButton]}
-    >
-      <Ionicons name={icon} size={big ? 28 : 24} color={color ? colors.onAccent : colors.text} />
-      <Text style={[styles.buttonText, !color && { color: colors.text }]}>{label}</Text>
-    </Tap>
-  );
-}
-
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    content: { padding: 16, gap: 12, paddingBottom: 32 },
-    banner: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-    hero: { alignItems: 'center', paddingVertical: 20, gap: 2 },
-    heroTop: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 8, marginBottom: 4 },
-    chipRow: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
-    sos: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
-    sosText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-    chip: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.faint, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
-    chipText: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
-    speed: { fontSize: 96, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'], lineHeight: 104 },
-    speedUnit: { fontSize: 17, fontWeight: '600', color: colors.muted, marginTop: -6, marginBottom: 8 },
-    race: { backgroundColor: colors.ink, gap: 8 },
-    raceHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    raceTitle: { color: colors.onInk, fontWeight: '700', fontSize: 15, flex: 1 },
-    raceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-    raceTime: { color: colors.onInk, fontSize: 40, fontWeight: '700', fontVariant: ['tabular-nums'] },
-    raceDelta: { fontSize: 24, fontWeight: '700', fontVariant: ['tabular-nums'] },
-    raceSub: { color: colors.onInkMuted, fontSize: 13, fontWeight: '500' },
-    progressTrack: { height: 6, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },
-    progressFill: { height: 6, backgroundColor: colors.good },
-    finish: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-    finishTime: { fontSize: 24, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
-    batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-    topFlash: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.warnSoft },
-    topFlashText: { fontSize: 17, fontWeight: '700', color: colors.text, flex: 1 },
-    fall: { gap: 12, borderWidth: 2, borderColor: colors.danger },
-    fallTitle: { fontSize: 24, fontWeight: '700', color: colors.danger },
-    fallCount: { fontSize: 20, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
-    runCard: { gap: 8 },
-    runHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    runStats: { flexDirection: 'row' },
-    runValue: { fontSize: 17, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
-    buttons: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 4 },
-    // Big targets: easy to hit with ski gloves on.
-    button: { flex: 1, flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', minHeight: 72, borderRadius: 16 },
-    bigButton: { minHeight: 88 },
-    // Secondary action: one filled button per screen state.
-    quietButton: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
-    buttonText: { color: colors.onAccent, fontSize: 20, fontWeight: '700' },
+    content: { flexGrow: 1, paddingHorizontal: space.xl, paddingTop: space.sm },
+    top: { minHeight: target.min, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.lg, marginBottom: space.xs },
+    state: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm },
+    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
+    dotHollow: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.accent },
+    dotQuiet: { backgroundColor: colors.muted },
+    // Outlined, not a filled alarm: calm, but one tap away in every state. The 73 is 45% alpha.
+    sos: {
+      height: target.min, flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingLeft: space.md, paddingRight: space.lg,
+      borderRadius: radius.pill, borderWidth: 1, borderColor: `${colors.danger}73`,
+    },
+    sosText: { fontFamily: font.medium, fontSize: size.caption, letterSpacing: 1, color: colors.danger },
+    tabular: { fontVariant: ['tabular-nums'] },
+    hint: { textAlign: 'center', marginTop: space.sm },
+    centerSelf: { alignSelf: 'center' },
+    grow: { flex: 1 },
+    between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.lg },
+    block: { gap: space.xs, paddingVertical: space.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.faint },
+    icon: { width: target.min, height: target.min, alignItems: 'flex-end', justifyContent: 'center' },
+    link: { minHeight: target.min, justifyContent: 'center', alignSelf: 'flex-start' },
+
+    intro: { marginTop: space.xxl, marginBottom: space.xl },
+    // Room for the rings (32 around the button) plus air: the button centres in whatever is left.
+    startArea: { flexGrow: 1, minHeight: target.start + 4 * space.xxl, alignItems: 'center', justifyContent: 'center' },
+    startWrap: { width: target.start, height: target.start },
+    ring: { position: 'absolute', borderRadius: radius.pill, borderColor: colors.ice },
+    ringInner: { top: -space.lg, right: -space.lg, bottom: -space.lg, left: -space.lg, borderWidth: 1.5 },
+    ringOuter: { top: -space.xxl, right: -space.xxl, bottom: -space.xxl, left: -space.xxl, borderWidth: 1 },
+    start: { width: target.start, height: target.start, borderRadius: target.start / 2, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
+    startText: { fontFamily: font.medium, fontSize: size.control, color: colors.bg },
+
+    hero: { marginTop: space.xl },
+    pick: { flexDirection: 'row', gap: space.xl, height: target.min },
+    pickItem: { height: target.min, justifyContent: 'center' },
+    pickLine: { position: 'absolute', left: -0.5, bottom: space.sm, width: 1, height: 2, backgroundColor: colors.ice },
+    bigBox: { height: 136, justifyContent: 'flex-end' },
+    big: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+    heroText: { fontFamily: font.light, fontVariant: ['tabular-nums'], includeFontPadding: false },
+    heroUnit: { fontFamily: font.regular, fontSize: size.control, color: colors.muted },
+    rule: { height: 2, backgroundColor: colors.ice, marginTop: space.sm },
+    trio: { flexDirection: 'row', gap: space.lg, marginTop: space.xl, paddingTop: space.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.faint },
+    third: { flex: 1 },
+    rows: { marginTop: space.lg },
+    detail: { minHeight: space.xxl, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.lg },
+    battery: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.lg },
+    notes: { gap: space.sm, marginTop: space.lg },
+    error: { marginTop: space.lg },
+
+    footer: { paddingHorizontal: space.xl, paddingTop: space.md, backgroundColor: colors.bg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.faint },
+    spinner: { height: target.control, alignItems: 'center', justifyContent: 'center' },
+    buttons: { flexDirection: 'row', gap: space.md },
+    // Glove-sized. Tonal by default, so the live figure stays the only high-contrast thing on screen.
+    button: {
+      flex: 1, height: target.control, borderRadius: radius.card, backgroundColor: colors.faint, overflow: 'hidden',
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm,
+    },
+    buttonSolid: { backgroundColor: colors.text },
+    holdFill: { backgroundColor: colors.text, opacity: 0.14 },
+
+    sheetWrap: { position: 'absolute', left: space.lg, right: space.lg },
+    sheet: {
+      backgroundColor: colors.card, borderRadius: radius.card, paddingHorizontal: space.xl, paddingTop: space.md, paddingBottom: space.xl,
+      borderWidth: StyleSheet.hairlineWidth, borderColor: colors.faint, gap: space.xs,
+    },
+    grab: { alignSelf: 'center', width: space.xxl, height: 4, borderRadius: 2, backgroundColor: colors.faint, marginBottom: space.md },
+    title: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.xs },
+    pisteDot: { width: 12, height: 12, borderRadius: 6 },
+    close: { height: 64, flexDirection: 'row', marginTop: space.xl },
+
+    track: { height: 2, backgroundColor: colors.faint, marginTop: space.sm },
+    trackFill: { height: 2 },
+    fall: { gap: space.md, padding: space.lg, marginTop: space.sm, borderRadius: radius.card, borderWidth: 1.5, borderColor: colors.danger },
   });

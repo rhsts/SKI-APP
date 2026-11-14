@@ -13,12 +13,16 @@ import { resetFriendsCache, syncFriends } from '../../friends/sync';
 import { normalizeServerUrl } from '../../lib/groups';
 import { refreshGeofences, requestReminderPermissions } from '../../tracking/geofence';
 import { useTracker } from '../../tracking/tracker';
+import { Row as LinkRow, Rows } from '../../components/Row';
+import { useTabBarSpace } from '../../components/TabBar';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const settings = useSettings();
   const { status } = useTracker();
+  const tabSpace = useTabBarSpace();
   const [name, setName] = useState(settings.name);
   const [busy, setBusy] = useState<string | null>(null);
   const [server, setServer] = useState(settings.serverUrl);
@@ -57,7 +61,11 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={s.screen} contentContainerStyle={[styles.content, { paddingBottom: tabSpace }]}>
+      {/* Season has no tab of its own any more: it opens from here. */}
+      <Rows>
+        <LinkRow label="Season" value="Totals, records, badges" onPress={() => router.push('/season')} />
+      </Rows>
       <AccountCard />
 
       <View style={[s.card, styles.section]}>

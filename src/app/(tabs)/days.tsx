@@ -8,12 +8,14 @@ import { fmtAlt, fmtDate, fmtDuration, fmtSpeed } from '../../lib/format';
 import { sportInfo } from '../../lib/sport';
 import { useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
+import { useTabBarSpace } from '../../components/TabBar';
 import { addDemoDay } from '../../tracking/demo';
 
 export default function DaysScreen() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const { units } = useSettings();
+  const tabSpace = useTabBarSpace();
   const [days, setDays] = useState<SessionRow[] | null>(null);
   const [adding, setAdding] = useState(false);
   // Compare mode: pick two days.
@@ -40,7 +42,7 @@ export default function DaysScreen() {
   return (
     <FlatList
       style={s.screen}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { paddingBottom: tabSpace }]}
       data={days}
       keyExtractor={(d) => d.id}
       ListHeaderComponent={

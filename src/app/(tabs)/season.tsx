@@ -19,10 +19,12 @@ import type { Units } from '../../lib/types';
 import { ALL_TIME, seasonKeys, seasonOf, summariseSeason, type DaySummary, type SeasonRecord } from '../../lib/season';
 import { updateSettings, useSettings } from '../../settings';
 import { useTheme, useStyles, type Palette } from '../../theme';
+import { useTabBarSpace } from '../../components/TabBar';
 
 export default function SeasonScreen() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
+  const tabSpace = useTabBarSpace();
   const { units, goals, playerId } = useSettings();
   const [days, setDays] = useState<SessionRow[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
@@ -91,7 +93,7 @@ export default function SeasonScreen() {
   const earned = badges.filter((b) => b.earnedAt != null).length;
 
   return (
-    <ScrollView style={s.screen} contentContainerStyle={styles.content}>
+    <ScrollView style={s.screen} contentContainerStyle={[styles.content, { paddingBottom: tabSpace }]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
         {keys.map((k) => (
           <Pressable key={k} onPress={() => setPicked(k)} style={[styles.pill, k === key && styles.pillOn]}>

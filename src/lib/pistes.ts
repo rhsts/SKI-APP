@@ -233,12 +233,13 @@ export function matchRunsToPistes(points: TrackPoint[], runs: Activity[], pistes
 /** `dark`: drawn on a dark UI surface (black runs become light). Maps stay light, so leave it off there. */
 export function difficultyColor(d: Difficulty, dark = false): string {
   switch (d) {
-    case 'novice': return '#2E9E4F';
-    case 'easy': return '#2F6FDE';
-    case 'intermediate': return '#D33A2F';
-    case 'advanced': case 'expert': return dark ? '#E8ECF1' : '#111111';
-    case 'freeride': return '#E8892B';
-    default: return '#8F9CAD';
+    // Still green, blue, red and black at a glance, but in tones that sit in the palette.
+    case 'novice': return dark ? '#6FA588' : '#4E8566';
+    case 'easy': return dark ? '#7BA0CC' : '#4A76A6';
+    case 'intermediate': return dark ? '#D0776D' : '#B24E44';
+    case 'advanced': case 'expert': return dark ? '#EFEBE4' : '#1A1917';
+    case 'freeride': return dark ? '#D9A566' : '#B9772F';
+    default: return '#A39E94';
   }
 }
 

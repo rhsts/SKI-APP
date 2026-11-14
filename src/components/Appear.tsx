@@ -1,11 +1,12 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 import Animated, { Easing, FadeInDown, FadeOut } from 'react-native-reanimated';
+import { motion, space } from '../theme';
 
-const enter = FadeInDown.duration(220)
-  .easing(Easing.out(Easing.cubic))
-  .withInitialValues({ opacity: 0, transform: [{ translateY: 8 }] });
+const enter = FadeInDown.duration(motion.enter)
+  .easing(Easing.bezier(...motion.easeOut))
+  .withInitialValues({ opacity: 0, transform: [{ translateY: space.sm }] });
 // Leaving is quicker than arriving: it should get out of your way.
-const exit = FadeOut.duration(140);
+const exit = FadeOut.duration(motion.exit);
 
 /**
  * Something that comes and goes: fades in while rising a few points into place,
