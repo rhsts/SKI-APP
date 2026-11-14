@@ -13,10 +13,10 @@ import { difficultyBreakdown } from '../../lib/breakdown';
 import { DifficultyBar } from '../../components/DifficultyBar';
 import { PhotoStrip } from '../../components/PhotoStrip';
 import { addPhotos, removePhoto } from '../../days/photos';
-import { SportPicker } from '../../components/SportPicker';
+import { sportInfo } from '../../lib/sport';
 import {
   deleteMotionEvent, deleteSession, getPoints, getSession, kvGet, kvSet, listMotionEvents, listPhotos, listSegments, listSessionAttempts,
-  renameSession, setSessionSport, type MotionRow, type PhotoRow, type SessionRow,
+  renameSession, type MotionRow, type PhotoRow, type SessionRow,
 } from '../../db';
 import { eventsBetween, jumpHeight, summariseMotion } from '../../lib/motion';
 import type { Attempt, Segment } from '../../lib/segments';
@@ -188,15 +188,8 @@ export default function DayScreen() {
         </Pressable>
       )}
       <Text style={s.muted}>
-        {fmtTimeOfDay(session.startedAt)} – {fmtTimeOfDay(session.endedAt ?? session.startedAt)} · {fmtDuration(stats.duration)} on the mountain
+        {sportInfo(session.sport).label} · {fmtTimeOfDay(session.startedAt)} – {fmtTimeOfDay(session.endedAt ?? session.startedAt)} · {fmtDuration(stats.duration)} on the mountain
       </Text>
-      <SportPicker
-        value={session.sport}
-        onChange={(sp) => {
-          setSession({ ...session, sport: sp });
-          setSessionSport(session.id, sp);
-        }}
-      />
 
       <StatGrid>
         <StatTile label="Top speed" value={fmtSpeed(stats.topSpeed, units)} sub={stats.topSpeedTime ? `at ${fmtTimeOfDay(stats.topSpeedTime)}` : undefined} />

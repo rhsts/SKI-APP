@@ -93,8 +93,10 @@ export default function DaysScreen() {
               <Ionicons name={picked.includes(item.id) ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={colors.accent} />
             ) : null}
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={s.h2} numberOfLines={1}>{sportInfo(item.sport).emoji} {item.place ?? 'Ski day'}</Text>
-              <Text style={s.muted}>{fmtDate(item.startedAt)}{item.isDemo ? ' · demo' : ''}</Text>
+              <Text style={s.h2} numberOfLines={1}>{item.place ?? 'Ski day'}</Text>
+              <Text style={s.muted}>
+                {fmtDate(item.startedAt)}{item.sport !== 'ski' ? ` · ${sportInfo(item.sport).label}` : ''}{item.isDemo ? ' · demo' : ''}
+              </Text>
               {st ? (
                 <View style={styles.metrics}>
                   <Metric icon="speedometer-outline" text={fmtSpeed(st.topSpeed, units)} />

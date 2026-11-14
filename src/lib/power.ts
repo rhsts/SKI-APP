@@ -94,6 +94,18 @@ export function batteryHoursLeft(startLevel: number, startT: number, level: numb
   return level / (used / hours);
 }
 
+/**
+ * Share of the battery (0..1) an hour of tracking uses, before this phone's own rate is known.
+ * ponytail: one guess for every phone; the tracker saves the measured rate after the first
+ * recorded day and that replaces this. Add per-GPS-mode rates if the estimate proves too rough.
+ */
+export const TYPICAL_DRAIN_PER_HOUR = 0.07;
+
+/** Hours of tracking a battery level (0..1) lasts at a drain rate (share per hour). */
+export function hoursAtRate(level: number, perHour: number): number {
+  return level / Math.max(perHour, 0.005);
+}
+
 /** Text for the Android tracking notification. */
 export function notificationBody(stats: { runCount: number; verticalDown: number; topSpeed: number }, fmt: {
   alt: (m: number) => string; speed: (mps: number) => string;

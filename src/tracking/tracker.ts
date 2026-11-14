@@ -20,7 +20,7 @@ import { ghostTimeAt, leaderboard, pickTarget, Racer } from '../lib/segments';
 import { getSettings } from '../settings';
 import { haptic } from '../haptics';
 import { compareSplits, SECTION_NAMES } from '../lib/ghost';
-import { AUTO_PAUSE_MS, batteryHoursLeft, restingFor } from '../lib/power';
+import { AUTO_PAUSE_MS, batteryHoursLeft, hoursAtRate, restingFor, TYPICAL_DRAIN_PER_HOUR } from '../lib/power';
 import type { Sport } from '../lib/sport';
 import { readPressure, startBarometer, stopBarometer } from './barometer';
 import { lookupPistes } from '../mountain/pistes';
@@ -59,7 +59,7 @@ export interface TrackerState {
   newTop: { speed: number; at: number } | null;
   /** Standing still for 10+ minutes: GPS is sleeping until you move. */
   autoPaused: boolean;
-  /** Battery level (0..1) and estimated hours of tracking left. */
+  /** Battery level (0..1) and estimated hours of tracking left (measured, or from a typical drain early on). */
   battery: { level: number; hoursLeft: number | null } | null;
   /** Jumps and falls so far today. */
   motion: MotionSummary;
@@ -310,6 +310,9 @@ export function dismissLastRun() {
   set({ lastRun: null });
 }
 
+/** Where the last measured battery drain (share per hour of tracking) is kept. */
+export const DRAIN_KEY = 'drainRate';
+
 async function updateBattery() {
   const level = await Battery.getBatteryLevelAsync();
   if (!(level >= 0)) return; // -1 when unknown (e.g. emulator)
@@ -324,7 +327,12 @@ async function updateBattery() {
     start = { level, t: Date.now() };
     await kvSet('batteryStart', JSON.stringify(start));
   }
-  set({ battery: { level, hoursLeft: batteryHoursLeft(start.level, start.t, level, Date.now()) } });
+  // Measured on this day once there is enough drain to go on. Until then: the rate this phone
+  // showed on an earlier day, or a typical one. The measured rate is kept for next time.
+  const measured = batteryHoursLeft(start.level, start.t, level, Date.now());
+  if (measured != null) await kvSet(DRAIN_KEY, String(level / measured));
+  const rate = Number(await kvGet(DRAIN_KEY)) || TYPICAL_DRAIN_PER_HOUR;
+  set({ battery: { level, hoursLeft: measured ?? hoursAtRate(level, rate) } });
 }
 
 function startPolling() {

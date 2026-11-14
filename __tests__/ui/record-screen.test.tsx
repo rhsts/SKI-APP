@@ -3,6 +3,7 @@
  * layout, and the moments (new top speed, run done) that appear on top of it.
  */
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { Alert } from 'react-native';
 import { simulateDay } from '../../src/lib/sim';
 import { computeStats } from '../../src/lib/stats';
@@ -30,6 +31,8 @@ let mockState: TrackerState = IDLE;
 const mockStart = jest.fn(async () => undefined);
 const mockStop = jest.fn(async () => 'd1');
 const mockDismissRun = jest.fn();
+const mockUpdateSettings = jest.fn();
+let mockBadges: { id: string; emoji: string; title: string; description: string }[] = [];
 
 jest.mock('../../src/tracking/tracker', () => ({
   useTracker: () => mockState,
@@ -42,10 +45,13 @@ jest.mock('../../src/tracking/tracker', () => ({
 }));
 jest.mock('../../src/settings', () => {
   const s = { units: 'metric', theme: 'light', playerId: 'me', serverUrl: '', vibrate: false, simulate: false, sport: 'ski' };
-  return { useSettings: () => s, getSettings: () => s, updateSettings: jest.fn() };
+  return { useSettings: () => s, getSettings: () => s, updateSettings: (...a: unknown[]) => mockUpdateSettings(...a) };
 });
-jest.mock('../../src/db', () => ({ listTrailMaps: jest.fn(async () => []), sessionStarts: jest.fn(async () => []) }));
-jest.mock('../../src/days/badges', () => ({ badgesEarnedBy: jest.fn(async () => []) }));
+jest.mock('../../src/db', () => ({ listTrailMaps: jest.fn(async () => []), sessionStarts: jest.fn(async () => []), kvGet: jest.fn(async () => null) }));
+jest.mock('../../src/days/badges', () => ({ badgesEarnedBy: jest.fn(async () => mockBadges) }));
+jest.mock('../../src/mountain/places', () => ({
+  searchPlaces: jest.fn(async () => [{ name: 'Mürren', region: 'Bern, Switzerland', lat: 46.559, lon: 7.892, alt: 1638 }]),
+}));
 jest.mock('../../src/mountain/pistes', () => ({ downloadTrailMap: jest.fn(async () => null) }));
 jest.mock('../../src/mountain/weather', () => ({ getWeather: jest.fn(async () => null) }));
 jest.mock('expo-location', () => ({ getForegroundPermissionsAsync: jest.fn(async () => ({ status: 'denied' })) }));
@@ -67,6 +73,8 @@ jest.mock('react-native-maps', () => {
 
 // eslint-disable-next-line import/first
 import RecordScreen from '../../src/app/(tabs)/index';
+// eslint-disable-next-line import/first
+import { Setup } from '../../src/components/Setup';
 
 async function open(state: TrackerState) {
   mockState = state;
@@ -75,13 +83,18 @@ async function open(state: TrackerState) {
 }
 
 describe('record screen', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockBadges = [];
+  });
 
   it('idle: one Start control and SOS, no live figures', async () => {
     await open(IDLE);
     expect(screen.getByLabelText(/^Emergency/)).toBeTruthy();
     expect(screen.queryByText('Top speed')).toBeNull();
-    expect(screen.getByText('86% battery')).toBeTruthy();
+    // Hours of tracking, never a percentage: 86% at the typical 7% an hour.
+    expect(screen.getByText('About 12 h of tracking')).toBeTruthy();
+    expect(screen.queryByText(/%/)).toBeNull();
     await act(async () => { fireEvent.press(screen.getByLabelText('Start recording your day')); });
     expect(mockStart).toHaveBeenCalledWith(false, 'ski');
   });
@@ -90,7 +103,8 @@ describe('record screen', () => {
     await open(LIVE);
     expect(screen.getByLabelText('Speed: 62 km/h')).toBeTruthy();
     expect(screen.getByText('Top speed')).toBeTruthy();
-    expect(screen.getByText(/74% · about 13 h 00 of tracking left/)).toBeTruthy();
+    expect(screen.getByText('About 13 h of tracking left')).toBeTruthy();
+    expect(screen.queryByText(/74%/)).toBeNull();
     await act(async () => { fireEvent.press(screen.getByLabelText('Vertical')); });
     expect(screen.getByLabelText(/^Vertical: [\d,]+ m$/)).toBeTruthy();
     await act(async () => { fireEvent.press(screen.getByLabelText('Time')); });
@@ -125,6 +139,41 @@ describe('record screen', () => {
     expect(screen.getByText('Intermediate piste · 2.4 km')).toBeTruthy();
     await act(async () => { fireEvent.press(screen.getByLabelText('Close')); });
     expect(mockDismissRun).toHaveBeenCalled();
+  });
+
+  it('search: type a place, pick it, and the page shows that place', async () => {
+    await open(IDLE);
+    await act(async () => { fireEvent.press(screen.getByLabelText('Search a resort or place')); });
+    await act(async () => { fireEvent.changeText(screen.getByLabelText('Place name'), 'Mürren'); });
+    await act(async () => { fireEvent.press(screen.getByLabelText('Search')); });
+    await act(async () => { fireEvent.press(screen.getByLabelText('Mürren, Bern, Switzerland')); });
+    // The heading on the page and the title of the sheet with its snow and map.
+    expect(screen.getAllByText('Mürren').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByLabelText('Another place')).toBeTruthy();
+  });
+
+  it('new badges show in the app’s own sheet, not a system dialog', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockBadges = [{ id: 'first', emoji: '🎿', title: 'First tracks', description: 'Record your first ski day.' }];
+    await open(LIVE);
+    await act(async () => { fireEvent(screen.getByLabelText('Finish your day'), 'longPress'); });
+    expect(screen.getByText('New badge')).toBeTruthy();
+    expect(screen.getByText('First tracks')).toBeTruthy();
+    expect(alert).not.toHaveBeenCalled();
+    // The day opens when the sheet is closed, not behind it.
+    expect(router.push).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.press(screen.getByLabelText('See your day')); });
+    expect(router.push).toHaveBeenCalledWith('/day/d1');
+    alert.mockRestore();
+  });
+
+  it('first open: the setup screen saves that it was answered', async () => {
+    await render(<Setup />);
+    expect(screen.getByText('Set up Ski Tracker')).toBeTruthy();
+    await act(async () => { fireEvent.press(screen.getByLabelText('Imperial (mph, ft)')); });
+    expect(mockUpdateSettings).toHaveBeenCalledWith({ units: 'imperial' });
+    await act(async () => { fireEvent.press(screen.getByLabelText('Done')); });
+    expect(mockUpdateSettings).toHaveBeenCalledWith({ setupDone: true });
   });
 
   it('a paused day offers Resume, and says so', async () => {

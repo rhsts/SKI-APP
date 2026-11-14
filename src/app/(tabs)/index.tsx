@@ -8,38 +8,47 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Appear } from '../../components/Appear';
-import { MountainIntro, MountainRows, useMountain } from '../../components/Mountain';
+import { MountainDetails, MountainIntro, mountainSummary, useMountain } from '../../components/Mountain';
+import { PlaceSearch } from '../../components/PlaceSearch';
 import { RollingNumber } from '../../components/RollingNumber';
 import { Row, Rows } from '../../components/Row';
+import { Sheet } from '../../components/Sheet';
 import { SportPicker } from '../../components/SportPicker';
 import { Figure } from '../../components/StatTile';
 import { useTabBarSpace } from '../../components/TabBar';
 import { Tap } from '../../components/Tap';
 import { badgesEarnedBy } from '../../days/badges';
+import { kvGet } from '../../db';
 import { haptic } from '../../haptics';
 import {
   fmtAir, fmtAlt, fmtClock, fmtDate, fmtDelta, fmtDist, fmtDuration, fmtG, fmtJumpHeight, fmtRaceTime, fmtSpeed, fmtTimeOfDay, speedUnit, speedValue,
 } from '../../lib/format';
+import type { Place } from '../../lib/geocode';
+import type { Badge } from '../../lib/goals';
 import { jumpHeight } from '../../lib/motion';
 import { difficultyColor, difficultyLabel } from '../../lib/pistes';
+import { hoursAtRate, TYPICAL_DRAIN_PER_HOUR } from '../../lib/power';
 import { sportInfo } from '../../lib/sport';
 import { liveStatus } from '../../lib/stats';
 import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
 import { chromeShadow, font, motion, radius, size, space, target, useStyles, useTheme, type Palette } from '../../theme';
 import {
-  dismissFall, dismissFinish, dismissLastRun, notAFall, pauseDay, resumeDay, startDay, stopDay, useTracker,
+  dismissFall, dismissFinish, dismissLastRun, DRAIN_KEY, notAFall, pauseDay, resumeDay, startDay, stopDay, useTracker,
   type LiveRace, type RaceFinish, type RunSummary, type TrackerState,
 } from '../../tracking/tracker';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Mode = 'speed' | 'vertical' | 'time';
+type SheetId = 'place' | 'mountain' | 'sport' | 'figures';
 const MODES: { id: Mode; label: string }[] = [
   { id: 'speed', label: 'Speed' },
   { id: 'vertical', label: 'Vertical' },
   { id: 'time', label: 'Time' },
 ];
 const easeOut = Easing.bezier(...motion.easeOut);
+/** Below this window height the page drops its second row of figures and one ring, so it still fits. */
+const COMPACT_HEIGHT = 760;
 
 /** The one small text label that says what the tracker is doing. */
 function stateOf(t: TrackerState): { text: string; dot: 'live' | 'hollow' | 'quiet' } {
@@ -69,9 +78,17 @@ function heroOf(mode: Mode, t: TrackerState, units: Units): { value: string; uni
   return { value: waiting ? '–' : t.status === 'recording' ? speedValue(t.currentSpeed, units).toFixed(0) : '0', unit: speedUnit(units) };
 }
 
+/** An estimate, so no false precision: whole hours when there are plenty, minutes only near the end. */
 function fmtHours(h: number): string {
-  if (h >= 24) return '24 h+';
-  return h >= 1 ? `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}` : `${Math.round(h * 60)} min`;
+  if (h >= 24) return 'more than 24 h';
+  if (h >= 3) return `${Math.round(h)} h`;
+  return h >= 1 ? `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, '0')}` : `${Math.max(1, Math.round(h * 60))} min`;
+}
+
+/** "31.2 km" → ["31.2", "km"], so the unit can sit small beside the number. */
+function split(text: string): [string, string] {
+  const i = text.lastIndexOf(' ');
+  return i < 0 ? [text, ''] : [text.slice(0, i), text.slice(i + 1)];
 }
 
 export default function RecordScreen() {
@@ -79,16 +96,34 @@ export default function RecordScreen() {
   const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const tabSpace = useTabBarSpace();
+  const compact = useWindowDimensions().height < COMPACT_HEIGHT;
   const t = useTracker();
   const { units, simulate, sport } = useSettings();
-  const m = useMountain(t.points);
-  // Before you start there is no drain to measure yet, so idle shows the level only (-1: unknown).
-  const batteryLevel = useBatteryLevel();
+  const idle = t.status === 'idle';
+  // A place you searched for is shown until you start: once you record, the mountain is where you are.
+  const [place, setPlace] = useState<Place | null>(null);
+  const m = useMountain(t.points, idle ? place : null);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<Mode>('speed');
-  const [open, setOpen] = useState<'sport' | 'figures' | null>(null);
+  // One sheet for every detail, so the page itself never grows. `sheet` stays set while it closes.
+  const [sheet, setSheet] = useState<SheetId>('mountain');
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Badges earned by the day you just finished. They show here first; the day opens when the sheet closes
+  // (a sheet opened from this tab can't appear while another screen covers it).
+  const [earned, setEarned] = useState<{ dayId: string; badges: Badge[] } | null>(null);
   const [footerHeight, setFooterHeight] = useState(tabSpace + target.control + space.md);
   const [today] = useState(() => fmtDate(Date.now()).replace(/ \d{4}$/, ''));
+  // Before recording there is no drain to measure: use the rate this phone showed last time, or a typical one.
+  const batteryLevel = useBatteryLevel();
+  const [drain, setDrain] = useState(TYPICAL_DRAIN_PER_HOUR);
+  useEffect(() => {
+    kvGet(DRAIN_KEY).then((v) => { if (Number(v) > 0) setDrain(Number(v)); }).catch(() => undefined);
+  }, [idle]);
+
+  const show = (id: SheetId) => {
+    setSheet(id);
+    setSheetOpen(true);
+  };
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -107,15 +142,16 @@ export default function RecordScreen() {
         Alert.alert('Too short to save', 'Record at least a minute of GPS to save a day.');
         return;
       }
-      router.push(`/day/${id}`);
       const fresh = await badgesEarnedBy(id).catch(() => []);
-      if (fresh.length) {
-        Alert.alert(
-          fresh.length === 1 ? 'New badge' : `${fresh.length} new badges`,
-          fresh.map((b) => `${b.title}: ${b.description}`).join('\n'),
-        );
-      }
+      if (fresh.length) setEarned({ dayId: id, badges: fresh });
+      else router.push(`/day/${id}`);
     });
+
+  const seeDay = () => {
+    if (!earned) return;
+    setEarned(null);
+    router.push(`/day/${earned.dayId}`);
+  };
 
   // A tap asks first; holding the button for a second is the confirmation.
   const confirmFinish = () =>
@@ -125,15 +161,33 @@ export default function RecordScreen() {
     ]);
 
   const st = t.stats;
-  const idle = t.status === 'idle';
   const state = idle ? null : stateOf(t);
   const flash = t.newTop && t.status === 'recording' ? t.newTop : null;
   const hero = flash ? { value: fmtSpeed(flash.speed, units, false), unit: speedUnit(units) } : heroOf(mode, t, units);
-  const lowBattery = !!t.battery && t.battery.level < 0.2;
+  const hoursLeft = idle ? (batteryLevel >= 0 ? hoursAtRate(batteryLevel, drain) : null) : t.battery?.hoursLeft ?? null;
+  const lowBattery = hoursLeft != null && hoursLeft < 1.5;
+  const [distance, distanceUnit] = split(fmtDist(st?.distance ?? 0, units));
+  const sheetTitle = { place: 'Find a place', mountain: m.name ?? 'Snow and trail map', sport: 'Sport', figures: 'All figures' }[sheet];
+
+  const tracking = hoursLeft != null ? (
+    <View style={[styles.battery, idle && styles.centerSelf]} accessible>
+      <Ionicons name={lowBattery ? 'battery-dead-outline' : 'battery-half-outline'} size={20} color={lowBattery ? colors.text : colors.muted} />
+      {/* Hours, not a percentage. Running low reads in graphite and a heavier weight: red stays with SOS and falls. */}
+      <Text style={[lowBattery ? s.control : s.muted, styles.tabular]}>
+        About {fmtHours(hoursLeft)} of tracking{idle ? '' : ' left'}
+      </Text>
+    </View>
+  ) : null;
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: idle ? tabSpace : space.xl }]}>
+      {/* The page is laid out to fit the screen. It only scrolls if a moment (a fall check) or very large text needs more room. */}
+      <ScrollView
+        bounces={false}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.content, { paddingBottom: idle ? tabSpace : space.md }]}
+      >
         <View style={styles.top}>
           <View style={styles.state} accessible accessibilityLabel={state ? state.text : today}>
             {state ? <View style={[styles.dot, state.dot === 'hollow' && styles.dotHollow, state.dot === 'quiet' && styles.dotQuiet]} /> : null}
@@ -183,14 +237,14 @@ export default function RecordScreen() {
           <>
             <View style={styles.intro}><MountainIntro m={m} units={units} /></View>
             <Rows>
-              <MountainRows m={m} points={t.points} units={units} />
-              <Row label="Sport" value={sportInfo(sport).label} onPress={() => setOpen(open === 'sport' ? null : 'sport')} open={open === 'sport'}>
-                <SportPicker value={sport} onChange={(sp) => updateSettings({ sport: sp })} />
-              </Row>
+              <Row label={place ? 'Another place' : 'Search a resort or place'} onPress={() => show('place')} />
+              <Row label="Snow and trail map" value={mountainSummary(m, units)} onPress={() => show('mountain')} />
+              <Row label="Sport" value={sportInfo(sport).label} onPress={() => show('sport')} />
             </Rows>
-            <View style={styles.startArea}>
+            <View style={[styles.startArea, compact && styles.startAreaCompact]}>
               {busy ? <ActivityIndicator color={colors.accent} size="large" /> : (
                 <StartButton
+                  compact={compact}
                   onPress={() => {
                     haptic('record');
                     run(() => startDay(simulate, sport));
@@ -198,17 +252,8 @@ export default function RecordScreen() {
                 />
               )}
             </View>
-            {batteryLevel >= 0 ? (
-              <View style={[styles.battery, styles.centerSelf]} accessible accessibilityLabel={`Battery ${Math.round(batteryLevel * 100)} percent`}>
-                <Ionicons name={batteryLevel < 0.2 ? 'battery-dead-outline' : batteryLevel < 0.5 ? 'battery-half-outline' : 'battery-full-outline'} size={20} color={colors.muted} />
-                <Text style={[s.muted, styles.tabular]}>{Math.round(batteryLevel * 100)}% battery</Text>
-              </View>
-            ) : null}
-            <Text style={[s.muted, styles.hint]}>
-              {simulate
-                ? 'Simulated GPS is on (You): a demo ski day plays at 20× speed.'
-                : 'Put your phone in your pocket. Runs and lifts are detected by themselves.'}
-            </Text>
+            {tracking}
+            {simulate ? <Text style={[s.muted, styles.hint]}>Simulated GPS is on (You): a demo day plays at 20× speed.</Text> : null}
           </>
         ) : (
           <>
@@ -230,59 +275,34 @@ export default function RecordScreen() {
             <View style={styles.trio}>
               <Figure style={styles.third} label="Top speed" value={fmtSpeed(st?.topSpeed ?? 0, units, false)} unit={speedUnit(units)} />
               <Figure style={styles.third} label="Vertical" value={fmtAlt(st?.verticalDown ?? 0, units, false)} unit={units === 'metric' ? 'm' : 'ft'} />
-              <Figure style={styles.third} label="Runs" value={String(st?.runCount ?? 0)} sub={`${st?.liftCount ?? 0} ${st?.liftCount === 1 ? 'lift' : 'lifts'}`} />
+              <Figure style={styles.third} label="Runs" value={String(st?.runCount ?? 0)} unit={`${st?.liftCount ?? 0} ${st?.liftCount === 1 ? 'lift' : 'lifts'}`} />
             </View>
+            {compact ? null : (
+              <View style={styles.trio}>
+                <Figure style={styles.third} label="Distance" value={distance} unit={distanceUnit} />
+                <Figure
+                  style={styles.third}
+                  label="Altitude"
+                  value={fmtAlt(t.points.length ? t.points[t.points.length - 1].alt : null, units, false)}
+                  unit={units === 'metric' ? 'm' : 'ft'}
+                />
+                <Figure style={styles.third} label="Ski time" value={fmtDuration(st?.skiTime ?? 0)} />
+              </View>
+            )}
 
             <View style={styles.rows}>
               <Rows>
-                <Row label="Distance" value={fmtDist(st?.distance ?? 0, units)} strong />
-                <Row label="Altitude" value={fmtAlt(t.points.length ? t.points[t.points.length - 1].alt : null, units)} strong />
-                <MountainRows m={m} points={t.points} units={units} live />
-                <Row label="All figures" value="Ski time, turns, jumps" onPress={() => setOpen(open === 'figures' ? null : 'figures')} open={open === 'figures'}>
-                  <View>
-                    <Detail label="Ski time" value={fmtDuration(st?.skiTime ?? 0)} />
-                    <Detail label="Lift time" value={fmtDuration(st?.liftTime ?? 0)} />
-                    <Detail label="Lift lines" value={fmtDuration(st?.liftWaitTime ?? 0)} />
-                    <Detail label="Skied distance" value={fmtDist(st?.skiDistance ?? 0, units)} />
-                    <Detail label="Highest point" value={fmtAlt(st?.maxAlt, units)} />
-                    <Detail label="Turns" value={String(st?.turns ?? 0)} />
-                    {st?.maxG ? <Detail label="Strongest turn" value={fmtG(st.maxG)} /> : null}
-                    <Detail label="Jumps" value={String(t.motion.jumps)} />
-                    {t.motion.bestAir ? <Detail label="Longest air" value={fmtAir(t.motion.bestAir)} /> : null}
-                    <Detail label="Falls" value={String(t.motion.falls)} />
-                  </View>
-                </Row>
+                <Row label="Snow and trail map" value={mountainSummary(m, units)} onPress={() => show('mountain')} />
+                <Row label="All figures" value="Turns, jumps, lifts" onPress={() => show('figures')} />
               </Rows>
             </View>
-
-            {t.battery ? (
-              <View style={styles.battery} accessible>
-                <Ionicons
-                  name={lowBattery ? 'battery-dead-outline' : t.battery.level < 0.5 ? 'battery-half-outline' : 'battery-full-outline'}
-                  size={20}
-                  color={lowBattery ? colors.text : colors.muted}
-                />
-                {/* Low battery reads in graphite and a heavier weight: red stays with SOS and falls. */}
-                <Text style={[lowBattery ? s.control : s.muted, styles.tabular]}>
-                  {Math.round(t.battery.level * 100)}%
-                  {t.battery.hoursLeft != null ? ` · about ${fmtHours(t.battery.hoursLeft)} of tracking left` : ''}
-                </Text>
-              </View>
+            {tracking}
+            {t.foregroundOnly && t.status === 'recording' ? (
+              <Text style={[s.muted, styles.note]}>Keep the app open: location “All the time” isn’t allowed, so tracking stops with the screen off.</Text>
             ) : null}
-
-            <View style={styles.notes}>
-              {t.foregroundOnly && t.status === 'recording' ? (
-                <Text style={s.muted}>
-                  Background location isn’t allowed, so keep the app open. Allow location “All the time” to track with the screen off.
-                </Text>
-              ) : null}
-              {t.motionLive && t.status === 'recording' && !t.foregroundOnly ? (
-                <Text style={s.muted}>Jumps and falls are picked up while the app is open on screen.</Text>
-              ) : null}
-            </View>
           </>
         )}
-        {t.error ? <Text style={[s.control, styles.error]}>{t.error}</Text> : null}
+        {t.error ? <Text style={[s.control, styles.note]}>{t.error}</Text> : null}
       </ScrollView>
 
       {!idle ? (
@@ -299,6 +319,57 @@ export default function RecordScreen() {
       ) : null}
 
       {t.lastRun && !idle && !t.race && !t.fallAlert ? <RunDone key={t.lastRun.number} r={t.lastRun} units={units} bottom={footerHeight + space.md} /> : null}
+
+      <Sheet visible={sheetOpen} title={sheetTitle} tall={sheet === 'place' || sheet === 'mountain'} onClose={() => setSheetOpen(false)}>
+        {sheet === 'place' ? (
+          <PlaceSearch
+            units={units}
+            current={place}
+            onPick={(p) => {
+              setPlace(p);
+              setSheet('mountain');
+            }}
+            onUseLocation={() => {
+              setPlace(null);
+              setSheetOpen(false);
+            }}
+          />
+        ) : sheet === 'mountain' ? (
+          <MountainDetails m={m} points={t.points} units={units} />
+        ) : sheet === 'sport' ? (
+          <SportPicker value={sport} onChange={(sp) => updateSettings({ sport: sp })} />
+        ) : (
+          <View>
+            <Detail label="Distance" value={fmtDist(st?.distance ?? 0, units)} />
+            <Detail label="Skied distance" value={fmtDist(st?.skiDistance ?? 0, units)} />
+            <Detail label="Altitude now" value={fmtAlt(t.points.length ? t.points[t.points.length - 1].alt : null, units)} />
+            <Detail label="Highest point" value={fmtAlt(st?.maxAlt, units)} />
+            <Detail label="Ski time" value={fmtDuration(st?.skiTime ?? 0)} />
+            <Detail label="Lift time" value={fmtDuration(st?.liftTime ?? 0)} />
+            <Detail label="Lift lines" value={fmtDuration(st?.liftWaitTime ?? 0)} />
+            <Detail label="Turns" value={String(st?.turns ?? 0)} />
+            {st?.maxG ? <Detail label="Strongest turn" value={fmtG(st.maxG)} /> : null}
+            <Detail label="Jumps" value={String(t.motion.jumps)} />
+            {t.motion.bestAir ? <Detail label="Longest air" value={fmtAir(t.motion.bestAir)} /> : null}
+            <Detail label="Falls" value={String(t.motion.falls)} />
+            {t.motionLive ? <Text style={[s.muted, styles.note]}>Jumps and falls are picked up while the app is open on screen.</Text> : null}
+          </View>
+        )}
+      </Sheet>
+
+      {/* New badges, in the app's own voice instead of a system dialog. The badge emoji stay: they are the badges. */}
+      <Sheet visible={!!earned} title={earned?.badges.length === 1 ? 'New badge' : `${earned?.badges.length ?? 0} new badges`} onClose={seeDay}>
+        {earned?.badges.map((b) => (
+          <View key={b.id} style={styles.badge}>
+            <Text style={styles.badgeMark} allowFontScaling={false}>{b.emoji}</Text>
+            <View style={styles.grow}>
+              <Text style={s.control}>{b.title}</Text>
+              <Text style={s.muted}>{b.description}</Text>
+            </View>
+          </View>
+        ))}
+        <View style={styles.close}><Button label="See your day" solid onPress={seeDay} /></View>
+      </Sheet>
     </View>
   );
 }
@@ -354,15 +425,22 @@ function MetricPick({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
   );
 }
 
-/** One very large, light figure with its unit small beside it. Shrinks to fit long values. */
+/** One very large, light figure with its unit small beside it. It takes the room the page has left, and shrinks to fit long values. */
 function HeroFigure({ label, value, unit, color }: { label: string; value: string; unit: string; color: string }) {
   const styles = useStyles(makeStyles);
   const { width } = useWindowDimensions();
+  const [room, setRoom] = useState<number>(size.hero);
   // Tabular digits are about 0.64 em wide, separators about half that.
   const ems = value.split('').reduce((n, c) => n + (c >= '0' && c <= '9' ? 0.64 : 0.32), 0);
-  const fontSize = Math.max(size.figure, Math.min(size.hero, Math.floor((width - 2 * space.xl - space.xxxl - space.lg) / Math.max(ems, 1))));
+  const fits = Math.floor((width - 2 * space.xl - space.xxxl - space.lg) / Math.max(ems, 1));
+  const fontSize = Math.max(size.figure, Math.min(size.hero, fits, Math.floor(room / 1.1)));
   return (
-    <View style={styles.bigBox} accessible accessibilityLabel={`${label}: ${value} ${unit}`}>
+    <View
+      style={styles.bigBox}
+      onLayout={(e) => setRoom(e.nativeEvent.layout.height)}
+      accessible
+      accessibilityLabel={`${label}: ${value} ${unit}`}
+    >
       <View style={styles.big} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
         <RollingNumber
           value={value}
@@ -376,7 +454,7 @@ function HeroFigure({ label, value, unit, color }: { label: string; value: strin
 }
 
 /** The one solid control on the tab, glove-sized, with a slow breathing ring: the only motion while idle. */
-function StartButton({ onPress }: { onPress: () => void }) {
+function StartButton({ onPress, compact }: { onPress: () => void; compact: boolean }) {
   const styles = useStyles(makeStyles);
   const focused = useIsFocused();
   const breath = useSharedValue(0);
@@ -389,7 +467,7 @@ function StartButton({ onPress }: { onPress: () => void }) {
   const outer = useAnimatedStyle(() => ({ opacity: 0.15 + 0.45 * breath.value, transform: [{ scale: 0.97 + 0.06 * breath.value }] }));
   return (
     <View style={styles.startWrap}>
-      <Animated.View style={[styles.ring, styles.ringOuter, outer]} />
+      {compact ? null : <Animated.View style={[styles.ring, styles.ringOuter, outer]} />}
       <Animated.View style={[styles.ring, styles.ringInner, inner]} />
       <Tap onPress={onPress} style={styles.start} accessibilityRole="button" accessibilityLabel="Start recording your day">
         <Text style={styles.startText} maxFontSizeMultiplier={1.4}>Start</Text>
@@ -401,6 +479,7 @@ function StartButton({ onPress }: { onPress: () => void }) {
 function Button({ label, icon, onPress, solid, danger }: { label: string; icon?: IconName; onPress: () => void; solid?: boolean; danger?: boolean }) {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
+  // Text on the solid and the danger fill uses the background colour, so it reads in light and dark.
   const ink = danger || solid ? colors.bg : colors.text;
   return (
     <Tap
@@ -604,6 +683,7 @@ function FallCheck() {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
+    // flexGrow: the page fills the screen exactly, and the Start button or the big figure takes what is left.
     content: { flexGrow: 1, paddingHorizontal: space.xl, paddingTop: space.sm },
     top: { minHeight: target.min, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.lg, marginBottom: space.xs },
     state: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm },
@@ -618,6 +698,7 @@ const makeStyles = (colors: Palette) =>
     sosText: { fontFamily: font.medium, fontSize: size.caption, letterSpacing: 1, color: colors.danger },
     tabular: { fontVariant: ['tabular-nums'] },
     hint: { textAlign: 'center', marginTop: space.sm },
+    note: { marginTop: space.md },
     centerSelf: { alignSelf: 'center' },
     grow: { flex: 1 },
     between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.lg },
@@ -625,9 +706,10 @@ const makeStyles = (colors: Palette) =>
     icon: { width: target.min, height: target.min, alignItems: 'flex-end', justifyContent: 'center' },
     link: { minHeight: target.min, justifyContent: 'center', alignSelf: 'flex-start' },
 
-    intro: { marginTop: space.xxl, marginBottom: space.xl },
-    // Room for the rings (32 around the button) plus air: the button centres in whatever is left.
-    startArea: { flexGrow: 1, minHeight: target.start + 4 * space.xxl, alignItems: 'center', justifyContent: 'center' },
+    intro: { marginTop: space.lg, marginBottom: space.lg },
+    // Room for the rings (32 around the button); the button centres in whatever height is left.
+    startArea: { flexGrow: 1, minHeight: target.start + 2 * space.xxxl, alignItems: 'center', justifyContent: 'center' },
+    startAreaCompact: { minHeight: target.start + 2 * space.xl },
     startWrap: { width: target.start, height: target.start },
     ring: { position: 'absolute', borderRadius: radius.pill, borderColor: colors.ice },
     ringInner: { top: -space.lg, right: -space.lg, bottom: -space.lg, left: -space.lg, borderWidth: 1.5 },
@@ -635,22 +717,20 @@ const makeStyles = (colors: Palette) =>
     start: { width: target.start, height: target.start, borderRadius: target.start / 2, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
     startText: { fontFamily: font.medium, fontSize: size.control, color: colors.bg },
 
-    hero: { marginTop: space.xl },
+    hero: { flexGrow: 1, marginTop: space.md },
     pick: { flexDirection: 'row', gap: space.xl, height: target.min },
     pickItem: { height: target.min, justifyContent: 'center' },
     pickLine: { position: 'absolute', left: -0.5, bottom: space.sm, width: 1, height: 2, backgroundColor: colors.ice },
-    bigBox: { height: 136, justifyContent: 'flex-end' },
+    bigBox: { flexGrow: 1, minHeight: 64, justifyContent: 'center' },
     big: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
     heroText: { fontFamily: font.light, fontVariant: ['tabular-nums'], includeFontPadding: false },
     heroUnit: { fontFamily: font.regular, fontSize: size.control, color: colors.muted },
-    rule: { height: 2, backgroundColor: colors.ice, marginTop: space.sm },
-    trio: { flexDirection: 'row', gap: space.lg, marginTop: space.xl, paddingTop: space.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.faint },
+    rule: { height: 2, backgroundColor: colors.ice },
+    trio: { flexDirection: 'row', gap: space.lg, marginTop: space.lg, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.faint },
     third: { flex: 1 },
     rows: { marginTop: space.lg },
     detail: { minHeight: space.xxl, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.lg },
-    battery: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.lg },
-    notes: { gap: space.sm, marginTop: space.lg },
-    error: { marginTop: space.lg },
+    battery: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.md },
 
     footer: { paddingHorizontal: space.xl, paddingTop: space.md, backgroundColor: colors.bg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.faint },
     spinner: { height: target.control, alignItems: 'center', justifyContent: 'center' },
@@ -671,7 +751,9 @@ const makeStyles = (colors: Palette) =>
     grab: { alignSelf: 'center', width: space.xxl, height: 4, borderRadius: 2, backgroundColor: colors.faint, marginBottom: space.md },
     title: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.xs },
     pisteDot: { width: 12, height: 12, borderRadius: 6 },
-    close: { height: 64, flexDirection: 'row', marginTop: space.xl },
+    close: { height: 64, flexDirection: 'row', marginTop: space.lg },
+    badge: { flexDirection: 'row', alignItems: 'center', gap: space.lg, minHeight: 56 },
+    badgeMark: { fontSize: 32, width: space.xxxl, textAlign: 'center' },
 
     track: { height: 2, backgroundColor: colors.faint, marginTop: space.sm },
     trackFill: { height: 2 },
