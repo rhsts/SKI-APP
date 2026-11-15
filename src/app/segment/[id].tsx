@@ -11,7 +11,7 @@ import { deleteSegment, getSegment, listAttempts } from '../../db';
 import { fmtAlt, fmtDate, fmtDelta, fmtDist, fmtRaceTime } from '../../lib/format';
 import { leaderboard, pathInfo, type Attempt, type Segment } from '../../lib/segments';
 import { useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { refreshRacers } from '../../tracking/tracker';
 
 export default function SegmentScreen() {
@@ -41,7 +41,7 @@ export default function SegmentScreen() {
 
   const invite = async (group: boolean) => {
     if (!name.trim()) {
-      dialog('What’s your name?', 'Add your name in Profile first.', [
+      dialog('What’s your name?', 'Add your name under You first.', [
         { text: 'Later', style: 'cancel', onPress: () => doShare(group) },
         { text: 'Set name', onPress: () => router.push('/profile') },
       ]);
@@ -138,7 +138,7 @@ export default function SegmentScreen() {
           <View key={e.playerId} style={[s.card, styles.lbRow, me && { borderColor: colors.accent }]}>
             <Text style={styles.rank}>{e.rank}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[s.body, { fontWeight: '600' }]}>{me ? `${e.playerName} (you)` : e.playerName}</Text>
+              <Text style={[s.body, { fontFamily: font.medium }]}>{me ? `${e.playerName} (you)` : e.playerName}</Text>
               <Text style={s.muted}>{fmtDate(e.at)}{e.attempts > 1 ? ` · ${e.attempts} runs` : ''}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -171,16 +171,16 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-    big: { fontSize: 44, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    big: { fontSize: 44, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     group: {
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
       borderRadius: 12, borderWidth: 1, borderColor: colors.accent,
     },
-    groupText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    groupText: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
     invite: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16 },
-    inviteText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    inviteText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
     lbRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
-    rank: { fontSize: 20, width: 36, textAlign: 'center', fontWeight: '700', color: colors.muted },
-    lbTime: { fontSize: 17, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    rank: { fontSize: 20, width: 36, textAlign: 'center', fontFamily: font.medium, color: colors.muted },
+    lbTime: { fontSize: 17, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     attempt: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.faint },
   });

@@ -16,7 +16,7 @@ import {
 import type { Segment } from '../../lib/segments';
 import { useSettings } from '../../settings';
 import { Avatar } from '../../components/Avatar';
-import { useStyles, useTheme, type Palette } from '../../theme';
+import { font, useStyles, useTheme, type Palette } from '../../theme';
 
 const METRICS: { key: BoardMetric; label: string }[] = [
   { key: 'vertical', label: 'Vertical' },
@@ -206,7 +206,7 @@ export default function GroupScreen() {
               <Text style={styles.rank}>{r.rank ?? '–'}</Text>
               <Avatar playerId={r.playerId} name={r.name} size={34} hasAvatar={!!avatarOf.get(r.playerId)} />
               <View style={{ flex: 1 }}>
-                <Text style={[s.body, { fontWeight: '700' }]} numberOfLines={1}>{r.playerId === playerId ? `${r.name} (you)` : r.name}</Text>
+                <Text style={[s.body, { fontFamily: font.medium }]} numberOfLines={1}>{r.playerId === playerId ? `${r.name} (you)` : r.name}</Text>
                 {r.rank != null ? (
                   <Text style={s.muted} numberOfLines={1}>
                     {[
@@ -302,7 +302,7 @@ function ChallengeCard({ c, rows, groupId, ownerId, today, onRemoved, compact, o
         ranked.map((r) => (
           <View key={r.playerId} style={[styles.rankRow, r.playerId === playerId && styles.meRow]}>
             <Text style={styles.rank}>{r.rank}</Text>
-            <Text style={[s.body, { flex: 1, fontWeight: '600' }]} numberOfLines={1}>{r.playerId === playerId ? 'You' : r.playerName}</Text>
+            <Text style={[s.body, { flex: 1, fontFamily: font.medium }]} numberOfLines={1}>{r.playerId === playerId ? 'You' : r.playerName}</Text>
             {r.rank > 1 ? <Text style={[s.muted, { color: colors.danger }]}>{fmtDelta(r.time - ranked[0].time)}</Text> : null}
             <Text style={styles.value}>{fmtRaceTime(r.time)}</Text>
           </View>
@@ -360,7 +360,7 @@ function NewChallenge({ groupId, today, onDone }: { groupId: string; today: stri
         segments.map((seg) => (
           <Tap key={seg.id} onPress={() => pick(seg)} disabled={!!busy} style={styles.rankRow}>
             <Ionicons name="flag-outline" size={18} color={colors.accent} />
-            <Text style={[s.body, { flex: 1, fontWeight: '600' }]} numberOfLines={1}>{seg.name}</Text>
+            <Text style={[s.body, { flex: 1, fontFamily: font.medium }]} numberOfLines={1}>{seg.name}</Text>
             {busy === seg.id ? <ActivityIndicator color={colors.accent} /> : <Text style={s.muted}>{fmtDist(segLength(seg), units)}</Text>}
           </Tap>
         ))
@@ -383,18 +383,18 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     codeCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    code: { fontSize: 24, fontWeight: '700', letterSpacing: 4, color: colors.text },
+    code: { fontSize: 24, fontFamily: font.medium, letterSpacing: 4, color: colors.text },
     pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    pillText: { fontWeight: '600', color: colors.text },
+    pillText: { fontFamily: font.medium, color: colors.text },
     segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 12, padding: 4 },
     segBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
     segOn: { backgroundColor: colors.accent },
-    segText: { fontWeight: '600', color: colors.text },
+    segText: { fontFamily: font.medium, color: colors.text },
     rankRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8 },
     meRow: { backgroundColor: colors.accentSoft },
-    rank: { width: 30, fontSize: 17, fontWeight: '700', color: colors.text, textAlign: 'center' },
-    value: { fontSize: 15, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    rank: { width: 30, fontSize: 17, fontFamily: font.medium, color: colors.text, textAlign: 'center' },
+    value: { fontSize: 15, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'space-between' },
-    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
   });

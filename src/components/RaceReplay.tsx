@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fmtDate, fmtDelta, fmtRaceTime } from '../lib/format';
 import { compareSplits, pointAlong, progressAt, SECTION_NAMES } from '../lib/ghost';
 import { ghostTimeAt, GHOST_SAMPLES, leaderboard, type Attempt, type Segment } from '../lib/segments';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 import { SegmentMap } from './SegmentMap';
 
 interface Props {
@@ -143,7 +143,7 @@ export function RaceReplay({ segment, attempts, playerId }: Props) {
                   <Text style={[s.body, styles.splitName]}>{SECTION_NAMES[i][0].toUpperCase() + SECTION_NAMES[i].slice(1)}</Text>
                   <Text style={[s.body, styles.splitVal]}>{splits.mine[i].toFixed(1)}s</Text>
                   <Text style={[s.body, styles.splitVal]}>{splits.theirs[i].toFixed(1)}s</Text>
-                  <Text style={[s.body, styles.splitVal, { fontWeight: '700', color: d > 0.05 ? colors.danger : d < -0.05 ? colors.good : colors.muted }]}>
+                  <Text style={[s.body, styles.splitVal, { fontFamily: font.medium, color: d > 0.05 ? colors.danger : d < -0.05 ? colors.good : colors.muted }]}>
                     {fmtDelta(d)}
                   </Text>
                 </View>
@@ -166,7 +166,7 @@ const makeStyles = (colors: Palette) =>
     playRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     play: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
     chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.faint },
-    chipText: { fontWeight: '600', color: colors.text, fontSize: 13 },
+    chipText: { fontFamily: font.medium, color: colors.text, fontSize: 13 },
     splits: { gap: 2 },
     splitRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8 },
     splitName: { flex: 1.2 },

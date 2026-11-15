@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FullWindowOverlay } from 'react-native-screens';
 import { closeDialog, useDialog, type DialogButton } from '../dialog';
 import { motion, radius, space, useStyles, useTheme, type Palette } from '../theme';
+import { useModalFill } from './Sheet';
 import { Tap } from './Tap';
 
 /**
@@ -15,6 +16,7 @@ export function DialogHost() {
   const { colors, s } = useTheme();
   const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const fill = useModalFill();
   if (!d) return null;
 
   const cancel = d.buttons.find((b) => b.style === 'cancel');
@@ -26,7 +28,7 @@ export function DialogHost() {
   };
 
   const body = (
-    <View style={styles.fill} accessibilityViewIsModal>
+    <View style={[styles.fill, fill]} accessibilityViewIsModal>
       <Animated.View entering={FadeIn.duration(motion.enter)} style={styles.scrim}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => pick(cancel)} accessibilityRole="button" accessibilityLabel="Close" />
       </Animated.View>
@@ -70,7 +72,7 @@ export function DialogHost() {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    fill: { flex: 1, justifyContent: 'flex-end' },
+    fill: { justifyContent: 'flex-end' },
     scrim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(15,14,13,0.4)' },
     panel: {
       backgroundColor: colors.card, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card,

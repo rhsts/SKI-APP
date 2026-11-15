@@ -10,7 +10,7 @@ import { emergencyNumbers, formatCoords } from '../lib/emergency';
 import { mapFor, nearestFeature } from '../lib/trailmap';
 import { fmtAlt, fmtTimeOfDay } from '../lib/format';
 import { useSettings } from '../settings';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 import { useTracker } from '../tracking/tracker';
 
 /**
@@ -82,7 +82,7 @@ export default function SosScreen() {
             <Text selectable style={styles.coords}>{c.decimal}</Text>
             <Text selectable style={[s.body, { fontVariant: ['tabular-nums'] }]}>{c.dms}</Text>
             {near ? (
-              <Text style={[s.body, { fontWeight: '600' }]}>
+              <Text style={[s.body, { fontFamily: font.medium }]}>
                 {near.meters < 30 ? 'On' : `${near.meters} m from`} {near.kind === 'lift' ? 'lift' : 'piste'} “{near.name}”
               </Text>
             ) : null}
@@ -137,9 +137,9 @@ const makeStyles = (colors: Palette) =>
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     call: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: 16, minHeight: 76 },
     callAlt: { backgroundColor: 'transparent', borderWidth: 2, borderColor: colors.danger, minHeight: 52 },
-    callText: { color: '#fff', fontSize: 24, fontWeight: '700' },
-    coords: { fontSize: 20, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    callText: { color: '#fff', fontSize: 24, fontFamily: font.medium },
+    coords: { fontSize: 20, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     row: { flexDirection: 'row', gap: 12, marginTop: 4 },
     btn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.accent },
-    btnText: { color: colors.accent, fontWeight: '700' },
+    btnText: { color: colors.accent, fontFamily: font.medium },
   });

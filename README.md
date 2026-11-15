@@ -121,7 +121,7 @@ Play Store would need a real signing key.
    ```
 3. Scan the QR code with Expo Go.
 
-No snow? Go to **Profile → Simulated GPS** and press **Start day**: a fake ski day plays at 20× speed.
+No snow? Go to **You → Simulated GPS** and press **Start**: a fake ski day plays at 20× speed.
 You can also tap **Add a demo day** to get a finished day you can explore in Days and Season.
 
 ### Background tracking

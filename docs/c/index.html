@@ -11,19 +11,19 @@
   <meta property="og:description" content="Beat my time on the slopes — open this in Ski Tracker.">
   <style>
     :root {
-      --bg: #F3F6FA; --card: #FFFFFF; --text: #0E1B2C; --muted: #5C6B7E; --line: #DDE4EC;
+      --shadow: 0 2px 10px rgba(14,27,44,.06); --bg: #F3F6FA; --card: #FFFFFF; --text: #0E1B2C; --muted: #5C6B7E; --line: #DDE4EC;
       --accent: #0B6BCB; --on-accent: #FFFFFF; --accent-soft: #E3F0FC; --good: #1F9D55; --warn: #C27C0E; --danger: #D0342C;
       color-scheme: light;
     }
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
-        --bg: #0B1420; --card: #14202F; --text: #EAF0F7; --muted: #9AA8B8; --line: #26354A;
+        --shadow: none; --bg: #0B1420; --card: #14202F; --text: #EAF0F7; --muted: #9AA8B8; --line: #26354A;
         --accent: #4DA3F5; --on-accent: #0B1420; --accent-soft: #15304D; --good: #3CC27A; --warn: #E8A33C; --danger: #F0645C;
         color-scheme: dark;
       }
     }
     :root[data-theme="dark"] {
-      --bg: #0B1420; --card: #14202F; --text: #EAF0F7; --muted: #9AA8B8; --line: #26354A;
+      --shadow: none; --bg: #0B1420; --card: #14202F; --text: #EAF0F7; --muted: #9AA8B8; --line: #26354A;
       --accent: #4DA3F5; --on-accent: #0B1420; --accent-soft: #15304D; --good: #3CC27A; --warn: #E8A33C; --danger: #F0645C;
       color-scheme: dark;
     }
@@ -34,9 +34,9 @@
     }
     main { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 14px; }
     .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--muted); font-size: 14px; letter-spacing: .04em; text-transform: uppercase; }
-    .card { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: 0 2px 10px rgba(14,27,44,.06); }
+    .card { background: var(--card); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
     .hero { text-align: center; display: grid; gap: 6px; }
-    .hero .emoji { font-size: 44px; line-height: 1; }
+    .hero .mark { justify-self: center; color: var(--accent); }
     h1 { margin: 0; font-size: 26px; line-height: 1.2; }
     .muted { color: var(--muted); font-size: 15px; }
     .label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
@@ -79,7 +79,7 @@
 
     <div id="content" hidden>
       <section class="card hero" style="margin-bottom:14px">
-        <div class="emoji" aria-hidden="true">🏁</div>
+        <svg class="mark" aria-hidden="true" viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4m0 1c4.5-2.5 8.5 2.5 14 0v9c-5.5 2.5-9.5-2.5-14 0"/></svg>
         <h1 id="headline"></h1>
         <div>
           <div class="label">Time to beat</div>

@@ -18,7 +18,7 @@ import { fmtAir, fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed, speedValue } f
 import type { Units } from '../../lib/types';
 import { ALL_TIME, seasonKeys, seasonOf, summariseSeason, type DaySummary, type SeasonRecord } from '../../lib/season';
 import { updateSettings, useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { useTabBarSpace } from '../../components/TabBar';
 
 export default function SeasonScreen() {
@@ -229,9 +229,9 @@ function GoalRow({ g, units, editing, onToggle, onChange }: {
     <Pressable onPress={onToggle} style={[s.card, { gap: 8 }]} accessibilityHint="Tap to change the goal">
       <View style={styles.goalHead}>
         <Ionicons name={g.done ? 'checkmark-circle' : t.icon} size={20} color={g.done ? colors.good : colors.accent} />
-        <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>{t.title} {t.period}</Text>
+        <Text style={[s.body, { flex: 1, fontFamily: font.medium }]}>{t.title} {t.period}</Text>
         <Text style={s.body}>
-          <Text style={{ fontWeight: '700' }}>{fmtGoal(g.key, g.value, units)}</Text>
+          <Text style={{ fontFamily: font.medium }}>{fmtGoal(g.key, g.value, units)}</Text>
           <Text style={s.muted}> / {fmtGoal(g.key, g.target, units)}</Text>
         </Text>
       </View>
@@ -276,9 +276,9 @@ function WeeklyRow({ w, units }: { w: WeeklyChallenge; units: Units }) {
     <View style={[s.card, { gap: 8 }]}>
       <View style={styles.goalHead}>
         <Ionicons name={w.done ? 'checkmark-circle' : w.icon} size={20} color={w.done ? colors.good : colors.accent} />
-        <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>{t.title}</Text>
+        <Text style={[s.body, { flex: 1, fontFamily: font.medium }]}>{t.title}</Text>
         <Text style={s.body}>
-          <Text style={{ fontWeight: '700' }}>{t.value}</Text>
+          <Text style={{ fontFamily: font.medium }}>{t.value}</Text>
           <Text style={s.muted}> / {t.target}</Text>
         </Text>
       </View>
@@ -335,9 +335,9 @@ const makeStyles = (colors: Palette) =>
     content: { padding: 16, gap: 12, paddingBottom: 32 },
     pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    pillText: { fontWeight: '600', color: colors.text },
+    pillText: { fontFamily: font.medium, color: colors.text },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-    big: { fontSize: 44, fontWeight: '700', color: colors.text },
+    big: { fontSize: 44, fontFamily: font.medium, color: colors.text },
     streak: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     goalHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     barTrack: { height: 8, borderRadius: 4, backgroundColor: colors.faint, overflow: 'hidden' },
@@ -347,8 +347,8 @@ const makeStyles = (colors: Palette) =>
     badgeHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 },
     badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     badge: { width: '31%', alignItems: 'center', gap: 2, paddingVertical: 12, paddingHorizontal: 8 },
-    badgeTitle: { fontSize: 13, fontWeight: '700', color: colors.text, textAlign: 'center' },
+    badgeTitle: { fontSize: 13, fontFamily: font.medium, color: colors.text, textAlign: 'center' },
     record: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     medal: { width: 40, height: 40, borderRadius: 16, backgroundColor: colors.warnSoft, alignItems: 'center', justifyContent: 'center' },
-    recValue: { fontSize: 20, fontWeight: '700', color: colors.text },
+    recValue: { fontSize: 20, fontFamily: font.medium, color: colors.text },
   });

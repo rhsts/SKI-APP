@@ -29,7 +29,7 @@ import type { Activity, TrackPoint, Units } from '../../lib/types';
 import type { MotionSummary } from '../../lib/motion';
 import type { PisteMatch } from '../../lib/pistes';
 import { useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 
 /** One ski day: the day's numbers and every run. Tap a run to see it on the map. */
 export default function DayScreen() {
@@ -236,7 +236,7 @@ export default function DayScreen() {
             return (
               <Pressable key={`${e.kind}-${e.t}`} onPress={() => showEvent(e.t)} onLongPress={() => removeEvent(e)} style={styles.timedRow}>
                 <Ionicons name={e.kind === 'jump' ? 'arrow-up-outline' : 'alert-circle-outline'} size={18} color={colors.accent} />
-                <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>
+                <Text style={[s.body, { flex: 1, fontFamily: font.medium }]}>
                   {e.kind === 'jump' ? `${fmtAir(e.value)} airtime` : 'Fall'}
                   <Text style={s.muted}>
                     {e.kind === 'jump' ? `  ${fmtJumpHeight(jumpHeight(e.value), units)} high` : `  ${fmtG(e.value)} impact`}
@@ -305,7 +305,7 @@ export default function DayScreen() {
             <Pressable key={attempt.id} onPress={() => router.push(`/segment/${segment.id}`)} style={styles.timedRow}>
               <Text style={[s.body, { flex: 1 }]} numberOfLines={1}>{segment.name}</Text>
               <Text style={s.muted}>{fmtTimeOfDay(attempt.at)}</Text>
-              <Text style={[s.body, { fontWeight: '700', minWidth: 64, textAlign: 'right' }]}>{fmtRaceTime(attempt.time)}</Text>
+              <Text style={[s.body, { fontFamily: font.medium, minWidth: 64, textAlign: 'right' }]}>{fmtRaceTime(attempt.time)}</Text>
             </Pressable>
           ))}
         </View>
@@ -364,9 +364,9 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    input: { flex: 1, fontSize: 20, fontWeight: '600', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
+    input: { flex: 1, fontSize: 20, fontFamily: font.medium, color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
     play: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
     suggest: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
     timedRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   });

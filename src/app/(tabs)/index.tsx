@@ -138,7 +138,8 @@ export default function RecordScreen() {
   const state = idle ? null : stateOf(t);
   const flash = t.newTop && t.status === 'recording' ? t.newTop : null;
   // The best of the day, not the speed right now: nobody reads a speedometer mid-turn.
-  const top = fmtSpeed(flash?.speed ?? st?.topSpeed ?? 0, units, false);
+  const best = flash?.speed ?? st?.topSpeed ?? 0;
+  const top = best > 0 ? fmtSpeed(best, units, false) : '0';
   const altUnit = units === 'metric' ? 'm' : 'ft';
   const hoursLeft = idle ? (batteryLevel >= 0 ? hoursAtRate(batteryLevel, drain) : null) : t.battery?.hoursLeft ?? null;
   const lowBattery = hoursLeft != null && hoursLeft < 1.5;

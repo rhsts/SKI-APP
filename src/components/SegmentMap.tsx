@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Circle, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { PathPoint } from '../lib/segments';
-import { useTheme, useStyles, type Palette } from '../theme';
+import { font, useTheme, useStyles, type Palette } from '../theme';
 import { mapsAvailable } from '../lib/mapsAvailable';
 import { MapPlaceholder } from './MapPlaceholder';
 import { ViewMarker } from './ViewMarker';
@@ -80,6 +80,6 @@ const makeStyles = (colors: Palette) =>
     flag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
     ghost: { alignItems: 'center' },
     ghostDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 3, borderColor: '#fff' },
-    ghostLabel: { color: '#fff', fontSize: 11, fontWeight: '700', paddingHorizontal: 4, borderRadius: 4, marginTop: 2, overflow: 'hidden', maxWidth: 80 },
-    flagText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+    ghostLabel: { color: '#fff', fontSize: 11, fontFamily: font.medium, paddingHorizontal: 4, borderRadius: 4, marginTop: 2, overflow: 'hidden', maxWidth: 80 },
+    flagText: { color: '#fff', fontSize: 11, fontFamily: font.medium },
   });

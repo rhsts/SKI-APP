@@ -4,7 +4,7 @@ import { dialog } from '../dialog';
 import type { PhotoRow } from '../db';
 import { Appear } from './Appear';
 import { fmtTimeOfDay } from '../lib/format';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 
 interface Props {
   photos: PhotoRow[];
@@ -88,11 +88,11 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     add: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    addText: { color: colors.accent, fontWeight: '700' },
+    addText: { color: colors.accent, fontFamily: font.medium },
     thumb: { width: 88, height: 88, borderRadius: 12, backgroundColor: colors.faint },
     viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
     full: { width: '100%', height: '75%' },
     bar: { position: 'absolute', top: 48, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    barText: { color: '#fff', fontWeight: '600' },
+    barText: { color: '#fff', fontFamily: font.medium },
     nav: { position: 'absolute', bottom: 48, left: 24, right: 24, flexDirection: 'row', justifyContent: 'space-between' },
   });

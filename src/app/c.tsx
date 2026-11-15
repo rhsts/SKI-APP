@@ -10,7 +10,7 @@ import { fmtAlt, fmtDist, fmtRaceTime } from '../lib/format';
 import { leaderboard, pathInfo } from '../lib/segments';
 import { decodeChallenge, type ChallengePayload } from '../lib/share';
 import { useSettings } from '../settings';
-import { useTheme, useStyles, type Palette } from '../theme';
+import { font, useTheme, useStyles, type Palette } from '../theme';
 import { refreshRacers } from '../tracking/tracker';
 
 /**
@@ -93,7 +93,7 @@ export default function InviteScreen() {
           {board.map((e) => (
             <View key={e.playerId} style={styles.lbRow}>
               <Text style={s.body}>#{e.rank} {e.playerName}{e.playerId === playerId ? ' (you)' : ''}</Text>
-              <Text style={[s.body, { fontWeight: '700' }]}>{fmtRaceTime(e.time)}</Text>
+              <Text style={[s.body, { fontFamily: font.medium }]}>{fmtRaceTime(e.time)}</Text>
             </View>
           ))}
         </View>
@@ -118,7 +118,7 @@ const makeStyles = (colors: Palette) =>
     hero: { alignItems: 'center', gap: 8, paddingVertical: 20 },
     lbRow: { flexDirection: 'row', justifyContent: 'space-between' },
     accept: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-    acceptText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    acceptText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
     secondary: { borderWidth: 1, borderColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12 },
-    secondaryText: { color: colors.accent, fontWeight: '600' },
+    secondaryText: { color: colors.accent, fontFamily: font.medium },
   });

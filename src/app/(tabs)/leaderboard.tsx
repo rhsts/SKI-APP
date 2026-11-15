@@ -10,7 +10,7 @@ import { fmtAlt, fmtDist, fmtDuration, fmtSpeed } from '../../lib/format';
 import { CATEGORIES, crowns, rank, type FriendTotals, type StatKind } from '../../lib/leaderboard';
 import type { Units } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { useStyles, useTheme, type Palette } from '../../theme';
+import { font, useStyles, useTheme, type Palette } from '../../theme';
 import { Row, Rows } from '../../components/Row';
 import { useTabBarSpace } from '../../components/TabBar';
 
@@ -85,7 +85,7 @@ export default function LeaderboardScreen() {
         <Text style={s.h2}>Race your friends</Text>
         <Text style={[s.muted, { textAlign: 'center' }]}>Needs a friends server and a group.</Text>
         <Pressable onPress={() => router.push('/profile')} style={styles.cta}>
-          <Text style={styles.ctaText}>Go to Profile</Text>
+          <Text style={styles.ctaText}>Open You</Text>
         </Pressable>
         </View>
       </View>
@@ -151,7 +151,7 @@ export default function LeaderboardScreen() {
                 >
                   <Text style={styles.rank}>{r.rank}</Text>
                   <Avatar playerId={r.friend.id} name={r.friend.name} size={30} hasAvatar={r.friend.hasAvatar} />
-                  <Text style={[s.body, { flex: 1, fontWeight: isMe ? '800' : '600' }]} numberOfLines={1}>
+                  <Text style={[s.body, { flex: 1, fontFamily: isMe ? font.medium : font.regular }]} numberOfLines={1}>
                     {isMe ? 'You' : r.friend.name}
                   </Text>
                   <Text style={styles.value}>{fmt(cat.kind, r.value, units)}</Text>
@@ -180,16 +180,16 @@ const makeStyles = (colors: Palette) =>
     aside: { padding: 16 },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
     cta: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 999, backgroundColor: colors.accent },
-    ctaText: { color: colors.onAccent, fontWeight: '700' },
+    ctaText: { color: colors.onAccent, fontFamily: font.medium },
     pills: { flexDirection: 'row', gap: 8 },
     pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    pillText: { fontWeight: '600', color: colors.text },
+    pillText: { fontFamily: font.medium, color: colors.text },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
     catHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
     rowMe: { backgroundColor: colors.warnSoft },
-    rank: { width: 28, textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.muted },
-    value: { fontWeight: '700', color: colors.text },
-    more: { color: colors.accent, fontWeight: '600', textAlign: 'center', paddingVertical: 4 },
+    rank: { width: 28, textAlign: 'center', fontSize: 17, fontFamily: font.medium, color: colors.muted },
+    value: { fontFamily: font.medium, color: colors.text },
+    more: { color: colors.accent, fontFamily: font.medium, textAlign: 'center', paddingVertical: 4 },
   });

@@ -13,7 +13,7 @@ import { useSettings } from '../../settings';
 import { cachedChallenges, cachedGroups, syncFriends, type CachedChallenge } from '../../friends/sync';
 import type { Group } from '../../lib/groups';
 import { localDate } from '../../lib/groups';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { useTabBarSpace } from '../../components/TabBar';
 
 interface Row {
@@ -98,7 +98,7 @@ export default function ChallengesScreen() {
             <Pressable style={[s.card, styles.row]} onPress={() => router.push('/group/new')}>
               <Ionicons name="people-outline" size={24} color={colors.accent} />
               <Text style={[s.muted, { flex: 1 }]}>
-                Groups need a friends server. Set one up in Profile.
+                Groups need a friends server. Set one up under You.
               </Text>
             </Pressable>
           ) : !groups.length ? (
@@ -160,7 +160,7 @@ export default function ChallengesScreen() {
                 {item.board.length > 1 ? ` · ${item.board.length} skiers` : ''}
               </Text>
               {groupChallenges.some((c) => c.segmentId === item.segment.id) ? (
-                <Text style={[s.muted, { color: colors.accent, fontWeight: '600' }]} numberOfLines={1}>
+                <Text style={[s.muted, { color: colors.accent, fontFamily: font.medium }]} numberOfLines={1}>
                   {[...new Set(groupChallenges.filter((c) => c.segmentId === item.segment.id).map((c) => c.groupName))].join(', ')}
                 </Text>
               ) : null}
@@ -190,11 +190,11 @@ const makeStyles = (colors: Palette) =>
       borderRadius: 12, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
     },
     groupsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
-    pasteText: { color: colors.accent, fontWeight: '600', fontSize: 15 },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
+    pasteText: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
     empty: { alignItems: 'center', gap: 12, paddingVertical: 32 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     badge: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
     times: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
-    time: { fontSize: 13, fontWeight: '600', color: colors.text },
+    time: { fontSize: 13, fontFamily: font.medium, color: colors.text },
   });

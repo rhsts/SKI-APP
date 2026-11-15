@@ -11,7 +11,7 @@ import { getPoints, getSession, type SessionRow } from '../../db';
 import { cleanTrack, computeStats, smoothedSpeeds } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { useStyles, useTheme, type Palette } from '../../theme';
+import { font, useStyles, useTheme, type Palette } from '../../theme';
 
 /** Preview of the day poster, with a button to share it as an image. */
 export default function ShareDayScreen() {
@@ -77,5 +77,5 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 16, alignItems: 'center', paddingBottom: 40 },
     button: { alignSelf: 'stretch', flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16 },
-    buttonText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    buttonText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
   });

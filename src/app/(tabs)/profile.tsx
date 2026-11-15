@@ -6,7 +6,7 @@ import { createBackup, importTracks, restoreBackup } from '../../days/files';
 import { deleteAllData, deleteDemoData, deleteTrailMaps } from '../../db';
 import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { addDemoDay } from '../../tracking/demo';
 import { AccountCard } from '../../components/AccountCard';
 import { checkServer } from '../../friends/api';
@@ -342,7 +342,7 @@ const makeStyles = (colors: Palette) =>
     segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 12, padding: 4 },
     segBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
     segOn: { backgroundColor: colors.accent },
-    segText: { fontWeight: '600', color: colors.text },
+    segText: { fontFamily: font.medium, color: colors.text },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.faint },
   });

@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Appear } from './Appear';
 import { badgeInfo } from '../lib/goals';
 import { fmtDate } from '../lib/format';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 
 export interface BadgeView {
   id: string;
@@ -38,7 +38,7 @@ export function BadgeSheet({ badge, onClose, onOpenDay, whose = 'you' }: {
               <Ionicons name={got ? info?.icon ?? 'ribbon-outline' : 'lock-closed-outline'} size={44} color={got ? colors.warn : colors.muted} />
             </View>
             <Text style={[s.h1, { textAlign: 'center' }]}>{badge.title}</Text>
-            <Text style={[s.body, { textAlign: 'center', fontWeight: '600' }]}>
+            <Text style={[s.body, { textAlign: 'center', fontFamily: font.medium }]}>
               {info?.description ?? ''}
             </Text>
             {info?.tip ? <Text style={[s.muted, { textAlign: 'center' }]}>{info.tip}</Text> : null}
@@ -72,6 +72,6 @@ const makeStyles = (_: Palette) =>
     medal: { alignSelf: 'center', width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
     status: { borderRadius: 12, padding: 12 },
     btn: { borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-    btnText: { fontWeight: '700', fontSize: 15 },
-    close: { textAlign: 'center', fontWeight: '700', fontSize: 15, paddingVertical: 4 },
+    btnText: { fontFamily: font.medium, fontSize: 15 },
+    close: { textAlign: 'center', fontFamily: font.medium, fontSize: 15, paddingVertical: 4 },
   });

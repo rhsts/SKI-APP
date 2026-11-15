@@ -6,7 +6,7 @@ import { Avatar } from '../components/Avatar';
 import { api, type AdminPlayer } from '../friends/api';
 import { fmtDate } from '../lib/format';
 import { useSettings } from '../settings';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 
 function ago(ms: number | null, now: number): string {
   if (!ms) return 'never';
@@ -116,5 +116,5 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     list: { padding: 16, gap: 12 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    link: { color: colors.accent, fontWeight: '600' },
+    link: { color: colors.accent, fontFamily: font.medium },
   });

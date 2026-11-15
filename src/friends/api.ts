@@ -31,7 +31,7 @@ async function call<T>(
   method: string, path: string, body?: unknown, base = getSettings().serverUrl, password = getSettings().serverPassword,
   timeoutMs = TIMEOUT_MS,
 ): Promise<T> {
-  if (!base) throw new FriendsError('Set up your friends server in Profile first.');
+  if (!base) throw new FriendsError('Set up your friends server under You first.');
   const { deviceId, deviceSecret } = getSettings();
   const ctrl = new AbortController();
   // The timer covers reading the answer too: a download that stalls halfway must not hang for ever.
@@ -69,7 +69,7 @@ async function call<T>(
         updateSettings({ unlocked: false }).catch(() => undefined);
       }
       throw new FriendsError(
-        password ? 'Wrong server password. Ask whoever runs the server for the right one.' : 'This server needs a password. Enter it in Profile → Friends server.',
+        password ? 'Wrong server password. Ask whoever runs the server for the right one.' : 'This server needs a password. Enter it under You → Friends server.',
         res.status, 'password',
       );
     }

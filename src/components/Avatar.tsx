@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useAvatar } from '../friends/avatars';
-import { useTheme } from '../theme';
+import { font, useTheme } from '../theme';
 
 const COLORS = ['#0B6BCB', '#E8892B', '#1F9D55', '#8E44AD', '#C0392B', '#16A085', '#D35400', '#2C3E50'];
 
@@ -24,5 +24,5 @@ export function Avatar({ playerId, name, size = 36, hasAvatar = true }: {
 
 const styles = StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
-  initials: { color: '#fff', fontWeight: '700' },
+  initials: { color: '#fff', fontFamily: font.medium },
 });

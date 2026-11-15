@@ -9,7 +9,7 @@ import {
 } from '../friends/account';
 import { useAvatar } from '../friends/avatars';
 import { updateSettings, useSettings } from '../settings';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 import { Avatar } from './Avatar';
 
 /** Your account: picture, password, log out, online backup, and (for admins) managing people. */
@@ -170,7 +170,7 @@ const makeStyles = (colors: Palette) =>
     head: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     picBusy: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.faint },
     camera: { position: 'absolute', right: -2, bottom: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.card },
-    link: { color: colors.accent, fontWeight: '600', marginTop: 4 },
+    link: { color: colors.accent, fontFamily: font.medium, marginTop: 4 },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     input: { fontSize: 15, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.faint },

@@ -13,7 +13,7 @@ import { buildSegmentPath, MIN_SEGMENT_LENGTH, pathInfo } from '../../lib/segmen
 import { cleanTrack, computeStats } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { refreshRacers } from '../../tracking/tracker';
 
 /** Turn (part of) a recorded run into a challenge. */
@@ -149,8 +149,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     facts: { flexDirection: 'row', marginTop: 8 },
-    factValue: { fontSize: 17, fontWeight: '700', color: colors.text },
-    input: { fontSize: 17, fontWeight: '500', color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
+    factValue: { fontSize: 17, fontFamily: font.medium, color: colors.text },
+    input: { fontSize: 17, fontFamily: font.medium, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
     save: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-    saveText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    saveText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
   });

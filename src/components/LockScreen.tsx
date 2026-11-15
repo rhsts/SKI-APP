@@ -12,7 +12,7 @@ import { createAccount, logIn, restoreDays } from '../friends/account';
 import { resetFriendsCache, syncFriends } from '../friends/sync';
 import { normalizeServerUrl, parseInvite } from '../lib/groups';
 import { getSettings, updateSettings, useSettings } from '../settings';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 
 /**
  * The app is private: it only opens for people who know your friends server's
@@ -119,7 +119,7 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
               onSubmitEditing={unlock}
             />
           </Field>
-          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontWeight: '700' }}>{code}</Text> too.</Text> : null}
+          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontFamily: font.medium }}>{code}</Text> too.</Text> : null}
           <Tap
             onPress={unlock}
             disabled={busy || !server.trim()}
@@ -267,7 +267,7 @@ function AccountStep({ code }: { code: string | null }) {
               />
             </Field>
           ) : null}
-          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontWeight: '700' }}>{code}</Text> too.</Text> : null}
+          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontFamily: font.medium }}>{code}</Text> too.</Text> : null}
           <Tap
             onPress={submit}
             disabled={busy || !ready}
@@ -311,10 +311,10 @@ const makeStyles = (colors: Palette) =>
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
       borderRadius: 12, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed',
     },
-    pasteText: { color: colors.accent, fontWeight: '600', fontSize: 15 },
+    pasteText: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
     btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, minHeight: 54 },
-    btnText: { color: colors.onAccent, fontWeight: '700', fontSize: 17 },
+    btnText: { color: colors.onAccent, fontFamily: font.medium, fontSize: 17 },
     tabs: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 4 },
     tab: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-    tabText: { fontWeight: '600', color: colors.text },
+    tabText: { fontFamily: font.medium, color: colors.text },
   });
