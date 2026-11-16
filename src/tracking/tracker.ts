@@ -372,6 +372,8 @@ async function startSource(a: ActiveSession): Promise<void> {
   if (a.source === 'sim') {
     // Continue the fake day from where it was, or start a new one.
     const already = state.points.length;
+    // The demo shows the lock-screen notification too, so it can be tried without snow.
+    const service = await startTrackingService(a, state.stats);
     const sim = simulateDay({ start: a.startedAt, runs: 4, seed: a.startedAt % 1000, barometer: true, turns: true });
     const day = sim.points;
     let i = already;
@@ -387,6 +389,7 @@ async function startSource(a: ActiveSession): Promise<void> {
             const p = chunk.reduce((b, q) => (Math.abs(q.t - e.t) < Math.abs(b.t - e.t) ? q : b), chunk[0]);
             await onMotion(e, a.sessionId, { lat: p.lat, lon: p.lon });
           }
+          if (service && lockScreenDue()) await syncLockScreen();
         })
         .catch((e) => set({ error: String(e) }));
     }, 1000);
