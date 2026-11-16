@@ -38,6 +38,7 @@ jest.mock('../src/tracking/task', () => ({
   LOCATION_TASK: 'loc',
   locationTaskOptions: () => ({}),
   resetGpsState: jest.fn(async () => undefined),
+  usesOwnService: async () => true,
   toTrackPoint: (l: unknown) => l,
   readActive: jest.fn(async () => { const raw = mockKv.get('active'); return raw ? JSON.parse(raw) : null; }),
 }));

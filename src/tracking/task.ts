@@ -78,6 +78,15 @@ export async function resetGpsState(ownService = true) {
   await kvSet('gps', JSON.stringify({ mode: 'precise', ownService } satisfies GpsState));
 }
 
+/** True when the running updates use expo-location's own service (or the state is unreadable). */
+export async function usesOwnService(): Promise<boolean> {
+  try {
+    return (JSON.parse((await kvGet('gps')) ?? '') as GpsState).ownService !== false;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Battery saver: after each batch, switch between precise and eco GPS by re-issuing
  * startLocationUpdatesAsync with new options.

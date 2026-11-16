@@ -28,7 +28,7 @@ import { lookupPistes } from '../mountain/pistes';
 import { refreshGeofences } from './geofence';
 import { lockScreenDue, showLockScreen, startTrackingService, stopTrackingService } from './lockscreen';
 import { lookupPlace } from './place';
-import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
+import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, usesOwnService, type ActiveSession } from './task';
 
 /**
  * Recording state shared by every screen. GPS fixes go GPS → SQLite (via the
@@ -714,7 +714,10 @@ export async function recoverActiveDay(): Promise<void> {
     await refreshRacers();
     startPolling();
     if (getSettings().motion) await startMotionSensor(a);
-    await syncLockScreen();
+    // The app was restarted (update, killed by the phone, reboot): GPS kept going, but the
+    // service behind the notification died with the app. Start it again, unless expo-location's
+    // own service is the one in use (the two must never run together).
+    if (!(await showLockScreen(a, stats)) && !(await usesOwnService())) await startTrackingService(a, stats);
     return;
   }
   const paused = { ...a, paused: true };
