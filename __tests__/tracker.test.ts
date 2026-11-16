@@ -14,6 +14,8 @@ const mockFinish = jest.fn(async (id: string, endedAt: number, _s: unknown, plac
 const mockStopMotion = jest.fn();
 const mockWatch = jest.fn();
 const mockLookupPlace = jest.fn();
+const mockShowLockScreen = jest.fn(async (_a: { paused: boolean }, _stats: unknown) => true);
+const mockStopService = jest.fn(async () => undefined);
 
 jest.mock('../src/db', () => ({
   createSession: jest.fn(async () => { const id = `s${mockSessions.size + 1}`; mockSessions.set(id, { endedAt: null, place: null }); return id; }),
@@ -38,6 +40,11 @@ jest.mock('../src/tracking/task', () => ({
   resetGpsState: jest.fn(async () => undefined),
   toTrackPoint: (l: unknown) => l,
   readActive: jest.fn(async () => { const raw = mockKv.get('active'); return raw ? JSON.parse(raw) : null; }),
+}));
+jest.mock('../src/tracking/lockscreen', () => ({
+  showLockScreen: (...a: [{ paused: boolean }, unknown]) => mockShowLockScreen(...a),
+  startTrackingService: jest.fn(async () => false),
+  stopTrackingService: () => mockStopService(),
 }));
 jest.mock('../src/tracking/motion', () => ({ startMotion: jest.fn(async () => true), stopMotion: () => mockStopMotion() }));
 jest.mock('../src/tracking/place', () => ({ lookupPlace: (...a: unknown[]) => mockLookupPlace(...a) }));
@@ -68,7 +75,7 @@ jest.mock('expo-haptics', () => ({
 }));
 
 // eslint-disable-next-line import/first
-import { dismissLastRun, recoverActiveDay, startDay, stopDay, useTracker } from '../src/tracking/tracker';
+import { dismissLastRun, pauseDay, recoverActiveDay, startDay, stopDay, useTracker } from '../src/tracking/tracker';
 // eslint-disable-next-line import/first
 import { matchSession } from '../src/challenges/service';
 
@@ -84,6 +91,8 @@ beforeEach(() => {
   mockStopMotion.mockClear();
   mockWatch.mockReset();
   mockLookupPlace.mockReset();
+  mockShowLockScreen.mockClear();
+  mockStopService.mockClear();
 });
 
 describe('tracker', () => {
@@ -92,6 +101,19 @@ describe('tracker', () => {
     await startDay(false);
     expect(mockStopMotion).toHaveBeenCalled();
     expect(mockKv.get('active')).toBeNull();
+  });
+
+  it('keeps the tracking notification in step: "Paused" when paused, gone when the day ends', async () => {
+    mockWatch.mockResolvedValue({ remove: jest.fn() });
+    mockLookupPlace.mockResolvedValue(null);
+    await startDay(false);
+    mockStopService.mockClear(); // the fallback to foreground-only GPS stops it once
+    await pauseDay();
+    expect(mockShowLockScreen).toHaveBeenLastCalledWith(expect.objectContaining({ paused: true }), null);
+    expect(mockStopService).not.toHaveBeenCalled();
+    mockPoints = day();
+    await stopDay();
+    expect(mockStopService).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the day when the place lookup fails', async () => {

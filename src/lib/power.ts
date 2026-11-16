@@ -105,11 +105,3 @@ export const TYPICAL_DRAIN_PER_HOUR = 0.07;
 export function hoursAtRate(level: number, perHour: number): number {
   return level / Math.max(perHour, 0.005);
 }
-
-/** Text for the Android tracking notification. */
-export function notificationBody(stats: { runCount: number; verticalDown: number; topSpeed: number }, fmt: {
-  alt: (m: number) => string; speed: (mps: number) => string;
-}): string {
-  const runs = `${stats.runCount} ${stats.runCount === 1 ? 'run' : 'runs'}`;
-  return `${runs} · ${fmt.alt(stats.verticalDown)} ↓ · top ${fmt.speed(stats.topSpeed)}`;
-}

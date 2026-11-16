@@ -25,6 +25,7 @@ import type { Sport } from '../lib/sport';
 import { readPressure, startBarometer, stopBarometer } from './barometer';
 import { lookupPistes } from '../mountain/pistes';
 import { refreshGeofences } from './geofence';
+import { showLockScreen, startTrackingService, stopTrackingService } from './lockscreen';
 import { lookupPlace } from './place';
 import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
 
@@ -175,6 +176,16 @@ async function pollOnce() {
     lastBatteryAt = now;
     updateBattery().catch(() => undefined);
   }
+}
+
+// ---------- lock screen ----------
+
+/**
+ * The Android tracking notification follows the recording state. (While recording, the GPS task
+ * refreshes it once a minute.) Never throws.
+ */
+function syncLockScreen(): Promise<unknown> {
+  return state.active ? showLockScreen(state.active, state.stats) : stopTrackingService();
 }
 
 // ---------- moments: run finished, new top speed, battery ----------
@@ -388,10 +399,14 @@ async function startSource(a: ActiveSession): Promise<void> {
   try {
     const bg = await Location.requestBackgroundPermissionsAsync();
     if (bg.status !== 'granted') throw new Error('no background permission');
-    await resetGpsState();
-    await Location.startLocationUpdatesAsync(LOCATION_TASK, locationTaskOptions('precise'));
+    // Android: the service behind the lock-screen notification keeps GPS coming with the screen
+    // off. If it can't start, expo-location runs its own, with a fixed text.
+    const ownService = !(await startTrackingService(a, state.stats));
+    await resetGpsState(ownService);
+    await Location.startLocationUpdatesAsync(LOCATION_TASK, locationTaskOptions('precise', ownService));
     set({ foregroundOnly: false });
   } catch {
+    await stopTrackingService();
     // Expo Go on iOS, or "Allow all the time" refused: track while the app is open
     // and keep the screen awake so the phone doesn't stop GPS.
     watchSub = await Location.watchPositionAsync(options, (loc) => {
@@ -581,6 +596,7 @@ async function doPauseDay(): Promise<void> {
   const active = { ...state.active, paused: true };
   await saveActive(active);
   set({ status: 'paused', active, currentSpeed: 0 });
+  await syncLockScreen();
 }
 
 export function resumeDay(): Promise<void> {
@@ -627,6 +643,7 @@ async function doStopDay(): Promise<string | null> {
       await saveActive(null);
       racers = [];
       set({ ...initial });
+      await syncLockScreen();
       return null;
     }
     const place = a.source === 'sim' ? 'Demo Mountain' : await lookupPlace(points).catch(() => null);
@@ -637,8 +654,10 @@ async function doStopDay(): Promise<string | null> {
     const paused = { ...a, paused: true };
     await saveActive(paused).catch(() => undefined);
     set({ status: 'paused', active: paused, currentSpeed: 0 });
+    await syncLockScreen();
     throw e;
   }
+  await stopTrackingService();
   // Re-time all challenges on the complete day (catches anything missed live).
   // The day is saved by now: a failure here must not leave the screen stuck on "recording".
   await matchSession(a.sessionId, points).catch(() => undefined);
@@ -659,11 +678,12 @@ export async function recoverActiveDay(): Promise<void> {
   const a = await readActive();
   // Leftovers of a start that was interrupted.
   await deleteUnfinishedSessions(a?.sessionId ?? null).catch(() => undefined);
-  if (!a) return;
   // Killed while finishing: the day was already saved (or deleted as too short).
-  const s = await getSession(a.sessionId);
-  if (!s || s.endedAt != null) {
-    await saveActive(null);
+  const s = a ? await getSession(a.sessionId) : null;
+  if (!a || !s || s.endedAt != null) {
+    if (a) await saveActive(null);
+    // Nothing is being recorded: a notification left behind would say otherwise.
+    await stopTrackingService();
     return;
   }
   const points = await getPoints(a.sessionId);
@@ -682,10 +702,13 @@ export async function recoverActiveDay(): Promise<void> {
     await refreshRacers();
     startPolling();
     if (getSettings().motion) await startMotionSensor(a);
+    await syncLockScreen();
     return;
   }
   const paused = { ...a, paused: true };
   await saveActive(paused);
   set({ ...initial, status: 'paused', active: paused, points, stats, recovered: !a.paused });
   await loadMotion(a.sessionId);
+  // GPS isn't running, so the tracking service has nothing to do.
+  await stopTrackingService();
 }

@@ -1,10 +1,10 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { getPoints, insertPoints, kvGet, kvSet, loadSettings } from '../db';
-import { fmtAlt, fmtSpeed } from '../lib/format';
-import { decideGpsMode, GPS_OPTIONS, notificationBody, type GpsMode } from '../lib/power';
+import { getPoints, insertPoints, kvGet, kvSet } from '../db';
+import { decideGpsMode, GPS_OPTIONS, type GpsMode } from '../lib/power';
 import { computeStats } from '../lib/stats';
 import { readPressure } from './barometer';
+import { lockScreenDue, showLockScreen } from './lockscreen';
 import { prefetchTrailMap } from '../mountain/pistes';
 import type { TrackPoint } from '../lib/types';
 
@@ -44,63 +44,59 @@ export function toTrackPoint(l: Location.LocationObject): TrackPoint {
   };
 }
 
-export const DEFAULT_NOTIFICATION = 'Speed, vertical and runs are being recorded.';
-
-/** Options for the background location service in a given battery mode. */
-export function locationTaskOptions(mode: GpsMode, body = DEFAULT_NOTIFICATION): Location.LocationTaskOptions {
+/**
+ * Options for background location updates in a given battery mode.
+ * `ownService`: Android only. expo-location runs its own foreground service, with a fixed
+ * notification. Only needed when the service behind the lock-screen notification
+ * (lockscreen.ts) couldn't start; the two must never run together.
+ */
+export function locationTaskOptions(mode: GpsMode, ownService = true): Location.LocationTaskOptions {
   return {
     accuracy: Location.Accuracy.BestForNavigation,
     ...GPS_OPTIONS[mode],
     activityType: Location.ActivityType.Fitness,
     pausesUpdatesAutomatically: false,
     showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: 'Tracking your ski day',
-      notificationBody: body,
-      notificationColor: '#0B6BCB',
-      killServiceOnDestroy: false,
-    },
+    ...(ownService ? {
+      foregroundService: {
+        notificationTitle: 'Tracking your ski day',
+        notificationBody: 'Speed, vertical and runs are being recorded.',
+        notificationColor: '#0B6BCB',
+        killServiceOnDestroy: false,
+      },
+    } : {}),
   };
 }
 
 interface GpsState {
   mode: GpsMode;
-  body: string;
-  notifiedAt: number;
+  /** See locationTaskOptions. Missing in a state saved by an older version, which always had it. */
+  ownService?: boolean;
 }
 
-const NOTIFY_EVERY_MS = 3 * 60 * 1000;
-
-export async function resetGpsState() {
-  await kvSet('gps', JSON.stringify({ mode: 'precise', body: DEFAULT_NOTIFICATION, notifiedAt: Date.now() } satisfies GpsState));
+export async function resetGpsState(ownService = true) {
+  await kvSet('gps', JSON.stringify({ mode: 'precise', ownService } satisfies GpsState));
 }
 
 /**
- * Battery saver + live notification: after each batch, switch between precise and
- * eco GPS, and every few minutes refresh the notification with the day's stats.
- * Both are done by re-issuing startLocationUpdatesAsync with new options.
+ * Battery saver: after each batch, switch between precise and eco GPS by re-issuing
+ * startLocationUpdatesAsync with new options.
+ * With `ownService`, Android refuses that while the app is in the background (a foreground
+ * service can't be started from there), so the mode then only changes while the app is open.
  */
 async function adapt(sessionId: string, lastT: number) {
   let st: GpsState;
   try {
     st = JSON.parse((await kvGet('gps')) ?? '');
   } catch {
-    st = { mode: 'precise', body: DEFAULT_NOTIFICATION, notifiedAt: 0 };
+    st = { mode: 'precise' };
   }
   // 11 minutes of history: enough to notice a 10-minute break (auto-pause).
   const recent = await getPoints(sessionId, lastT - 11 * 60000);
   const mode = decideGpsMode(recent, st.mode);
-  const now = Date.now();
-  const notify = now - st.notifiedAt >= NOTIFY_EVERY_MS;
-  if (mode === st.mode && !notify) return;
-  let body = st.body;
-  if (notify) {
-    const { units } = await loadSettings();
-    const stats = computeStats(await getPoints(sessionId));
-    body = notificationBody(stats, { alt: (m) => fmtAlt(m, units), speed: (v) => fmtSpeed(v, units) });
-  }
-  await Location.startLocationUpdatesAsync(LOCATION_TASK, locationTaskOptions(mode, body));
-  await kvSet('gps', JSON.stringify({ mode, body, notifiedAt: notify ? now : st.notifiedAt } satisfies GpsState));
+  if (mode === st.mode) return;
+  await Location.startLocationUpdatesAsync(LOCATION_TASK, locationTaskOptions(mode, st.ownService !== false));
+  await kvSet('gps', JSON.stringify({ ...st, mode } satisfies GpsState));
 }
 
 if (!TaskManager.isTaskDefined(LOCATION_TASK)) {
@@ -117,6 +113,13 @@ if (!TaskManager.isTaskDefined(LOCATION_TASK)) {
       await adapt(active.sessionId, pts[pts.length - 1].t);
     } catch {
       // Never let battery-saver logic break recording.
+    }
+    // The notification on the lock screen, once a minute. From here, because this task also
+    // runs with the app in the background, where nothing else does.
+    try {
+      if (lockScreenDue()) await showLockScreen(active, computeStats(await getPoints(active.sessionId)));
+    } catch {
+      // Nor the lock screen.
     }
   });
 }
