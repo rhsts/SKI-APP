@@ -44,6 +44,7 @@ jest.mock('../src/tracking/task', () => ({
 jest.mock('../src/tracking/lockscreen', () => ({
   showLockScreen: (...a: [{ paused: boolean }, unknown]) => mockShowLockScreen(...a),
   startTrackingService: jest.fn(async () => false),
+  lockScreenDue: () => false,
   stopTrackingService: () => mockStopService(),
 }));
 jest.mock('../src/tracking/motion', () => ({ startMotion: jest.fn(async () => true), stopMotion: () => mockStopMotion() }));

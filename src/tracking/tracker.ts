@@ -26,7 +26,7 @@ import type { Sport } from '../lib/sport';
 import { readPressure, startBarometer, stopBarometer } from './barometer';
 import { lookupPistes } from '../mountain/pistes';
 import { refreshGeofences } from './geofence';
-import { showLockScreen, startTrackingService, stopTrackingService } from './lockscreen';
+import { lockScreenDue, showLockScreen, startTrackingService, stopTrackingService } from './lockscreen';
 import { lookupPlace } from './place';
 import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
 
@@ -412,12 +412,15 @@ async function startSource(a: ActiveSession): Promise<void> {
     await Location.startLocationUpdatesAsync(LOCATION_TASK, locationTaskOptions('precise', ownService));
     set({ foregroundOnly: false });
   } catch {
-    await stopTrackingService();
     // Expo Go on iOS, or "Allow all the time" refused: track while the app is open
-    // and keep the screen awake so the phone doesn't stop GPS.
+    // and keep the screen awake so the phone doesn't stop GPS. Android still gets the
+    // notification: its service only needs "while using", started from the foreground.
+    await stopTrackingService();
+    const service = await startTrackingService(a, state.stats);
     watchSub = await Location.watchPositionAsync(options, (loc) => {
       readPressure()
         .then((pres) => insertPoints(a.sessionId, [{ ...toTrackPoint(loc), pres }]))
+        .then(() => (service && lockScreenDue() ? syncLockScreen() : undefined))
         .catch((e) => set({ error: String(e) }));
     });
     await activateKeepAwakeAsync('ski-tracking');
