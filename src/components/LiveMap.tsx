@@ -8,8 +8,11 @@ import { TrailOverlay } from './TrailOverlay';
 import { mapsAvailable } from '../lib/mapsAvailable';
 import { MapPlaceholder } from './MapPlaceholder';
 
-/** Where you are now, today's track, and the resort's pistes and lifts. */
-export function LiveMap({ points, trail, center }: { points: TrackPoint[]; trail: TrailMap | null; center: { lat: number; lon: number } }) {
+/**
+ * Where you are now, today's track, and the resort's pistes and lifts.
+ * `follow`: keep the map on the phone's position. Off for a place you searched for.
+ */
+export function LiveMap({ points, trail, center, follow = true }: { points: TrackPoint[]; trail: TrailMap | null; center: { lat: number; lon: number }; follow?: boolean }) {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
   const track = useMemo(() => {
@@ -30,11 +33,11 @@ export function LiveMap({ points, trail, center }: { points: TrackPoint[]; trail
         mapType={Platform.OS === 'android' ? 'terrain' : 'standard'}
         initialRegion={{ latitude: center.lat, longitude: center.lon, latitudeDelta: 0.02, longitudeDelta: 0.02 }}
         showsUserLocation
-        followsUserLocation
+        followsUserLocation={follow}
         onPanDrag={() => { pausedUntil.current = Date.now() + 30_000; }}
         onUserLocationChange={(e) => {
           const c = e.nativeEvent.coordinate;
-          if (Platform.OS !== 'android' || !c || Date.now() < pausedUntil.current) return;
+          if (!follow || Platform.OS !== 'android' || !c || Date.now() < pausedUntil.current) return;
           mapRef.current?.animateCamera({ center: { latitude: c.latitude, longitude: c.longitude } }, { duration: 500 });
         }}
         showsMyLocationButton

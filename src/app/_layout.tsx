@@ -15,7 +15,9 @@ import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { getDb, listSessions } from '../db';
 import { lookupStalePistes } from '../mountain/pistes';
 import { getSettings, initSettings, useSettings } from '../settings';
+import { DialogHost } from '../components/DialogHost';
 import { LockScreen } from '../components/LockScreen';
+import { Setup } from '../components/Setup';
 import { checkServer } from '../friends/api';
 import { font, size, useTheme } from '../theme';
 // Importing this also registers the ski-area reminder (geofence) task.
@@ -31,7 +33,7 @@ export default function RootLayout() {
   // If a font fails to load the app still opens, in the system font.
   const [fontsLoaded, fontsFailed] = useFonts({ Inter_300Light, Inter_400Regular, Inter_500Medium });
   const fontsDone = fontsLoaded || !!fontsFailed;
-  const { unlocked, account, devSkip } = useSettings();
+  const { unlocked, account, devSkip, setupDone } = useSettings();
   // Private app: a server + password, then an account. (Expo Go can skip it for development.)
   const locked = !unlocked || (!account && !(__DEV__ && devSkip));
 
@@ -91,11 +93,14 @@ export default function RootLayout() {
         <Stack.Screen name="admin" options={{ title: 'Manage people' }} />
       </Stack>
       {ready && locked ? <LockScreen /> : null}
+      {/* Once you're in: the first-open questions, a single time. */}
+      {ready && !locked && !setupDone ? <Setup /> : null}
       {!ready ? (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }]}>
           <ActivityIndicator color={colors.accent} />
         </View>
       ) : null}
+      <DialogHost />
     </>
   );
 }

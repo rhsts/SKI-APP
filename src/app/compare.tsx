@@ -7,7 +7,7 @@ import { fmtAlt, fmtDate, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtSpeed 
 import { computeStats } from '../lib/stats';
 import type { Units } from '../lib/types';
 import { useSettings } from '../settings';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 
 interface Loaded {
   a: SessionRow;
@@ -76,7 +76,7 @@ export default function CompareScreen() {
             return (
               <Pressable key={c.segmentId} onPress={() => router.push(`/segment/${c.segmentId}`)} style={styles.row}>
                 <Text style={[styles.val, d > 0 && styles.win]}>{fmtRaceTime(c.a)}</Text>
-                <Text style={styles.rowLabel} numberOfLines={1}>🏁 {c.name}</Text>
+                <Text style={styles.rowLabel} numberOfLines={1}>{c.name}</Text>
                 <Text style={[styles.val, { textAlign: 'right' }, d < 0 && styles.win]}>
                   {fmtRaceTime(c.b)}{'\n'}
                   <Text style={[s.muted, { color: d < 0 ? colors.good : colors.danger }]}>{fmtDelta(d)}</Text>
@@ -114,10 +114,10 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     headRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    vs: { fontSize: 15, fontWeight: '700', color: colors.muted },
+    vs: { fontSize: 15, fontFamily: font.medium, color: colors.muted },
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 8 },
     rowBorder: { borderTopWidth: 1, borderTopColor: colors.faint },
-    rowLabel: { flex: 1.2, textAlign: 'center', fontSize: 13, fontWeight: '500', color: colors.muted },
-    val: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
-    win: { color: colors.good, fontWeight: '700' },
+    rowLabel: { flex: 1.2, textAlign: 'center', fontSize: 13, fontFamily: font.medium, color: colors.muted },
+    val: { flex: 1, fontSize: 15, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
+    win: { color: colors.good, fontFamily: font.medium },
   });

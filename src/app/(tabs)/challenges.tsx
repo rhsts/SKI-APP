@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { listAttempts, listSegments } from '../../db';
 import { fmtAlt, fmtDist, fmtRaceTime } from '../../lib/format';
 import { leaderboard, pathInfo, type LeaderboardEntry, type Segment } from '../../lib/segments';
@@ -12,7 +13,7 @@ import { useSettings } from '../../settings';
 import { cachedChallenges, cachedGroups, syncFriends, type CachedChallenge } from '../../friends/sync';
 import type { Group } from '../../lib/groups';
 import { localDate } from '../../lib/groups';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { useTabBarSpace } from '../../components/TabBar';
 
 interface Row {
@@ -71,7 +72,7 @@ export default function ChallengesScreen() {
     const text = await Clipboard.getStringAsync();
     const code = extractCode(text ?? '');
     if (!code) {
-      Alert.alert('No invite found', 'Copy the whole invite message (or link) your friend sent you, then tap Paste invite again.');
+      dialog('No invite found', 'Copy the invite your friend sent, then try again.');
       return;
     }
     router.push({ pathname: '/c', params: { d: code } });
@@ -97,13 +98,13 @@ export default function ChallengesScreen() {
             <Pressable style={[s.card, styles.row]} onPress={() => router.push('/group/new')}>
               <Ionicons name="people-outline" size={24} color={colors.accent} />
               <Text style={[s.muted, { flex: 1 }]}>
-                Make a group for your ski trip: a daily leaderboard and group challenges. Needs a friends server (Profile).
+                Groups need a friends server. Set one up under You.
               </Text>
             </Pressable>
           ) : !groups.length ? (
             <Pressable style={[s.card, styles.row]} onPress={() => router.push('/group/new')}>
               <Ionicons name="people-outline" size={24} color={colors.accent} />
-              <Text style={[s.muted, { flex: 1 }]}>No groups yet. Start one for your trip, or join with a friend’s code.</Text>
+              <Text style={[s.muted, { flex: 1 }]}>No groups yet. Start one or join with a code.</Text>
             </Pressable>
           ) : (
             groups.map((g) => {
@@ -117,7 +118,7 @@ export default function ChallengesScreen() {
                     <Text style={s.h2} numberOfLines={1}>{g.name}</Text>
                     <Text style={s.muted} numberOfLines={1}>
                       {g.members} {g.members === 1 ? 'skier' : 'skiers'}
-                      {todays.length ? ` · 🏁 today: ${todays.map((c) => c.name).join(', ')}` : ''}
+                      {todays.length ? ` · today: ${todays.map((c) => c.name).join(', ')}` : ''}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.muted} />
@@ -128,7 +129,7 @@ export default function ChallengesScreen() {
           <Text style={[s.h2, { marginTop: 8 }]}>Challenges</Text>
           <Tap style={styles.paste} onPress={paste}>
             <Ionicons name="clipboard-outline" size={18} color={colors.accent} />
-            <Text style={styles.pasteText}>Paste invite from a friend</Text>
+            <Text style={styles.pasteText}>Paste invite</Text>
           </Tap>
         </View>
       }
@@ -137,8 +138,7 @@ export default function ChallengesScreen() {
           <Ionicons name="flag-outline" size={40} color={colors.accent} />
           <Text style={s.h2}>No challenges yet</Text>
           <Text style={[s.muted, { textAlign: 'center' }]}>
-            Open a ski day in Days and tap the flag on a run to turn it into a challenge. Then send it to a friend
-            and try to beat each other’s time.
+            Tap the flag on a run in Days to make one.
           </Text>
         </View>
       }
@@ -160,8 +160,8 @@ export default function ChallengesScreen() {
                 {item.board.length > 1 ? ` · ${item.board.length} skiers` : ''}
               </Text>
               {groupChallenges.some((c) => c.segmentId === item.segment.id) ? (
-                <Text style={[s.muted, { color: colors.accent, fontWeight: '600' }]} numberOfLines={1}>
-                  👥 {[...new Set(groupChallenges.filter((c) => c.segmentId === item.segment.id).map((c) => c.groupName))].join(', ')}
+                <Text style={[s.muted, { color: colors.accent, fontFamily: font.medium }]} numberOfLines={1}>
+                  {[...new Set(groupChallenges.filter((c) => c.segmentId === item.segment.id).map((c) => c.groupName))].join(', ')}
                 </Text>
               ) : null}
               <View style={styles.times}>
@@ -190,11 +190,11 @@ const makeStyles = (colors: Palette) =>
       borderRadius: 12, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
     },
     groupsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
-    pasteText: { color: colors.accent, fontWeight: '600', fontSize: 15 },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
+    pasteText: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
     empty: { alignItems: 'center', gap: 12, paddingVertical: 32 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     badge: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
     times: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
-    time: { fontSize: 13, fontWeight: '600', color: colors.text },
+    time: { fontSize: 13, fontFamily: font.medium, color: colors.text },
   });

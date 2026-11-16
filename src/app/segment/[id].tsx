@@ -3,17 +3,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { shareChallenge } from '../../challenges/service';
 import { RaceReplay } from '../../components/RaceReplay';
 import { deleteSegment, getSegment, listAttempts } from '../../db';
 import { fmtAlt, fmtDate, fmtDelta, fmtDist, fmtRaceTime } from '../../lib/format';
 import { leaderboard, pathInfo, type Attempt, type Segment } from '../../lib/segments';
 import { useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { refreshRacers } from '../../tracking/tracker';
-
-const MEDALS = ['🥇', '🥈', '🥉'];
 
 export default function SegmentScreen() {
   const { colors, s } = useTheme();
@@ -42,7 +41,7 @@ export default function SegmentScreen() {
 
   const invite = async (group: boolean) => {
     if (!name.trim()) {
-      Alert.alert('What’s your name?', 'Add your name in Profile so your friends know who challenged them.', [
+      dialog('What’s your name?', 'Add your name under You first.', [
         { text: 'Later', style: 'cancel', onPress: () => doShare(group) },
         { text: 'Set name', onPress: () => router.push('/profile') },
       ]);
@@ -60,7 +59,7 @@ export default function SegmentScreen() {
   };
 
   const remove = () =>
-    Alert.alert('Delete this challenge?', 'Your times on it are deleted too. Friends keep their copy.', [
+    dialog('Delete this challenge?', 'Your times on it are deleted too. Friends keep their copy.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -99,7 +98,7 @@ export default function SegmentScreen() {
             <Text style={styles.big}>{fmtRaceTime(myBest.time)}</Text>
             <Text style={s.muted}>
               {myBest.rank === 1
-                ? board.length > 1 ? `You’re the fastest of ${board.length}! Defend it.` : 'Send it to a friend and see if they can beat it.'
+                ? board.length > 1 ? `Fastest of ${board.length}.` : 'Send it to a friend.'
                 : `#${myBest.rank} of ${board.length} · ${fmtDelta(myBest.time - leader.time)} behind ${leader.playerName}`}
             </Text>
           </>
@@ -128,7 +127,7 @@ export default function SegmentScreen() {
         <Text style={styles.groupText}>Share to a group chat</Text>
       </Tap>
       <Text style={[s.muted, { textAlign: 'center', marginTop: -4 }]}>
-        Everyone who opens the link joins the same leaderboard (up to 20 skiers).
+        Up to 20 skiers per leaderboard.
       </Text>
 
       <Text style={[s.h2, { marginTop: 8 }]}>Leaderboard</Text>
@@ -137,9 +136,9 @@ export default function SegmentScreen() {
         const me = e.playerId === playerId;
         return (
           <View key={e.playerId} style={[s.card, styles.lbRow, me && { borderColor: colors.accent }]}>
-            <Text style={styles.rank}>{MEDALS[e.rank - 1] ?? `#${e.rank}`}</Text>
+            <Text style={styles.rank}>{e.rank}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={[s.body, { fontWeight: '600' }]}>{me ? `${e.playerName} (you)` : e.playerName}</Text>
+              <Text style={[s.body, { fontFamily: font.medium }]}>{me ? `${e.playerName} (you)` : e.playerName}</Text>
               <Text style={s.muted}>{fmtDate(e.at)}{e.attempts > 1 ? ` · ${e.attempts} runs` : ''}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -160,7 +159,7 @@ export default function SegmentScreen() {
         >
           <Text style={s.body}>{fmtDate(a.at)}</Text>
           <Text style={[styles.lbTime, { fontSize: 15 }]}>
-            {a.id === myBest?.id ? '⭐ ' : ''}{fmtRaceTime(a.time)}
+            {a.id === myBest?.id ? 'Best · ' : ''}{fmtRaceTime(a.time)}
           </Text>
         </Pressable>
       ))}
@@ -172,16 +171,16 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-    big: { fontSize: 44, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    big: { fontSize: 44, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     group: {
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
       borderRadius: 12, borderWidth: 1, borderColor: colors.accent,
     },
-    groupText: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    groupText: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
     invite: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16 },
-    inviteText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    inviteText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
     lbRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
-    rank: { fontSize: 20, width: 36, textAlign: 'center', fontWeight: '700', color: colors.muted },
-    lbTime: { fontSize: 17, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+    rank: { fontSize: 20, width: 36, textAlign: 'center', fontFamily: font.medium, color: colors.muted },
+    lbTime: { fontSize: 17, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     attempt: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.faint },
   });

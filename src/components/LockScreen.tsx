@@ -4,14 +4,15 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
+import { dialog } from '../dialog';
 import { api, checkServer, FriendsError } from '../friends/api';
 import { createAccount, logIn, restoreDays } from '../friends/account';
 import { resetFriendsCache, syncFriends } from '../friends/sync';
 import { normalizeServerUrl, parseInvite } from '../lib/groups';
 import { getSettings, updateSettings, useSettings } from '../settings';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 
 /**
  * The app is private: it only opens for people who know your friends server's
@@ -37,7 +38,7 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
   const paste = async () => {
     const info = parseInvite((await Clipboard.getStringAsync()) ?? '');
     if (!info.server) {
-      Alert.alert('No invite found', 'Copy the whole invite message your friend sent you, then tap Paste invite again.');
+      dialog('No invite found', 'Copy the invite your friend sent, then try again.');
       return;
     }
     setServer(info.server);
@@ -48,7 +49,7 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
   const unlock = async () => {
     const url = normalizeServerUrl(server);
     if (!url) {
-      Alert.alert('Check the server address', 'It looks like https://skipi.tail1a2b.ts.net');
+      dialog('Check the server address', 'It looks like https://skipi.tail1a2b.ts.net');
       return;
     }
     setBusy(true);
@@ -60,7 +61,7 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
       await syncFriends().catch(() => undefined);
       // Next: create an account or log in (AccountStep); a group from the invite is joined after that.
     } catch (e) {
-      Alert.alert('Couldn’t unlock', e instanceof Error ? e.message : String(e));
+      dialog('Couldn’t unlock', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -74,12 +75,12 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
         </View>
         <Text style={[s.h1, { textAlign: 'center' }]}>Ski Tracker is private</Text>
         <Text style={[s.muted, { textAlign: 'center' }]}>
-          Only for our crew. Enter the server address and password a friend sent you. You only need to do this once.
+          Enter the server address and password a friend sent you.
         </Text>
 
         <Tap style={styles.paste} onPress={paste}>
           <Ionicons name="clipboard-outline" size={18} color={colors.accent} />
-          <Text style={styles.pasteText}>Paste invite from a friend</Text>
+          <Text style={styles.pasteText}>Paste invite</Text>
         </Tap>
 
         <View style={[s.card, { gap: 12 }]}>
@@ -118,7 +119,7 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
               onSubmitEditing={unlock}
             />
           </Field>
-          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontWeight: '700' }}>{code}</Text> too.</Text> : null}
+          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontFamily: font.medium }}>{code}</Text> too.</Text> : null}
           <Tap
             onPress={unlock}
             disabled={busy || !server.trim()}
@@ -175,17 +176,17 @@ function AccountStep({ code }: { code: string | null }) {
         const missing = await logIn(username, password);
         await done();
         if (missing > 0) {
-          Alert.alert(
-            'Welcome back!',
-            `${missing} ${missing === 1 ? 'day is' : 'days are'} backed up in your account but not on this phone. Download ${missing === 1 ? 'it' : 'them'} now?`,
+          dialog(
+            'Download your days?',
+            `${missing} ${missing === 1 ? 'day is' : 'days are'} in your account but not on this phone.`,
             [
               { text: 'Later', style: 'cancel' },
               {
                 text: 'Download',
                 onPress: () => {
                   restoreDays()
-                    .then((n) => Alert.alert('Days restored', `${n} ${n === 1 ? 'day' : 'days'} added. You’ll find them under Days.`))
-                    .catch((e) => Alert.alert('Couldn’t restore', e instanceof Error ? e.message : String(e)));
+                    .then((n) => dialog('Days restored', `${n} ${n === 1 ? 'day' : 'days'} added.`))
+                    .catch((e) => dialog('Couldn’t restore', e instanceof Error ? e.message : String(e)));
                 },
               },
             ],
@@ -194,13 +195,13 @@ function AccountStep({ code }: { code: string | null }) {
       }
     } catch (e) {
       if (e instanceof FriendsError && e.status === 404) {
-        Alert.alert(
+        dialog(
           'The server needs an update',
           'Your friends server doesn’t know accounts yet. On the Raspberry Pi, in the SKI-APP/server folder, run:\n\ngit pull && docker compose up -d --build\n\nThen try again.',
         );
         return;
       }
-      Alert.alert(mode === 'create' ? 'Couldn’t create your account' : 'Couldn’t log in', e instanceof Error ? e.message : String(e));
+      dialog(mode === 'create' ? 'Couldn’t create your account' : 'Couldn’t log in', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -216,8 +217,8 @@ function AccountStep({ code }: { code: string | null }) {
         <Text style={[s.h1, { textAlign: 'center' }]}>{mode === 'create' ? 'Create your account' : 'Log in'}</Text>
         <Text style={[s.muted, { textAlign: 'center' }]}>
           {mode === 'create'
-            ? 'With an account you can log in on any phone, your days are backed up, and friends see your profile.'
-            : 'Log in with the username and password of your account. Your groups and backed-up days come along.'}
+            ? 'Log in on any phone and keep your days backed up.'
+            : 'Your groups and backed-up days come along.'}
         </Text>
 
         <View style={styles.tabs}>
@@ -266,7 +267,7 @@ function AccountStep({ code }: { code: string | null }) {
               />
             </Field>
           ) : null}
-          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontWeight: '700' }}>{code}</Text> too.</Text> : null}
+          {code ? <Text style={s.muted}>You’ll join group <Text style={{ fontFamily: font.medium }}>{code}</Text> too.</Text> : null}
           <Tap
             onPress={submit}
             disabled={busy || !ready}
@@ -310,10 +311,10 @@ const makeStyles = (colors: Palette) =>
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
       borderRadius: 12, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed',
     },
-    pasteText: { color: colors.accent, fontWeight: '600', fontSize: 15 },
+    pasteText: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
     btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, minHeight: 54 },
-    btnText: { color: colors.onAccent, fontWeight: '700', fontSize: 17 },
+    btnText: { color: colors.onAccent, fontFamily: font.medium, fontSize: 17 },
     tabs: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 4 },
     tab: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-    tabText: { fontWeight: '600', color: colors.text },
+    tabText: { fontFamily: font.medium, color: colors.text },
   });

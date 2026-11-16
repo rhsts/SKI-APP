@@ -182,9 +182,11 @@ export interface Settings {
   devSkip: boolean;
   /** Also share demo/simulated days with your groups (for trying it out). */
   shareDemoDays: boolean;
+  /** The first-open questions (units, sport, look) have been answered. */
+  setupDone: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true, serverUrl: '', serverPassword: '', unlocked: false, deviceId: '', deviceSecret: '', account: null, backupDays: true, devSkip: false, shareDemoDays: false };
+export const DEFAULT_SETTINGS: Settings = { playerId: '', name: '', units: 'metric', simulate: false, theme: 'system', vibrate: true, goals: DEFAULT_GOALS, sport: 'ski', remindStart: false, motion: true, fallCheck: true, serverUrl: '', serverPassword: '', unlocked: false, deviceId: '', deviceSecret: '', account: null, backupDays: true, devSkip: false, shareDemoDays: false, setupDone: false };
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await kvGet('settings');

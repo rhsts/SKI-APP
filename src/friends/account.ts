@@ -1,6 +1,6 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
+import { dialog } from '../dialog';
 import { matchSession } from '../challenges/service';
 import {
   countPoints, deleteSession, getPoints, insertMotionEvents, insertPoints, insertSessionRaw, kvGet, kvSet, listAttempts, listMotionEvents,
@@ -84,7 +84,7 @@ async function forgetAccount() {
 export async function loggedOutElsewhere(message: string): Promise<void> {
   if (!getSettings().account) return;
   await forgetAccount();
-  Alert.alert('Logged out', message);
+  dialog('Logged out', message);
 }
 setLoggedOutHandler(loggedOutElsewhere);
 
@@ -220,7 +220,7 @@ export async function uploadProfile(): Promise<void> {
   const days = (await listSessions()).filter((d) => d.stats).map((d) => ({ id: d.id, startedAt: d.startedAt, place: d.place, stats: d.stats! }));
   const badges = computeBadges(days, await listAttempts(), getSettings().playerId)
     .filter((b) => b.earnedAt != null)
-    .map((b) => ({ id: b.id, emoji: b.emoji, title: b.title, at: b.earnedAt }));
+    .map((b) => ({ id: b.id, title: b.title, at: b.earnedAt }));
   const sig = badges.map((b) => b.id).join(',');
   if ((await kvGet('profile:badges')) === sig) return;
   await api.setProfile(badges);

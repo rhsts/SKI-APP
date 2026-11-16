@@ -1,6 +1,7 @@
 import { weekStart } from './goals';
 import type { MotionSummary } from './motion';
 import type { DaySummary } from './season';
+import type { IconName } from './types';
 
 // ---------- streaks ----------
 
@@ -54,7 +55,7 @@ export type WeeklyKind = 'vertical' | 'topSpeed' | 'runs' | 'longestRun' | 'days
 
 export interface WeeklyChallenge {
   kind: WeeklyKind;
-  emoji: string;
+  icon: IconName;
   value: number;
   target: number;
   /** 0..1 */
@@ -62,8 +63,9 @@ export interface WeeklyChallenge {
   done: boolean;
 }
 
-export const WEEKLY_EMOJI: Record<WeeklyKind, string> = {
-  vertical: '⛰️', topSpeed: '💨', runs: '🔁', longestRun: '📏', days: '📅', turns: '🌀', airtime: '🦘', jumps: '🛫', earlyBird: '🌅',
+export const WEEKLY_ICON: Record<WeeklyKind, IconName> = {
+  vertical: 'trending-down-outline', topSpeed: 'speedometer-outline', runs: 'repeat-outline', longestRun: 'resize-outline', days: 'calendar-outline',
+  turns: 'sync-outline', airtime: 'arrow-up-outline', jumps: 'airplane-outline', earlyBird: 'sunny-outline',
 };
 
 /** Challenges per week. */
@@ -135,7 +137,7 @@ export function weeklyChallenges(
   const order = pool.map((d) => ({ d, k: rnd() })).sort((a, b) => a.k - b.k).map((x) => x.d);
   return order.slice(0, WEEKLY_COUNT).map(({ kind, target, value }) => {
     const t = target(), v = value();
-    return { kind, emoji: WEEKLY_EMOJI[kind], value: v, target: t, progress: t > 0 ? Math.min(1, v / t) : 0, done: v >= t };
+    return { kind, icon: WEEKLY_ICON[kind], value: v, target: t, progress: t > 0 ? Math.min(1, v / t) : 0, done: v >= t };
   });
 }
 

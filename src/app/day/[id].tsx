@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams, type ErrorBoundaryProps } from 'expo-router';
 import Stack from 'expo-router/stack';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { StatGrid, StatTile } from '../../components/StatTile';
 import { TimelineCard } from '../../components/TimelineCard';
 import { exportGpx } from '../../days/files';
@@ -13,10 +14,10 @@ import { difficultyBreakdown } from '../../lib/breakdown';
 import { DifficultyBar } from '../../components/DifficultyBar';
 import { PhotoStrip } from '../../components/PhotoStrip';
 import { addPhotos, removePhoto } from '../../days/photos';
-import { SportPicker } from '../../components/SportPicker';
+import { sportInfo } from '../../lib/sport';
 import {
   deleteMotionEvent, deleteSession, getPoints, getSession, kvGet, kvSet, listMotionEvents, listPhotos, listSegments, listSessionAttempts,
-  renameSession, setSessionSport, type MotionRow, type PhotoRow, type SessionRow,
+  renameSession, type MotionRow, type PhotoRow, type SessionRow,
 } from '../../db';
 import { eventsBetween, jumpHeight, summariseMotion } from '../../lib/motion';
 import type { Attempt, Segment } from '../../lib/segments';
@@ -28,7 +29,7 @@ import type { Activity, TrackPoint, Units } from '../../lib/types';
 import type { MotionSummary } from '../../lib/motion';
 import type { PisteMatch } from '../../lib/pistes';
 import { useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 
 /** One ski day: the day's numbers and every run. Tap a run to see it on the map. */
 export default function DayScreen() {
@@ -118,7 +119,7 @@ export default function DayScreen() {
     if (i != null) router.push({ pathname: '/run', params: { session: session.id, i: String(i) } });
   };
   const removeEvent = (e: MotionRow) =>
-    Alert.alert(e.kind === 'jump' ? 'Remove this jump?' : 'Remove this fall?', 'It will no longer count in your stats.', [
+    dialog(e.kind === 'jump' ? 'Remove this jump?' : 'Remove this fall?', undefined, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -131,7 +132,7 @@ export default function DayScreen() {
     ]);
 
   const remove = () =>
-    Alert.alert('Delete this day?', 'This can’t be undone.', [
+    dialog('Delete this day?', 'This can’t be undone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
           await deleteSession(session.id);
@@ -142,11 +143,10 @@ export default function DayScreen() {
     ]);
 
   const gpx = () =>
-    exportGpx(session.id).catch((e) => Alert.alert('Couldn’t export', e instanceof Error ? e.message : String(e)));
+    exportGpx(session.id).catch((e) => dialog('Couldn’t export', e instanceof Error ? e.message : String(e)));
 
-  // Android shows at most three buttons in an alert.
   const menu = () =>
-    Alert.alert(session.place ?? 'Ski day', undefined, [
+    dialog(session.place ?? 'Ski day', undefined, [
       { text: 'Export GPX (Strava, Komoot…)', onPress: gpx },
       { text: 'Delete day', style: 'destructive', onPress: remove },
       { text: 'Cancel', style: 'cancel' },
@@ -188,15 +188,8 @@ export default function DayScreen() {
         </Pressable>
       )}
       <Text style={s.muted}>
-        {fmtTimeOfDay(session.startedAt)} – {fmtTimeOfDay(session.endedAt ?? session.startedAt)} · {fmtDuration(stats.duration)} on the mountain
+        {sportInfo(session.sport).label} · {fmtTimeOfDay(session.startedAt)} – {fmtTimeOfDay(session.endedAt ?? session.startedAt)} · {fmtDuration(stats.duration)}
       </Text>
-      <SportPicker
-        value={session.sport}
-        onChange={(sp) => {
-          setSession({ ...session, sport: sp });
-          setSessionSport(session.id, sp);
-        }}
-      />
 
       <StatGrid>
         <StatTile label="Top speed" value={fmtSpeed(stats.topSpeed, units)} sub={stats.topSpeedTime ? `at ${fmtTimeOfDay(stats.topSpeedTime)}` : undefined} />
@@ -221,11 +214,10 @@ export default function DayScreen() {
 
       <DifficultyBar shares={shares} units={units} />
       {!shares.length && !session.isDemo && stats.runCount ? (
-        <Text style={s.muted}>{lookupFailed ? 'Couldn’t look up the pistes (no internet, or the map server is busy). Open this day again to retry.' : 'Looking up the pistes…'}</Text>
+        <Text style={s.muted}>{lookupFailed ? 'Piste names unavailable. Reopen this day to retry.' : 'Looking up the pistes…'}</Text>
       ) : null}
 
       <Text style={[s.h2, { marginTop: 8 }]}>Runs</Text>
-      <Text style={s.muted}>Tap a run to see it on the map. Tap 🏳 to make it a challenge for your friends.</Text>
       {stats.runCount === 0 ? <Text style={s.muted}>No runs detected.</Text> : null}
       <RunList
         timeline={timeline}
@@ -243,8 +235,8 @@ export default function DayScreen() {
             const r = runOfEvent(e.t);
             return (
               <Pressable key={`${e.kind}-${e.t}`} onPress={() => showEvent(e.t)} onLongPress={() => removeEvent(e)} style={styles.timedRow}>
-                <Text style={{ fontSize: 17 }}>{e.kind === 'jump' ? '🦘' : '💥'}</Text>
-                <Text style={[s.body, { flex: 1, fontWeight: '600' }]}>
+                <Ionicons name={e.kind === 'jump' ? 'arrow-up-outline' : 'alert-circle-outline'} size={18} color={colors.accent} />
+                <Text style={[s.body, { flex: 1, fontFamily: font.medium }]}>
                   {e.kind === 'jump' ? `${fmtAir(e.value)} airtime` : 'Fall'}
                   <Text style={s.muted}>
                     {e.kind === 'jump' ? `  ${fmtJumpHeight(jumpHeight(e.value), units)} high` : `  ${fmtG(e.value)} impact`}
@@ -254,7 +246,7 @@ export default function DayScreen() {
               </Pressable>
             );
           })}
-          <Text style={[s.muted, { fontSize: 12 }]}>Tap to open the run it was on. Press and hold to remove one that wasn’t real.</Text>
+          <Text style={[s.muted, { fontSize: 12 }]}>Hold one to remove it.</Text>
         </View>
       ) : null}
 
@@ -269,10 +261,10 @@ export default function DayScreen() {
             const r = await addPhotos(session.id);
             if (r) {
               setPhotos(await listPhotos(session.id));
-              if (r.skipped) Alert.alert('Some photos were skipped', `${r.skipped} ${r.skipped === 1 ? 'photo wasn’t' : 'photos weren’t'} taken during this day.`);
+              if (r.skipped) dialog('Some photos were skipped', `${r.skipped} ${r.skipped === 1 ? 'photo wasn’t' : 'photos weren’t'} taken during this day.`);
             }
           } catch (e) {
-            Alert.alert('Couldn’t add photos', e instanceof Error ? e.message : String(e));
+            dialog('Couldn’t add photos', e instanceof Error ? e.message : String(e));
           } finally {
             setAddingPhotos(false);
           }
@@ -285,12 +277,10 @@ export default function DayScreen() {
 
       {suggestion ? (
         <View style={[s.card, styles.suggest]}>
-          <Text style={{ fontSize: 24 }}>🏁</Text>
+          <Ionicons name="flag-outline" size={24} color={colors.accent} />
           <View style={{ flex: 1, gap: 8 }}>
             <Text style={s.h2}>You skied this line {suggestion.times} times</Text>
-            <Text style={s.muted}>
-              Make it a challenge to get timed on it from now on and race your friends. Your fastest was Run {suggestedRunNo}.
-            </Text>
+            <Text style={s.muted}>Fastest: Run {suggestedRunNo}. Make it a challenge to race friends.</Text>
             <View style={{ flexDirection: 'row', gap: 16, marginTop: 2 }}>
               <Pressable onPress={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(suggestion.activityIndex) } })}>
                 <Text style={styles.link}>Make challenge</Text>
@@ -313,9 +303,9 @@ export default function DayScreen() {
           <Text style={s.label}>Challenge times</Text>
           {timed.map(({ attempt, segment }) => (
             <Pressable key={attempt.id} onPress={() => router.push(`/segment/${segment.id}`)} style={styles.timedRow}>
-              <Text style={[s.body, { flex: 1 }]} numberOfLines={1}>🏁 {segment.name}</Text>
+              <Text style={[s.body, { flex: 1 }]} numberOfLines={1}>{segment.name}</Text>
               <Text style={s.muted}>{fmtTimeOfDay(attempt.at)}</Text>
-              <Text style={[s.body, { fontWeight: '700', minWidth: 64, textAlign: 'right' }]}>{fmtRaceTime(attempt.time)}</Text>
+              <Text style={[s.body, { fontFamily: font.medium, minWidth: 64, textAlign: 'right' }]}>{fmtRaceTime(attempt.time)}</Text>
             </Pressable>
           ))}
         </View>
@@ -374,9 +364,9 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    input: { flex: 1, fontSize: 20, fontWeight: '600', color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
+    input: { flex: 1, fontSize: 20, fontFamily: font.medium, color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
     play: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
     suggest: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
     timedRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   });

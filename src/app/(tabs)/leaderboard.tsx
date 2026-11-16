@@ -1,4 +1,5 @@
 import { Tap } from '../../components/Tap';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -9,14 +10,13 @@ import { fmtAlt, fmtDist, fmtDuration, fmtSpeed } from '../../lib/format';
 import { CATEGORIES, crowns, rank, type FriendTotals, type StatKind } from '../../lib/leaderboard';
 import type { Units } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { useStyles, useTheme, type Palette } from '../../theme';
+import { font, useStyles, useTheme, type Palette } from '../../theme';
 import { Row, Rows } from '../../components/Row';
 import { useTabBarSpace } from '../../components/TabBar';
 
 type Period = 'season' | 'allTime';
 type Loaded = { season: FriendTotals[]; allTime: FriendTotals[]; seasonKey: string };
 
-const MEDALS = ['🥇', '🥈', '🥉'];
 const SHOWN = 5;
 
 function fmt(kind: StatKind, v: number, units: Units): string {
@@ -60,7 +60,7 @@ export default function LeaderboardScreen() {
   // Challenges have no tab of their own any more: they open from here, with or without a server.
   const challenges = (
     <Rows>
-      <Row label="Challenges" value="Timed runs and groups" onPress={() => router.push('/challenges')} />
+      <Row label="Challenges" onPress={() => router.push('/challenges')} />
     </Rows>
   );
 
@@ -81,11 +81,11 @@ export default function LeaderboardScreen() {
       <View style={[s.screen, styles.aside]}>
         {challenges}
         <View style={styles.empty}>
-        <Text style={{ fontSize: 48 }}>🏆</Text>
+        <Ionicons name="trophy-outline" size={44} color={colors.accent} />
         <Text style={s.h2}>Race your friends</Text>
-        <Text style={[s.muted, { textAlign: 'center' }]}>Set up a friends server in Profile and join a group to see who rules the mountain.</Text>
+        <Text style={[s.muted, { textAlign: 'center' }]}>Needs a friends server and a group.</Text>
         <Pressable onPress={() => router.push('/profile')} style={styles.cta}>
-          <Text style={styles.ctaText}>Go to Profile</Text>
+          <Text style={styles.ctaText}>Open You</Text>
         </Pressable>
         </View>
       </View>
@@ -117,12 +117,12 @@ export default function LeaderboardScreen() {
       </View>
 
       <View style={[s.card, styles.hero]}>
-        <Text style={{ fontSize: 40 }}>{myCrowns ? '👑' : '🎿'}</Text>
+        <Ionicons name={myCrowns ? 'trophy' : 'trophy-outline'} size={36} color={myCrowns ? colors.warn : colors.muted} />
         <Text style={s.h2}>
-          {myCrowns ? `You lead ${myCrowns} of ${CATEGORIES.length} boards` : 'No crowns yet'}
+          {myCrowns ? `You lead ${myCrowns} of ${CATEGORIES.length} boards` : 'No boards led yet'}
         </Text>
         <Text style={s.muted}>
-          {friends.length > 1 ? `${friends.length} skiers in your groups` : 'Invite friends to a group to compete'}
+          {friends.length > 1 ? `${friends.length} skiers` : 'Invite friends to a group'}
         </Text>
       </View>
 
@@ -134,7 +134,7 @@ export default function LeaderboardScreen() {
         return (
           <View key={cat.id} style={[s.card, { gap: 8 }]}>
             <View style={styles.catHead}>
-              <Text style={{ fontSize: 24 }}>{cat.emoji}</Text>
+              <Ionicons name={cat.icon} size={24} color={colors.accent} />
               <View style={{ flex: 1 }}>
                 <Text style={s.h2}>{cat.title}</Text>
                 <Text style={s.muted}>{cat.blurb}</Text>
@@ -149,15 +149,15 @@ export default function LeaderboardScreen() {
                   style={[styles.row, isMe && styles.rowMe]}
                   accessibilityLabel={`${r.rank}. ${r.friend.name}, ${fmt(cat.kind, r.value, units)}`}
                 >
-                  <Text style={styles.rank}>{MEDALS[r.rank - 1] ?? r.rank}</Text>
+                  <Text style={styles.rank}>{r.rank}</Text>
                   <Avatar playerId={r.friend.id} name={r.friend.name} size={30} hasAvatar={r.friend.hasAvatar} />
-                  <Text style={[s.body, { flex: 1, fontWeight: isMe ? '800' : '600' }]} numberOfLines={1}>
+                  <Text style={[s.body, { flex: 1, fontFamily: isMe ? font.medium : font.regular }]} numberOfLines={1}>
                     {isMe ? 'You' : r.friend.name}
                   </Text>
                   <Text style={styles.value}>{fmt(cat.kind, r.value, units)}</Text>
                 </Tap>
               );
-            }) : <Text style={s.muted}>Nobody yet. Go ski!</Text>}
+            }) : <Text style={s.muted}>Nobody yet.</Text>}
             {!expanded && mine && mine.rank > SHOWN ? (
               <Text style={s.muted}>You: #{mine.rank} · {fmt(cat.kind, mine.value, units)}</Text>
             ) : null}
@@ -180,16 +180,16 @@ const makeStyles = (colors: Palette) =>
     aside: { padding: 16 },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
     cta: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 999, backgroundColor: colors.accent },
-    ctaText: { color: colors.onAccent, fontWeight: '700' },
+    ctaText: { color: colors.onAccent, fontFamily: font.medium },
     pills: { flexDirection: 'row', gap: 8 },
     pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    pillText: { fontWeight: '600', color: colors.text },
+    pillText: { fontFamily: font.medium, color: colors.text },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
     catHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 12 },
     rowMe: { backgroundColor: colors.warnSoft },
-    rank: { width: 28, textAlign: 'center', fontSize: 17, fontWeight: '700', color: colors.muted },
-    value: { fontWeight: '700', color: colors.text },
-    more: { color: colors.accent, fontWeight: '600', textAlign: 'center', paddingVertical: 4 },
+    rank: { width: 28, textAlign: 'center', fontSize: 17, fontFamily: font.medium, color: colors.muted },
+    value: { fontFamily: font.medium, color: colors.text },
+    more: { color: colors.accent, fontFamily: font.medium, textAlign: 'center', paddingVertical: 4 },
   });

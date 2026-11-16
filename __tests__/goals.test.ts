@@ -73,7 +73,7 @@ describe('badge details', () => {
   it('every badge has a description and a tip to show when tapped', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { badgeInfo, computeBadges } = require('../src/lib/goals');
-    const all = computeBadges([], [], 'me') as { id: string; emoji: string; title: string }[];
+    const all = computeBadges([], [], 'me') as { id: string; icon: string; title: string }[];
     expect(all.length).toBeGreaterThan(15);
     for (const b of all) {
       const info = badgeInfo(b.id);

@@ -3,12 +3,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { api } from '../../friends/api';
 import { syncFriends } from '../../friends/sync';
 import { cleanCode } from '../../lib/groups';
 import { useSettings } from '../../settings';
-import { useStyles, useTheme, type Palette } from '../../theme';
+import { font, useStyles, useTheme, type Palette } from '../../theme';
 
 /** Start a friend group for your trip, or join one with the code a friend sent you. */
 export default function NewGroupScreen() {
@@ -28,7 +29,7 @@ export default function NewGroupScreen() {
       await syncFriends().catch(() => undefined);
       router.replace(`/group/${g.id}`);
     } catch (e) {
-      Alert.alert(kind === 'create' ? 'Couldn’t make the group' : 'Couldn’t join', e instanceof Error ? e.message : String(e));
+      dialog(kind === 'create' ? 'Couldn’t make the group' : 'Couldn’t join', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(null);
     }
@@ -41,10 +42,10 @@ export default function NewGroupScreen() {
           <Ionicons name="server-outline" size={36} color={colors.accent} />
           <Text style={s.h2}>Set up your friends server first</Text>
           <Text style={[s.muted, { textAlign: 'center' }]}>
-            Groups live on a small server (for example a Raspberry Pi). Enter its address under Profile → Friends server.
+            Enter its address under You.
           </Text>
           <Pressable onPress={() => router.navigate('/profile')}>
-            <Text style={styles.link}>Open Profile</Text>
+            <Text style={styles.link}>Open You</Text>
           </Pressable>
         </View>
       </View>
@@ -106,8 +107,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12 },
     input: { fontSize: 17, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
-    code: { fontSize: 28, fontWeight: '700', letterSpacing: 6, textAlign: 'center' },
+    code: { fontSize: 28, fontFamily: font.medium, letterSpacing: 6, textAlign: 'center' },
     btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, minHeight: 52 },
-    btnText: { color: colors.onAccent, fontWeight: '700', fontSize: 17 },
-    link: { color: colors.accent, fontWeight: '700', fontSize: 15 },
+    btnText: { color: colors.onAccent, fontFamily: font.medium, fontSize: 17 },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
   });

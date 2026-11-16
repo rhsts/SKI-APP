@@ -4,7 +4,7 @@ import Svg, { ClipPath, Defs, G, LinearGradient, Polyline, Rect, Stop } from 're
 import { fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed } from '../lib/format';
 import { localProjector } from '../lib/geo';
 import type { Activity, DayStats, TrackPoint, Units } from '../lib/types';
-import { speedColor } from '../theme';
+import { font, speedColor } from '../theme';
 
 interface Props {
   points: TrackPoint[]; // cleaned
@@ -65,7 +65,7 @@ export function DayShareCard({ points, speeds, stats, place, startedAt, units, r
         </G>
       </Svg>
 
-      <Text allowFontScaling={false} style={styles.brand}>⛷️  SKI TRACKER</Text>
+      <Text allowFontScaling={false} style={styles.brand}>SKI TRACKER</Text>
       <Text allowFontScaling={false} style={styles.title} numberOfLines={1}>{place ?? 'Ski day'}</Text>
       <Text allowFontScaling={false} style={styles.date}>{fmtDate(startedAt)}</Text>
 
@@ -137,11 +137,11 @@ function buildLines(points: TrackPoint[], speeds: number[], activities: Activity
 const styles = StyleSheet.create({
   // No borderRadius: this view is captured to PNG and rounded corners would come out transparent.
   card: { width: CARD_W, height: CARD_H, overflow: 'hidden', backgroundColor: '#081421' },
-  brand: { position: 'absolute', top: 18, left: PAD, color: '#7FB3E6', fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
-  title: { position: 'absolute', top: 32, left: PAD, right: PAD, color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
-  date: { position: 'absolute', top: 17, right: PAD, color: '#9FB3C8', fontSize: 12, fontWeight: '500' },
+  brand: { position: 'absolute', top: 18, left: PAD, color: '#7FB3E6', fontSize: 11, fontFamily: font.medium, letterSpacing: 1.5 },
+  title: { position: 'absolute', top: 32, left: PAD, right: PAD, color: '#FFFFFF', fontSize: 20, fontFamily: font.medium },
+  date: { position: 'absolute', top: 17, right: PAD, color: '#9FB3C8', fontSize: 12, fontFamily: font.medium },
   grid: { position: 'absolute', left: PAD, right: PAD, bottom: PAD, flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
   cell: { width: '33.33%' },
-  value: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  label: { color: '#9FB3C8', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
+  value: { color: '#FFFFFF', fontSize: 20, fontFamily: font.medium, fontVariant: ['tabular-nums'] },
+  label: { color: '#9FB3C8', fontSize: 11, fontFamily: font.medium, textTransform: 'uppercase', letterSpacing: 0.8 },
 });

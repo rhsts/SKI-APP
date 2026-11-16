@@ -10,7 +10,7 @@ import { fmtAlt, fmtDist, fmtRaceTime } from '../lib/format';
 import { leaderboard, pathInfo } from '../lib/segments';
 import { decodeChallenge, type ChallengePayload } from '../lib/share';
 import { useSettings } from '../settings';
-import { useTheme, useStyles, type Palette } from '../theme';
+import { font, useTheme, useStyles, type Palette } from '../theme';
 import { refreshRacers } from '../tracking/tracker';
 
 /**
@@ -71,13 +71,13 @@ export default function InviteScreen() {
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
       <View style={[s.card, styles.hero]}>
-        <Text style={{ fontSize: 40 }}>⛷️</Text>
+        <Ionicons name="flag-outline" size={40} color={colors.accent} />
         <Text style={[s.h1, { textAlign: 'center' }]}>
           {have ? `New times on “${segment.name}”` : `${fromName ?? 'A friend'} challenges you!`}
         </Text>
         <Text style={[s.muted, { textAlign: 'center' }]}>
           {have
-            ? `${fromName ?? 'Your friend'} sent their latest times. Add them to your leaderboard.`
+            ? `Latest times from ${fromName ?? 'your friend'}.`
             : `Ski “${segment.name}” faster than ${leader ? fmtRaceTime(leader.time) : 'them'}.`}
         </Text>
       </View>
@@ -93,19 +93,19 @@ export default function InviteScreen() {
           {board.map((e) => (
             <View key={e.playerId} style={styles.lbRow}>
               <Text style={s.body}>#{e.rank} {e.playerName}{e.playerId === playerId ? ' (you)' : ''}</Text>
-              <Text style={[s.body, { fontWeight: '700' }]}>{fmtRaceTime(e.time)}</Text>
+              <Text style={[s.body, { fontFamily: font.medium }]}>{fmtRaceTime(e.time)}</Text>
             </View>
           ))}
         </View>
       ) : null}
 
-      {fromMe ? <Text style={[s.muted, { textAlign: 'center' }]}>This is your own invite: it only has your times.</Text> : null}
+      {fromMe ? <Text style={[s.muted, { textAlign: 'center' }]}>Your own invite.</Text> : null}
 
       <Tap onPress={accept} disabled={saving || have === null} style={styles.accept}>
         {saving ? <ActivityIndicator color={colors.onAccent} /> : <Text style={styles.acceptText}>{have ? 'Update leaderboard' : 'Accept challenge'}</Text>}
       </Tap>
       <Text style={[s.muted, { textAlign: 'center' }]}>
-        After you accept, just record your ski day. When you ski through the start and finish, you’re timed automatically.
+        Record a day and ski it: timing is automatic.
       </Text>
     </ScrollView>
   );
@@ -118,7 +118,7 @@ const makeStyles = (colors: Palette) =>
     hero: { alignItems: 'center', gap: 8, paddingVertical: 20 },
     lbRow: { flexDirection: 'row', justifyContent: 'space-between' },
     accept: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-    acceptText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    acceptText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
     secondary: { borderWidth: 1, borderColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12 },
-    secondaryText: { color: colors.accent, fontWeight: '600' },
+    secondaryText: { color: colors.accent, fontFamily: font.medium },
   });

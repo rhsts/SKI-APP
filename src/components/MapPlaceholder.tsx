@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 
 /** Shown instead of a map in builds without a Google Maps key (see README → Install the app). */
 export function MapPlaceholder({ height = 260, style }: { height?: number; style?: StyleProp<ViewStyle> }) {
@@ -9,7 +9,7 @@ export function MapPlaceholder({ height = 260, style }: { height?: number; style
   return (
     <View style={[styles.wrap, { height }, style]}>
       <Ionicons name="map-outline" size={32} color={colors.muted} />
-      <Text style={[s.body, { fontWeight: '600' }]}>Map not available in this build</Text>
+      <Text style={[s.body, { fontFamily: font.medium }]}>Map not available in this build</Text>
       <Text style={[s.muted, { textAlign: 'center' }]}>
         The app was built without a Google Maps key. Everything else works; maps appear after the next build with the key.
       </Text>

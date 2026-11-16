@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../dialog';
 import type { PhotoRow } from '../db';
 import { Appear } from './Appear';
 import { fmtTimeOfDay } from '../lib/format';
-import { useStyles, useTheme, type Palette } from '../theme';
+import { font, useStyles, useTheme, type Palette } from '../theme';
 
 interface Props {
   photos: PhotoRow[];
@@ -40,7 +41,7 @@ export function PhotoStrip({ photos, open, onOpen, onAdd, onRemove, busy }: Prop
           ))}
         </ScrollView>
       ) : (
-        <Text style={s.muted}>Pick photos from this day: they’re pinned on the map of the run you took them on.</Text>
+        <Text style={s.muted}>Photos from this day get pinned on the map.</Text>
       )}
 
       <Modal visible={!!current} transparent animationType="fade" onRequestClose={() => onOpen(null)}>
@@ -60,7 +61,7 @@ export function PhotoStrip({ photos, open, onOpen, onAdd, onRemove, busy }: Prop
               accessibilityLabel="Remove photo"
               onPress={() =>
                 current &&
-                Alert.alert('Remove this photo from the day?', 'It stays in your gallery.', [
+                dialog('Remove this photo from the day?', 'It stays in your gallery.', [
                   { text: 'Cancel', style: 'cancel' },
                   { text: 'Remove', style: 'destructive', onPress: () => { onRemove(current); onOpen(null); } },
                 ])
@@ -87,11 +88,11 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     add: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    addText: { color: colors.accent, fontWeight: '700' },
+    addText: { color: colors.accent, fontFamily: font.medium },
     thumb: { width: 88, height: 88, borderRadius: 12, backgroundColor: colors.faint },
     viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
     full: { width: '100%', height: '75%' },
     bar: { position: 'absolute', top: 48, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    barText: { color: '#fff', fontWeight: '600' },
+    barText: { color: '#fff', fontFamily: font.medium },
     nav: { position: 'absolute', bottom: 48, left: 24, right: 24, flexDirection: 'row', justifyContent: 'space-between' },
   });

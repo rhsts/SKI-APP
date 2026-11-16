@@ -3,7 +3,8 @@ import Slider from '@react-native-community/slider';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { createChallenge } from '../../challenges/service';
 import { SegmentMap } from '../../components/SegmentMap';
 import { getPoints, getSession } from '../../db';
@@ -12,7 +13,7 @@ import { buildSegmentPath, MIN_SEGMENT_LENGTH, pathInfo } from '../../lib/segmen
 import { cleanTrack, computeStats } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { useTheme, useStyles, type Palette } from '../../theme';
+import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { refreshRacers } from '../../tracking/tracker';
 
 /** Turn (part of) a recorded run into a challenge. */
@@ -64,7 +65,7 @@ export default function NewChallengeScreen() {
       await refreshRacers();
       router.replace(`/segment/${seg.id}`);
     } catch (e) {
-      Alert.alert('Couldn’t save the challenge', String(e));
+      dialog('Couldn’t save the challenge', String(e));
       setSaving(false);
     }
   };
@@ -74,8 +75,7 @@ export default function NewChallengeScreen() {
     <KeyboardAvoidingView style={s.screen} behavior="padding" keyboardVerticalOffset={headerHeight}>
       <ScrollView style={s.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={s.muted}>
-          Pick the stretch to race. Timing starts when you leave the green start circle and stops when you reach the
-          finish circle. Anyone who skis it, including you next time, gets a time.
+          Pick the stretch to race. Timing runs from the start circle to the finish circle.
         </Text>
 
         <SegmentMap path={path} context={context} />
@@ -149,8 +149,8 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     facts: { flexDirection: 'row', marginTop: 8 },
-    factValue: { fontSize: 17, fontWeight: '700', color: colors.text },
-    input: { fontSize: 17, fontWeight: '500', color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
+    factValue: { fontSize: 17, fontFamily: font.medium, color: colors.text },
+    input: { fontSize: 17, fontFamily: font.medium, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
     save: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-    saveText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    saveText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
   });

@@ -1,5 +1,7 @@
 import { altitudeToPressure, fuseAltitude, hasBarometer, pressureToAltitude } from '../src/lib/altitude';
-import { batteryHoursLeft, decideGpsMode, notificationBody, restingFor, type GpsMode } from '../src/lib/power';
+import { fmtTimeOfDay } from '../src/lib/format';
+import { lockScreenText } from '../src/lib/lockscreen';
+import { batteryHoursLeft, decideGpsMode, restingFor, type GpsMode } from '../src/lib/power';
 import { simulateDay } from '../src/lib/sim';
 import { cleanTrack, completedRuns, computeStats } from '../src/lib/stats';
 import type { TrackPoint } from '../src/lib/types';
@@ -89,10 +91,28 @@ describe('battery saver GPS mode', () => {
     expect(batteryHoursLeft(0.9, 0, 0.8, 3600000)).toBeCloseTo(8, 5); // 10%/h, 80% left
   });
 
-  it('writes a short notification line', () => {
-    expect(notificationBody({ runCount: 5, verticalDown: 2450, topSpeed: 20 }, {
-      alt: (m) => `${m} m`, speed: (v) => `${v * 3.6} km/h`,
-    })).toBe('5 runs · 2450 m ↓ · top 72 km/h');
+});
+
+describe('lock screen', () => {
+  const startedAt = new Date(2026, 0, 10, 9, 12).getTime();
+  const at = (minutes: number, paused = false) => ({ startedAt, paused, units: 'metric' as const, now: startedAt + minutes * 60000 + 59000 });
+
+  it('shows the last run, vertical, runs and recording time', () => {
+    const stats = computeStats(simulateDay({ runs: 2 }).points);
+    const lastRun = stats.activities.filter((a) => a.kind === 'run').pop()!;
+    const speed = `${(lastRun.topSpeed * 3.6).toFixed(1)} km/h`;
+    const vertical = `${Math.round(stats.verticalDown).toLocaleString('en-US')} m`;
+    expect(lockScreenText(stats, at(134))).toEqual({
+      title: `2 runs · ${vertical} ↓`,
+      body: `Run 2 top ${speed} · 2h 14m since ${fmtTimeOfDay(startedAt)}`,
+    });
+  });
+
+  it('says so when paused, and makes sense before the first run', () => {
+    expect(lockScreenText(null, at(5))).toEqual({ title: '0 runs · 0 m ↓', body: `Recording 5 min since ${fmtTimeOfDay(startedAt)}` });
+    const paused = lockScreenText(computeStats(simulateDay({ runs: 1 }).points), at(61, true));
+    expect(paused.title).toMatch(/^Paused · 1 run · /);
+    expect(paused.body).toMatch(/ · 1h 01m since /);
   });
 });
 

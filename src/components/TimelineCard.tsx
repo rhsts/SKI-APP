@@ -4,7 +4,7 @@ import { fmtAir, fmtAlt, fmtDist, fmtDuration, fmtSpeed, fmtTimeOfDay } from '..
 import type { MotionSummary } from '../lib/motion';
 import { difficultyColor, difficultyLabel, type PisteMatch } from '../lib/pistes';
 import type { Activity, Units } from '../lib/types';
-import { useTheme, useStyles, type Palette } from '../theme';
+import { font, useTheme, useStyles, type Palette } from '../theme';
 
 interface Props {
   activity: Activity;
@@ -53,12 +53,12 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
           </View>
         </View>
         {!isRun && !isTour && piste?.name ? (
-          <Text style={[s.body, { fontWeight: '600' }]} numberOfLines={1}>{piste.name}</Text>
+          <Text style={[s.body, { fontFamily: font.medium }]} numberOfLines={1}>{piste.name}</Text>
         ) : null}
         {isRun && piste ? (
           <View style={styles.pisteRow}>
             <View style={[styles.dot, { backgroundColor: difficultyColor(piste.difficulty, dark) }]} />
-            <Text style={[s.body, { fontWeight: '600', flex: 1 }]} numberOfLines={1}>
+            <Text style={[s.body, { fontFamily: font.medium, flex: 1 }]} numberOfLines={1}>
               {piste.name ?? difficultyLabel(piste.difficulty) ?? 'Piste'}
               {piste.name && difficultyLabel(piste.difficulty) ? <Text style={s.muted}>  {difficultyLabel(piste.difficulty)}</Text> : null}
             </Text>
@@ -75,11 +75,11 @@ export function TimelineCard({ activity: a, number, units, selected, onPress, on
         {isRun && (a.turns || a.stops || motion?.jumps || motion?.falls) ? (
           <Text style={s.muted}>
             {[
-              a.turns ? `🌀 ${a.turns} turns` : null,
-              a.stops ? `⏸ ${a.stops} ${a.stops === 1 ? 'stop' : 'stops'} · ${fmtDuration(a.stopTime ?? 0)}` : null,
-              motion?.jumps ? `🦘 ${motion.jumps} · best ${fmtAir(motion.bestAir)}` : null,
-              motion?.falls ? `💥 ${motion.falls} ${motion.falls === 1 ? 'fall' : 'falls'}` : null,
-            ].filter(Boolean).join('   ')}
+              a.turns ? `${a.turns} turns` : null,
+              a.stops ? `${a.stops} ${a.stops === 1 ? 'stop' : 'stops'} · ${fmtDuration(a.stopTime ?? 0)}` : null,
+              motion?.jumps ? `${motion.jumps} ${motion.jumps === 1 ? 'jump' : 'jumps'}, best ${fmtAir(motion.bestAir)}` : null,
+              motion?.falls ? `${motion.falls} ${motion.falls === 1 ? 'fall' : 'falls'}` : null,
+            ].filter(Boolean).join(' · ')}
           </Text>
         ) : null}
         {isRun ? null : isTour ? (
@@ -131,7 +131,7 @@ const makeStyles = (colors: Palette) =>
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
     // Wraps to a second line on narrow screens / big fonts instead of spilling past the card.
     metrics: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12, rowGap: 8 },
-    metric: { fontSize: 13, fontWeight: '600', color: colors.text, fontVariant: ['tabular-nums'] },
+    metric: { fontSize: 13, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     pisteRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     dot: { width: 10, height: 10, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
     breakRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 2 },

@@ -31,7 +31,7 @@ async function call<T>(
   method: string, path: string, body?: unknown, base = getSettings().serverUrl, password = getSettings().serverPassword,
   timeoutMs = TIMEOUT_MS,
 ): Promise<T> {
-  if (!base) throw new FriendsError('Set up your friends server in Profile first.');
+  if (!base) throw new FriendsError('Set up your friends server under You first.');
   const { deviceId, deviceSecret } = getSettings();
   const ctrl = new AbortController();
   // The timer covers reading the answer too: a download that stalls halfway must not hang for ever.
@@ -69,7 +69,7 @@ async function call<T>(
         updateSettings({ unlocked: false }).catch(() => undefined);
       }
       throw new FriendsError(
-        password ? 'Wrong server password. Ask whoever runs the server for the right one.' : 'This server needs a password. Enter it in Profile → Friends server.',
+        password ? 'Wrong server password. Ask whoever runs the server for the right one.' : 'This server needs a password. Enter it under You → Friends server.',
         res.status, 'password',
       );
     }
@@ -107,7 +107,7 @@ export interface PlayerProfile {
   season: PlayerTotals & { key: string };
   allTime: PlayerTotals;
   recent: { date: string; vertical: number; topSpeed: number; runs: number }[];
-  badges: { id: string; emoji: string; title: string; at: number | null }[];
+  badges: { id: string; title: string; at: number | null }[];
 }
 
 export interface TrackInfo { dayId: string; startedAt: number; endedAt: number | null; place: string | null; sport: string | null; size: number; updatedAt: number }
@@ -128,7 +128,7 @@ export const api = {
   changePassword: (old: string, password: string) => call<{ ok: true }>('PUT', '/v1/account/password', { old, password }),
   setAvatar: (jpeg: string) => call<{ ok: true }>('PUT', '/v1/me/avatar', { jpeg }),
   deleteAvatar: () => call<{ ok: true }>('DELETE', '/v1/me/avatar'),
-  setProfile: (badges: { id: string; emoji: string; title: string; at: number | null }[]) => call<{ ok: true }>('PUT', '/v1/me/profile', { badges }),
+  setProfile: (badges: { id: string; title: string; at: number | null }[]) => call<{ ok: true }>('PUT', '/v1/me/profile', { badges }),
   player: (id: string) => call<PlayerProfile>('GET', `/v1/players/${enc(id)}`),
   playerAvatar: (id: string) => call<{ jpeg: string | null }>('GET', `/v1/players/${enc(id)}/avatar`),
   tracks: () => call<TrackInfo[]>('GET', '/v1/me/tracks'),

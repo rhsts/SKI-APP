@@ -1,11 +1,11 @@
 export type Sport = 'ski' | 'snowboard' | 'telemark' | 'sitski' | 'touring';
 
-export const SPORTS: { id: Sport; label: string; emoji: string }[] = [
-  { id: 'ski', label: 'Ski', emoji: '⛷️' },
-  { id: 'snowboard', label: 'Snowboard', emoji: '🏂' },
-  { id: 'telemark', label: 'Telemark', emoji: '🎿' },
-  { id: 'sitski', label: 'Sit-ski', emoji: '♿' },
-  { id: 'touring', label: 'Ski touring', emoji: '🏔️' },
+export const SPORTS: { id: Sport; label: string }[] = [
+  { id: 'ski', label: 'Ski' },
+  { id: 'snowboard', label: 'Snowboard' },
+  { id: 'telemark', label: 'Telemark' },
+  { id: 'sitski', label: 'Sit-ski' },
+  { id: 'touring', label: 'Ski touring' },
 ];
 
 export function sportInfo(id: string | null | undefined) {

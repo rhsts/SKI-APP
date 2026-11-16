@@ -3,14 +3,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { dialog } from '../../dialog';
 import { captureRef } from 'react-native-view-shot';
 import { DayShareCard } from '../../components/DayShareCard';
 import { getPoints, getSession, type SessionRow } from '../../db';
 import { cleanTrack, computeStats, smoothedSpeeds } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { useStyles, useTheme, type Palette } from '../../theme';
+import { font, useStyles, useTheme, type Palette } from '../../theme';
 
 /** Preview of the day poster, with a button to share it as an image. */
 export default function ShareDayScreen() {
@@ -41,7 +42,7 @@ export default function ShareDayScreen() {
       const uri = await captureRef(card, { format: 'png', quality: 1, result: 'tmpfile', width: 1080, height: 1350 });
       await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share your ski day' });
     } catch (e) {
-      Alert.alert('Couldn’t create the image', e instanceof Error ? e.message : String(e));
+      dialog('Couldn’t create the image', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -68,7 +69,6 @@ export default function ShareDayScreen() {
           </>
         )}
       </Tap>
-      <Text style={[s.muted, { textAlign: 'center' }]}>Post it to Instagram, WhatsApp or anywhere else.</Text>
     </ScrollView>
   );
 }
@@ -77,5 +77,5 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 16, alignItems: 'center', paddingBottom: 40 },
     button: { alignSelf: 'stretch', flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16 },
-    buttonText: { color: colors.onAccent, fontSize: 17, fontWeight: '700' },
+    buttonText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
   });

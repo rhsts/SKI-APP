@@ -77,18 +77,18 @@ export function parseWeather(json: unknown, now = Date.now()): Weather {
   };
 }
 
-/** WMO weather code → emoji + short label. */
-export function weatherInfo(code: number | null): { emoji: string; label: string } {
-  if (code == null) return { emoji: '🌡️', label: '–' };
-  if (code === 0) return { emoji: '☀️', label: 'Clear' };
-  if (code <= 2) return { emoji: '🌤️', label: 'Partly cloudy' };
-  if (code === 3) return { emoji: '☁️', label: 'Cloudy' };
-  if (code === 45 || code === 48) return { emoji: '🌫️', label: 'Fog' };
-  if (code >= 51 && code <= 57) return { emoji: '🌦️', label: 'Drizzle' };
-  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return { emoji: '🌧️', label: 'Rain' };
-  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return { emoji: '🌨️', label: 'Snow' };
-  if (code >= 95) return { emoji: '⛈️', label: 'Thunderstorm' };
-  return { emoji: '🌡️', label: '–' };
+/** WMO weather code → short label. */
+export function weatherInfo(code: number | null): { label: string } {
+  if (code == null) return { label: '–' };
+  if (code === 0) return { label: 'Clear' };
+  if (code <= 2) return { label: 'Partly cloudy' };
+  if (code === 3) return { label: 'Cloudy' };
+  if (code === 45 || code === 48) return { label: 'Fog' };
+  if (code >= 51 && code <= 57) return { label: 'Drizzle' };
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return { label: 'Rain' };
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return { label: 'Snow' };
+  if (code >= 95) return { label: 'Thunderstorm' };
+  return { label: '–' };
 }
 
 export function fmtTemp(c: number | null, units: 'metric' | 'imperial'): string {

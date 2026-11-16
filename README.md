@@ -121,14 +121,15 @@ Play Store would need a real signing key.
    ```
 3. Scan the QR code with Expo Go.
 
-No snow? Go to **Profile → Simulated GPS** and press **Start day**: a fake ski day plays at 20× speed.
+No snow? Go to **You → Simulated GPS** and press **Start**: a fake ski day plays at 20× speed.
 You can also tap **Add a demo day** to get a finished day you can explore in Days and Season.
 
 ### Background tracking
 
 - **Android**: allow location **"All the time"** when asked. The app then records with the screen off and
-  shows a "Tracking your ski day" notification. If you only allow "While using the app", recording still
-  works, but the app keeps the screen on and must stay open.
+  shows a notification with the day so far ("5 runs · 2,450 m ↓", last run's top speed, recording time),
+  refreshed once a minute. Allow notifications too, or Android hides it. If you only allow "While using
+  the app", recording still works, but the app keeps the screen on and must stay open.
 - **iPhone in Expo Go**: Expo Go can't track in the background, so keep the app open. A development build
   (below) tracks with the phone locked.
 
