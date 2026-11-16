@@ -25,6 +25,9 @@ const LOGIN_FAILS = 8; // wrong passwords per username…
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // …within this window lock it for the rest of the window
 const SERVER_PW_FAILS_PER_IP = 10; // wrong server passwords per client IP per window…
 const SERVER_PW_FAILS_TOTAL = 100; // …and from everyone together (so faking IPs doesn't help)
+const DAY_MS = 24 * 3600 * 1000;
+const LIVE_FRESH_MS = 10 * 60 * 1000; // a position older than this is no longer "where they are"
+const PIN_AFTER_MEET_MS = 2 * 3600 * 1000; // a pin with a time stays this long after it
 
 /** Counts failures per key; once a key has `max` within `windowMs` of its first, check() throws 429. */
 function failLimit(max, windowMs, clock, message) {
@@ -235,7 +238,18 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
                        FROM attempts a JOIN members m ON m.player_id = a.player_id AND m.group_id = ?
                        JOIN players p ON p.id = a.player_id
                        WHERE a.segment_id = ? AND a.date = ? ORDER BY a.time`),
+    pin: q(`SELECT n.lat, n.lon, n.label, n.meet_at AS meetAt, n.created_by AS createdBy, p.name AS createdByName,
+              n.created_at AS createdAt, n.expires_at AS expiresAt
+            FROM pins n JOIN players p ON p.id = n.created_by WHERE n.group_id = ? AND n.expires_at > ?`),
+    setPin: q(`INSERT OR REPLACE INTO pins (group_id, lat, lon, label, meet_at, created_by, created_at, expires_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+    deletePin: q('DELETE FROM pins WHERE group_id = ?'),
+    deletePinBy: q('DELETE FROM pins WHERE group_id = ? AND created_by = ?'),
   };
+
+  // Where each skier was last, while they record: player id -> { lat, lon, at }. In memory on
+  // purpose: it is only worth something for a few minutes, and nobody's whereabouts get stored.
+  const live = new Map();
 
   const sameHash = (x, y) => {
     const a = Buffer.from(x, 'hex'), b = Buffer.from(y, 'hex');
@@ -316,6 +330,7 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
     db.prepare('DELETE FROM days WHERE player_id = ?').run(oldId);
     db.prepare('UPDATE attempts SET player_id = ? WHERE player_id = ?').run(newId, oldId);
     db.prepare('UPDATE challenges SET created_by = ? WHERE created_by = ?').run(newId, oldId);
+    db.prepare('UPDATE pins SET created_by = ? WHERE created_by = ?').run(newId, oldId);
     db.prepare('UPDATE groups SET created_by = ? WHERE created_by = ?').run(newId, oldId);
     db.prepare('DELETE FROM players WHERE id = ?').run(oldId);
   }
@@ -574,8 +589,57 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
       const g = memberOf(gid, me);
       tx(() => {
         stmt.removeMember.run(g.id, me.id);
+        stmt.deletePinBy.run(g.id, me.id); // nobody left who could clear it
         if (stmt.memberCount.get(g.id).n === 0) stmt.deleteGroup.run(g.id);
       });
+      return { ok: true };
+    }],
+
+    // ----- live map: where your friends are, and the group's meet-up pin -----
+    ['POST', /^\/v1\/live$/, (me, _p, body) => {
+      live.set(me.id, { lat: num(body?.lat, -90, 90), lon: num(body?.lon, -180, 180), at: clock() });
+      return { ok: true };
+    }],
+
+    ['DELETE', /^\/v1\/live$/, (me) => {
+      live.delete(me.id);
+      return { ok: true };
+    }],
+
+    ['GET', /^\/v1\/groups\/([^/]+)\/live$/, (me, [gid]) => {
+      const g = memberOf(gid, me);
+      const t = clock();
+      const members = stmt.members.all(g.id).flatMap((m) => {
+        const at = live.get(m.playerId);
+        return m.playerId !== me.id && at && t - at.at < LIVE_FRESH_MS ? [{ playerId: m.playerId, name: m.name, ...at }] : [];
+      });
+      const pin = stmt.pin.get(g.id, t);
+      return { members, pin: pin ? { ...pin, mine: pin.createdBy === me.id } : null };
+    }],
+
+    ['POST', /^\/v1\/groups\/([^/]+)\/pin$/, (me, [gid], body) => {
+      const g = memberOf(gid, me);
+      const t = clock();
+      const lat = num(body?.lat, -90, 90), lon = num(body?.lon, -180, 180);
+      const label = str(body?.label, 60) || 'Meet here';
+      const meetAt = body?.meetAt == null ? null : Math.round(num(body.meetAt, t - PIN_AFTER_MEET_MS + 1, t + DAY_MS));
+      // Without a time the pin lasts until the end of the setter's day. The server doesn't know
+      // their time zone, so the phone sends its offset (Date#getTimezoneOffset: minutes behind UTC).
+      const off = num(body?.tzOffset ?? 0, -14 * 60, 14 * 60) * 60000;
+      const dayEnd = (Math.floor((t - off) / DAY_MS) + 1) * DAY_MS + off;
+      const pin = {
+        lat, lon, label, meetAt, createdBy: me.id, createdByName: me.name, createdAt: t,
+        expiresAt: meetAt == null ? dayEnd : meetAt + PIN_AFTER_MEET_MS,
+      };
+      stmt.setPin.run(g.id, lat, lon, label, meetAt, me.id, t, pin.expiresAt);
+      return { ...pin, mine: true };
+    }],
+
+    ['DELETE', /^\/v1\/groups\/([^/]+)\/pin$/, (me, [gid]) => {
+      const g = memberOf(gid, me);
+      const pin = stmt.pin.get(g.id, clock());
+      if (pin && pin.createdBy !== me.id) throw new HttpError(403, 'Only who set the pin can clear it');
+      stmt.deletePin.run(g.id);
       return { ok: true };
     }],
 

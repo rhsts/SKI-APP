@@ -1,5 +1,5 @@
 import type {
-  BoardRow, ChallengeRow, DayUpload, Group, GroupChallenge, GroupDetail,
+  BoardRow, ChallengeRow, DayUpload, Group, GroupChallenge, GroupDetail, GroupLive, Pin,
 } from '../lib/groups';
 import { segmentUpload } from '../lib/groups';
 import type { Segment } from '../lib/segments';
@@ -152,6 +152,13 @@ export const api = {
     call<{ ok: true }>('DELETE', `/v1/groups/${encodeURIComponent(id)}/challenges/${encodeURIComponent(cid)}`),
   challengeBoard: (id: string, cid: string) =>
     call<{ date: string; rows: ChallengeRow[] }>('GET', `/v1/groups/${encodeURIComponent(id)}/challenges/${encodeURIComponent(cid)}/board`),
+  postLive: (lat: number, lon: number) => call<{ ok: true }>('POST', '/v1/live', { lat, lon }),
+  stopLive: () => call<{ ok: true }>('DELETE', '/v1/live'),
+  groupLive: (id: string) => call<GroupLive>('GET', `/v1/groups/${enc(id)}/live`),
+  // The offset tells the server when your day ends: a pin without a time lasts until then.
+  setPin: (id: string, pin: { lat: number; lon: number; label: string; meetAt: number | null }) =>
+    call<Pin>('POST', `/v1/groups/${enc(id)}/pin`, { ...pin, tzOffset: new Date().getTimezoneOffset() }),
+  clearPin: (id: string) => call<{ ok: true }>('DELETE', `/v1/groups/${enc(id)}/pin`),
   putDay: (dayId: string, d: DayUpload) => call<{ ok: true }>('PUT', `/v1/days/${encodeURIComponent(dayId)}`, d),
   deleteDay: (dayId: string) => call<{ ok: true }>('DELETE', `/v1/days/${encodeURIComponent(dayId)}`),
   putAttempt: (attemptId: string, a: { segmentId: string; date: string; time: number; at: number; ghost: number[] | null }) =>

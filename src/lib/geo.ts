@@ -16,6 +16,14 @@ export function distance(a: LatLon, b: LatLon): number {
   return 2 * EARTH_RADIUS * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
+/** Compass bearing from `a` to `b` in degrees: 0 = north, 90 = east. */
+export function bearing(a: LatLon, b: LatLon): number {
+  const dLon = (b.lon - a.lon) * RAD;
+  const y = Math.sin(dLon) * Math.cos(b.lat * RAD);
+  const x = Math.cos(a.lat * RAD) * Math.sin(b.lat * RAD) - Math.sin(a.lat * RAD) * Math.cos(b.lat * RAD) * Math.cos(dLon);
+  return (Math.atan2(y, x) / RAD + 360) % 360;
+}
+
 /**
  * Equirectangular projection to local metres around `origin`.
  * Accurate to well under 1% over a ski area (a few km).

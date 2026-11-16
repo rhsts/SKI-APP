@@ -9,6 +9,7 @@ import {
 } from '../db';
 import { EMPTY_MOTION, summariseMotion, type MotionEvent, type MotionSummary } from '../lib/motion';
 import { startMotion, stopMotion } from './motion';
+import { allowPinNotifications, leaveLive, liveTick } from '../friends/live';
 import { setNewSegmentsHandler, syncFriends } from '../friends/sync';
 import { simulateDay } from '../lib/sim';
 import { cleanTrack, completedRuns, computeStats, smoothedSpeeds } from '../lib/stats';
@@ -150,6 +151,11 @@ async function poll() {
 async function pollOnce() {
   const a = state.active;
   if (!a) return;
+  // The live friend map rides on this loop (it paces itself). Before the check for new fixes:
+  // friends and meet-up pins must keep coming while you stand still. A demo day's made-up
+  // positions are only shared when demo days are.
+  const here = state.points[state.points.length - 1];
+  liveTick(here && (a.source === 'gps' || getSettings().shareDemoDays) ? here : null);
   const lastT = state.points.length ? state.points[state.points.length - 1].t : -1;
   const fresh = await getPoints(a.sessionId, lastT);
   if (!fresh.length || state.active?.sessionId !== a.sessionId) return;
@@ -576,6 +582,7 @@ async function doStartDay(simulate: boolean, sport: Sport): Promise<void> {
     await refreshRacers();
     await startSource(active);
     startPolling();
+    allowPinNotifications().catch(() => undefined);
   } catch (e) {
     await cleanUpFailedStart();
     await saveActive(null);
@@ -593,6 +600,7 @@ async function doPauseDay(): Promise<void> {
   await stopSource();
   await poll();
   stopPolling();
+  leaveLive().catch(() => undefined);
   const active = { ...state.active, paused: true };
   await saveActive(active);
   set({ status: 'paused', active, currentSpeed: 0 });
@@ -633,6 +641,7 @@ async function doStopDay(): Promise<string | null> {
   if (!a) return null;
   await stopSource();
   stopPolling();
+  leaveLive().catch(() => undefined);
   // "active" keeps pointing at the day until it is saved, so a crash in here never loses it.
   let points: TrackPoint[];
   try {

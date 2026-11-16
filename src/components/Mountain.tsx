@@ -5,7 +5,11 @@ import { dialog } from '../dialog';
 import { listTrailMaps, sessionStarts } from '../db';
 import { areaAt, skiAreas, type SkiArea } from '../lib/areas';
 import type { Place } from '../lib/geocode';
-import { mapFor, type TrailMap } from '../lib/trailmap';
+import { mapFor, nearestFeature, type TrailMap } from '../lib/trailmap';
+import type { LatLon } from '../lib/geo';
+import { friendsEnabled } from '../friends/api';
+import { refreshLive, useLive } from '../friends/live';
+import { MeetEditor, PinNote } from './MeetPin';
 import type { TrackPoint, Units } from '../lib/types';
 import { fmtSnow, fmtTemp, fmtWind, weatherInfo, type Weather } from '../lib/weather';
 import { downloadTrailMap } from '../mountain/pistes';
@@ -177,6 +181,21 @@ export function MountainDetails({ m, points, units }: { m: Mountain; points: Tra
   const { colors, s } = useTheme();
   const themed = useStyles(makeStyles);
   const { pos, weather: w, trail } = m;
+  const friendsOn = friendsEnabled();
+  const live = useLive();
+  const [draft, setDraft] = useState<LatLon | null>(null);
+  // Ask once when the map opens; while you record, the tracker keeps it fresh.
+  useEffect(() => {
+    if (friendsOn) refreshLive().catch(() => undefined);
+  }, [friendsOn]);
+  // Where you are: the last fix of today's recording, else the phone's position (not a searched place).
+  const last = points[points.length - 1];
+  const me: LatLon | null = last ? { lat: last.lat, lon: last.lon } : m.place ? null : pos;
+  /** The nearest lift or piste on the trail map, else the ski area or place name. */
+  const meetLabel = (p: LatLon) => {
+    const f = trail ? nearestFeature(trail, p, 300) : null;
+    return f ? (f.kind === 'lift' ? `Top of ${f.name}` : f.name) : m.name ?? '';
+  };
   if (!pos) return <Text style={s.body}>Allow location or find a place to see the snow.</Text>;
 
   return (
@@ -209,7 +228,34 @@ export function MountainDetails({ m, points, units }: { m: Mountain; points: Tra
       )}
 
       {/* A searched place can be far away: the map stays on it instead of following the phone. */}
-      <LiveMap key={keyOf(pos)} points={points} trail={trail} center={pos} follow={!m.place} />
+      <LiveMap
+        key={keyOf(pos)}
+        points={points}
+        trail={trail}
+        center={pos}
+        follow={!m.place}
+        friends={friendsOn ? live.friends : []}
+        pins={friendsOn ? live.pins : []}
+        draft={draft}
+        onLongPress={friendsOn ? setDraft : undefined}
+      />
+      {friendsOn ? (
+        draft ? (
+          <MeetEditor key={keyOf({ ...draft, alt: null })} at={draft} label={meetLabel(draft)} onDone={() => setDraft(null)} />
+        ) : (
+          <>
+            {live.pins.map((p) => <PinNote key={p.groupId} pin={p} me={me} units={units} />)}
+            <View style={styles.mapFoot}>
+              <Text style={[s.muted, styles.grow]}>Long-press the map to pick a meeting point.</Text>
+              {me ? (
+                <Pressable onPress={() => setDraft(me)} style={themed.button} accessibilityRole="button" accessibilityLabel="Meet here, at my position">
+                  <Text style={s.control}>Meet here</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </>
+        )
+      ) : null}
       <View style={styles.mapFoot}>
         <Text style={[s.muted, styles.grow]}>
           {trail
