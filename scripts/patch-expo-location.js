@@ -4,6 +4,8 @@
 // importance but no sound or vibration, and alerts only once (not on every refresh).
 // A new channel id is needed: Android never raises the importance of an existing channel.
 // Fails the install if expo-location changed, so the patch can't silently stop applying.
+// Only works because package.json sets expo.autolinking.android.buildFromSource for
+// expo-location: otherwise Gradle links its precompiled AAR and ignores this source.
 const fs = require('fs');
 const path = require('path');
 
