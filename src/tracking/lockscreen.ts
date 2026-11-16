@@ -1,5 +1,6 @@
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { loadSettings } from '../db';
+import { dialog } from '../dialog';
 import { lockScreenText } from '../lib/lockscreen';
 import type { DayStats } from '../lib/types';
 import type { ActiveSession } from './task';
@@ -22,8 +23,14 @@ export function lockScreenDue(now = Date.now()): boolean {
   return now - shownAt >= LOCK_SCREEN_EVERY_MS;
 }
 
-let loading: Promise<typeof import('expo-location/next') | null> | undefined;
-const locationNext = () => (loading ??= import('expo-location/next').catch(() => null));
+async function locationNext(): Promise<typeof import('expo-location/next') | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-location/next');
+  } catch {
+    return null;
+  }
+}
 
 async function notification(active: ActiveSession, stats: DayStats | null) {
   const { units } = await loadSettings();
@@ -42,13 +49,33 @@ export async function startTrackingService(active: ActiveSession, stats: DayStat
     const next = await locationNext();
     if (!next) return false;
     // Android 13+: without this permission the service still runs, but its notification is hidden.
-    await next.Location.requestNotificationPermissions().catch(() => undefined);
+    const perm = await next.Location.requestNotificationPermissions().catch(() => null);
+    if (perm && !perm.granted) explainBlockedNotifications();
     await next.Location.ensureBackgroundSessionStarted(await notification(active, stats));
     shownAt = Date.now();
     return true;
   } catch {
     return false;
   }
+}
+
+let explained = false;
+/**
+ * Notifications are blocked: recording works, but the day can't show on the lock screen.
+ * Android stops asking after two refusals, so only the app's settings can turn them back on.
+ * Said once per app start, not on every Start.
+ */
+function explainBlockedNotifications() {
+  if (explained) return;
+  explained = true;
+  dialog(
+    'Notifications are off',
+    'Ski Tracker is recording, but it can only show your runs and vertical on the lock screen when notifications are allowed. Turn on Notifications in the app settings.',
+    [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Open settings', onPress: () => void Linking.openSettings().catch(() => undefined) },
+    ],
+  );
 }
 
 /** Recording is over (or GPS is off): stops the service and takes its notification away. */
