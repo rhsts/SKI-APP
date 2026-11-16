@@ -10,6 +10,7 @@ import { font, useTheme, useStyles, type Palette } from '../../theme';
 import { addDemoDay } from '../../tracking/demo';
 import { AccountCard } from '../../components/AccountCard';
 import { checkServer } from '../../friends/api';
+import { leaveLive } from '../../friends/live';
 import { resetFriendsCache, syncFriends } from '../../friends/sync';
 import { normalizeServerUrl } from '../../lib/groups';
 import { refreshGeofences, requestReminderPermissions } from '../../tracking/geofence';
@@ -140,6 +141,20 @@ export default function ProfileScreen() {
                 onValueChange={async (v) => {
                   await updateSettings({ shareDemoDays: v });
                   syncFriends().catch(() => undefined);
+                }}
+                trackColor={{ true: colors.accent }}
+              />
+            </View>
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.body}>Show friends where I am</Text>
+                <Text style={s.muted}>While you record, on your groups’ live map.</Text>
+              </View>
+              <Switch
+                value={settings.shareLive}
+                onValueChange={async (v) => {
+                  await updateSettings({ shareLive: v });
+                  if (!v) leaveLive().catch(() => undefined);
                 }}
                 trackColor={{ true: colors.accent }}
               />

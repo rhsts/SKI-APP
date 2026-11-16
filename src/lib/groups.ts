@@ -59,6 +59,38 @@ export interface ChallengeRow {
   ghost: number[] | null;
 }
 
+/** A group's meet-up pin. One per group: the next one replaces it. */
+export interface Pin {
+  lat: number;
+  lon: number;
+  label: string;
+  /** When to meet (ms), if a time was given. */
+  meetAt: number | null;
+  createdBy: string;
+  createdByName: string;
+  /** Changes whenever the pin is set again, so it tells one pin from the next. */
+  createdAt: number;
+  /** Gone after this: two hours after `meetAt`, or without one the end of the setter's day. */
+  expiresAt: number;
+  /** You set it, so you can clear it. */
+  mine: boolean;
+}
+
+/** Where a friend was last seen while recording. */
+export interface LiveMember {
+  playerId: string;
+  name: string;
+  lat: number;
+  lon: number;
+  at: number;
+}
+
+export interface GroupLive {
+  /** The other members seen in the last ten minutes (never yourself). */
+  members: LiveMember[];
+  pin: Pin | null;
+}
+
 export interface DayUpload {
   date: string;
   startedAt: number;

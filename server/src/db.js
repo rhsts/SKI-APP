@@ -2,7 +2,8 @@ import { DatabaseSync } from 'node:sqlite';
 
 /**
  * One SQLite file holds everything: players, groups, day summaries, group
- * challenges and their times. Only summaries are stored, never GPS tracks.
+ * challenges and their times, and each group's meet-up pin. Only summaries are
+ * stored, never GPS tracks; live positions are kept in memory only (app.js).
  */
 export function openDb(file) {
   const db = new DatabaseSync(file);
@@ -73,6 +74,18 @@ export function openDb(file) {
       ghost_json TEXT
     );
     CREATE INDEX IF NOT EXISTS attempts_segment ON attempts(segment_id, date);
+
+    -- A group's meet-up pin: one per group, the next one replaces it. Not shown after expires_at.
+    CREATE TABLE IF NOT EXISTS pins (
+      group_id TEXT PRIMARY KEY NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+      lat REAL NOT NULL,
+      lon REAL NOT NULL,
+      label TEXT NOT NULL,
+      meet_at INTEGER,
+      created_by TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
   `);
   migrateAccounts(db);
   return db;

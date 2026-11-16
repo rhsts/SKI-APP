@@ -6,6 +6,8 @@ rankings. A Raspberry Pi 4 handles this easily: it's built for a handful to a fe
 - **No dependencies.** Plain Node.js (22.13 or newer) with its built-in HTTP server and SQLite.
 - **Friends see totals only**: day totals, challenge times and profiles (picture, season totals, badges).
   Each person's online backup of their days (GPS tracks included) is visible only to themselves.
+- **Live map.** While someone records, the people in their groups see where they are, and a group can have
+  one meet-up pin. Only the last position is kept, in memory, and it is dropped after 10 minutes.
 - **Server password.** Set `SERVER_PASSWORD` and only people who know it can use the server (the app asks
   for it when connecting). Wrong guesses are answered slowly.
 - **Accounts.** Each phone makes up a random device id + secret, and logs in to an account (username +
@@ -108,6 +110,11 @@ A wrong password gets `401 {"error": "Wrong server password", "code": "password"
 | POST | `/v1/groups/:id/challenges` | `{date, segment}`: set a group challenge for a day |
 | DELETE | `/v1/groups/:id/challenges/:cid` | Remove it (only who set it, or the group's creator) |
 | GET | `/v1/groups/:id/challenges/:cid/board` | Each member's best time on that stretch that day |
+| POST | `/v1/live` | `{lat, lon}`: where you are now (sent while recording) |
+| DELETE | `/v1/live` | Stop showing where you are |
+| GET | `/v1/groups/:id/live` | `{members: [{playerId, name, lat, lon, at}], pin}`: the other members seen in the last 10 minutes, and the meet-up pin (or `null`) |
+| POST | `/v1/groups/:id/pin` | `{lat, lon, label, meetAt?, tzOffset?}`: set the group's meet-up pin (replaces the old one). It expires 2 hours after `meetAt` (ms), or without one at the end of your day (`tzOffset`: minutes behind UTC) |
+| DELETE | `/v1/groups/:id/pin` | Clear the pin (only who set it) |
 | PUT | `/v1/days/:dayId` | `{date, startedAt, vertical, topSpeed, runs, distance, skiTime}` |
 | DELETE | `/v1/days/:dayId` | Take a day off the leaderboards |
 | PUT | `/v1/attempts/:id` | `{segmentId, date, time, at, ghost}`: a timed run |
