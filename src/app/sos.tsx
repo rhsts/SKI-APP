@@ -1,9 +1,8 @@
-import { Tap } from '../components/Tap';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { dialog } from '../dialog';
 import { listTrailMaps } from '../db';
 import { emergencyNumbers, formatCoords } from '../lib/emergency';
@@ -15,7 +14,7 @@ import { useTracker } from '../tracking/tracker';
 
 /**
  * Everything you need if someone gets hurt: your exact position in the formats
- * rescue services ask for, one-tap calling and sharing your location.
+ * rescue services ask for, the emergency number, and sharing your location.
  */
 export default function SosScreen() {
   const { colors, s } = useTheme();
@@ -57,19 +56,13 @@ export default function SosScreen() {
   }, [fix]);
 
   const c = fix ? formatCoords(fix.lat, fix.lon) : null;
-  const call = (n: string) => Linking.openURL(`tel:${n}`).catch(() => dialog('Can’t start a call', `Dial ${n} yourself.`));
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
-      {numbers.map((n, k) => (
-        <Tap key={n} onPress={() => call(n)} style={[styles.call, k > 0 && styles.callAlt]}>
-          <Ionicons name="call" size={k === 0 ? 28 : 20} color={k === 0 ? '#fff' : colors.danger} />
-          <Text style={[styles.callText, k > 0 && { color: colors.danger, fontSize: size.body }]}>Call {n}</Text>
-        </Tap>
-      ))}
-      <Text style={[s.muted, { textAlign: 'center' }]}>
-        112 works across Europe and on most phones worldwide. On a piste, ski patrol can also be reached via the
-        number on your lift pass or at any lift station.
+      <Text style={[s.body, { textAlign: 'center' }]}>
+        Emergency number: <Text style={{ fontFamily: font.medium }}>{numbers.join(' or ')}</Text>. 112 works across Europe
+        and on most phones worldwide. On a piste, ski patrol can also be reached via the number on your lift pass or at any
+        lift station.
       </Text>
 
       <View style={[s.card, { gap: 8 }]}>
@@ -135,9 +128,6 @@ export default function SosScreen() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
-    call: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: radius.control, minHeight: 76 },
-    callAlt: { backgroundColor: 'transparent', borderWidth: 2, borderColor: colors.danger, minHeight: 52 },
-    callText: { color: '#fff', fontSize: size.figure, fontFamily: font.medium },
     coords: { fontSize: size.control, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     row: { flexDirection: 'row', gap: 12, marginTop: 4 },
     btn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: radius.control, borderWidth: 1, borderColor: colors.accent },

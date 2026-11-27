@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **SOS no longer has call buttons.** The screen shows the emergency number to dial yourself, your
+  coordinates, the nearest piste or lift, and Copy and Send location.
+
 ## 1.1 (2026-11-27)
 
 ### Before you install: a one-time reinstall
