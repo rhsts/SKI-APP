@@ -12,7 +12,7 @@ import { createAccount, logIn, restoreDays } from '../friends/account';
 import { resetFriendsCache, syncFriends } from '../friends/sync';
 import { INSECURE_SERVER_MESSAGE, isInsecureServerUrl, normalizeServerUrl, parseInvite } from '../lib/groups';
 import { getSettings, updateSettings, useSettings } from '../settings';
-import { font, useStyles, useTheme, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 
 /**
  * The app is private: it only opens for people who know your friends server's
@@ -135,7 +135,7 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
           </Tap>
         </View>
 
-        <Text style={[s.muted, { textAlign: 'center', fontSize: 12 }]}>
+        <Text style={[s.muted, { textAlign: 'center', fontSize: size.caption }]}>
           Running the server yourself? See server/SETUP-PI.md in the app’s GitHub repository.
         </Text>
 
@@ -310,15 +310,15 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 24, gap: 16, paddingTop: 72, paddingBottom: 40 },
     logo: { alignSelf: 'center', width: 76, height: 76, borderRadius: 38, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-    input: { fontSize: 17, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
+    input: { fontSize: size.body, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
     paste: {
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 12, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed',
+      borderRadius: radius.control, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed',
     },
-    pasteText: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
-    btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, minHeight: 54 },
-    btnText: { color: colors.onAccent, fontFamily: font.medium, fontSize: 17 },
-    tabs: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 4 },
-    tab: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+    pasteText: { color: colors.accent, fontFamily: font.medium, fontSize: size.body },
+    btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: radius.control, minHeight: 54 },
+    btnText: { color: colors.onAccent, fontFamily: font.medium, fontSize: size.body },
+    tabs: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: radius.control, padding: 4 },
+    tab: { flex: 1, paddingVertical: 12, borderRadius: radius.control, alignItems: 'center' },
     tabText: { fontFamily: font.medium, color: colors.text },
   });

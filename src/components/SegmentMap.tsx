@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, { Circle, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import type { PathPoint } from '../lib/segments';
-import { font, useTheme, useStyles, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 import { mapsAvailable } from '../lib/mapsAvailable';
 import { MapPlaceholder } from './MapPlaceholder';
 import { ViewMarker } from './ViewMarker';
@@ -76,10 +76,10 @@ export function SegmentMap({ path, gateRadius = 30, context, style, markers }: P
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    wrap: { height: 260, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
+    wrap: { height: 260, borderRadius: radius.control, overflow: 'hidden', backgroundColor: colors.faint },
     flag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
     ghost: { alignItems: 'center' },
-    ghostDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 3, borderColor: '#fff' },
-    ghostLabel: { color: '#fff', fontSize: 11, fontFamily: font.medium, paddingHorizontal: 4, borderRadius: 4, marginTop: 2, overflow: 'hidden', maxWidth: 80 },
-    flagText: { color: '#fff', fontSize: 11, fontFamily: font.medium },
+    ghostDot: { width: 16, height: 16, borderRadius: radius.pill, borderWidth: 3, borderColor: '#fff' },
+    ghostLabel: { color: '#fff', fontSize: size.label, fontFamily: font.medium, paddingHorizontal: 4, borderRadius: 4, marginTop: 2, overflow: 'hidden', maxWidth: 80 },
+    flagText: { color: '#fff', fontSize: size.label, fontFamily: font.medium },
   });

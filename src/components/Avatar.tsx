@@ -2,7 +2,9 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { useAvatar } from '../friends/avatars';
 import { font, useTheme } from '../theme';
 
-const COLORS = ['#0B6BCB', '#E8892B', '#1F9D55', '#8E44AD', '#C0392B', '#16A085', '#D35400', '#2C3E50'];
+// Mountain tones that sit beside glacier and graphite: lake, pine, slate, umber, larch, dusk, moss, rock.
+// All dark enough for white initials (at least 4.5:1). Red stays with SOS, so none of them is red.
+const COLORS = ['#2F5561', '#2E5E4E', '#4A5563', '#7A5236', '#7A6420', '#5E4A66', '#4F6B3A', '#54514B'];
 
 /** A skier's profile picture, or their initials on a coloured circle. */
 export function Avatar({ playerId, name, size = 36, hasAvatar = true }: {

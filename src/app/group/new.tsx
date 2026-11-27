@@ -9,7 +9,7 @@ import { api } from '../../friends/api';
 import { syncFriends } from '../../friends/sync';
 import { cleanCode } from '../../lib/groups';
 import { useSettings } from '../../settings';
-import { font, useStyles, useTheme, type Palette } from '../../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../../theme';
 
 /** Start a friend group for your trip, or join one with the code a friend sent you. */
 export default function NewGroupScreen() {
@@ -106,9 +106,9 @@ function Btn({ label, icon, onPress, disabled, busy }: {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12 },
-    input: { fontSize: 17, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
-    code: { fontSize: 28, fontFamily: font.medium, letterSpacing: 6, textAlign: 'center' },
-    btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, minHeight: 52 },
-    btnText: { color: colors.onAccent, fontFamily: font.medium, fontSize: 17 },
-    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
+    input: { fontSize: size.body, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
+    code: { fontSize: size.figure, fontFamily: font.medium, letterSpacing: 6, textAlign: 'center' },
+    btn: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: radius.control, minHeight: 52 },
+    btnText: { color: colors.onAccent, fontFamily: font.medium, fontSize: size.body },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: size.body },
   });

@@ -4,7 +4,7 @@ import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 import { fmtAlt, fmtSpeed, fmtTimeOfDay } from '../lib/format';
 import { activityAt, indexAtX } from '../lib/scrub';
 import type { Activity, Units } from '../lib/types';
-import { font, useTheme, useStyles, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 
 interface Props {
   times: number[];
@@ -156,8 +156,8 @@ export const ElevationChart = memo(function ElevationChart({
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     legend: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
-    bubble: { position: 'absolute', top: 0, height: LABEL_H - 4, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: colors.ink },
-    bubbleText: { color: colors.onInk, fontSize: 12, fontFamily: font.medium, fontVariant: ['tabular-nums'] },
+    bubble: { position: 'absolute', top: 0, height: LABEL_H - 4, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control, backgroundColor: colors.ink },
+    bubbleText: { color: colors.onInk, fontSize: size.caption, fontFamily: font.medium, fontVariant: ['tabular-nums'] },
     hintWrap: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
-    hint: { fontSize: 12, fontFamily: font.medium, color: colors.muted },
+    hint: { fontSize: size.caption, fontFamily: font.medium, color: colors.muted },
   });

@@ -16,7 +16,7 @@ import { mapFor, type TrailMap } from '../lib/trailmap';
 import { cleanTrack, computeStats, smoothedAltitudes, smoothedSpeeds } from '../lib/stats';
 import type { TrackPoint } from '../lib/types';
 import { useSettings } from '../settings';
-import { font, useStyles, useTheme, type Palette } from '../theme';
+import { font, radius, useStyles, useTheme, type Palette } from '../theme';
 
 /** One run up close: map with the resort's pistes, speed and elevation over the run, steepness, and prev/next. */
 export default function RunScreen() {
@@ -191,7 +191,7 @@ const makeStyles = (colors: Palette) =>
     pisteRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     dot: { width: 14, height: 14, borderRadius: 8, borderWidth: 1, borderColor: colors.faint },
     nav: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-    navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.accent },
+    navBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12, borderRadius: radius.control, borderWidth: 1, borderColor: colors.accent },
     navText: { color: colors.accent, fontFamily: font.medium },
     legend: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center' },
     swatch: { width: 18, height: 6, borderRadius: 4 },

@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Appear } from './Appear';
 import { badgeInfo } from '../lib/goals';
 import { fmtDate } from '../lib/format';
-import { font, useStyles, useTheme, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 
 export interface BadgeView {
   id: string;
@@ -68,10 +68,10 @@ export function BadgeSheet({ badge, onClose, onOpenDay, whose = 'you' }: {
 const makeStyles = (_: Palette) =>
   StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 },
-    sheet: { borderRadius: 16, padding: 24, gap: 12, alignItems: 'stretch' },
+    sheet: { borderRadius: radius.control, padding: 24, gap: 12, alignItems: 'stretch' },
     medal: { alignSelf: 'center', width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' },
-    status: { borderRadius: 12, padding: 12 },
-    btn: { borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-    btnText: { fontFamily: font.medium, fontSize: 15 },
-    close: { textAlign: 'center', fontFamily: font.medium, fontSize: 15, paddingVertical: 4 },
+    status: { borderRadius: radius.control, padding: 12 },
+    btn: { borderRadius: radius.control, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+    btnText: { fontFamily: font.medium, fontSize: size.body },
+    close: { textAlign: 'center', fontFamily: font.medium, fontSize: size.body, paddingVertical: 4 },
   });

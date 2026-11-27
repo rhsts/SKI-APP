@@ -3,7 +3,7 @@ import type { DifficultyShare } from '../lib/breakdown';
 import { fmtAlt, fmtDuration } from '../lib/format';
 import { difficultyColor, difficultyLabel } from '../lib/pistes';
 import type { Units } from '../lib/types';
-import { font, useStyles, useTheme, type Palette } from '../theme';
+import { font, radius, useStyles, useTheme, type Palette } from '../theme';
 
 /** Time on each piste difficulty: a stacked bar plus a row per difficulty. */
 export function DifficultyBar({ shares, units, title = 'Pistes' }: { shares: DifficultyShare[]; units: Units; title?: string }) {
@@ -34,9 +34,9 @@ export function DifficultyBar({ shares, units, title = 'Pistes' }: { shares: Dif
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    bar: { flexDirection: 'row', height: 12, borderRadius: 8, overflow: 'hidden', gap: 2 },
+    bar: { flexDirection: 'row', height: 12, borderRadius: radius.control, overflow: 'hidden', gap: 2 },
     row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    dot: { width: 12, height: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.faint },
+    dot: { width: 12, height: 12, borderRadius: radius.control, borderWidth: 1, borderColor: colors.faint },
     // The label keeps its full width; the details line gives way (ellipsis) on narrow screens.
     name: { flexShrink: 0, maxWidth: '50%', fontFamily: font.medium },
     detail: { flex: 1, flexShrink: 1, textAlign: 'right' },
