@@ -160,7 +160,7 @@ const makeStyles = (colors: Palette) =>
     hero: { alignItems: 'center', gap: space.xs, paddingVertical: space.xl },
     catHead: { flexDirection: 'row', alignItems: 'center', gap: space.md },
     // 12 = the redesign's radius.control for rows; switch to the token once it lands in theme.ts.
-    row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm, paddingHorizontal: space.sm, borderRadius: 12 },
+    row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm, paddingHorizontal: space.sm, borderRadius: radius.control },
     rowMe: { backgroundColor: colors.warnSoft },
     rank: { width: 28, textAlign: 'center', fontSize: size.body, fontFamily: font.medium, color: colors.muted },
     value: { fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },

@@ -11,7 +11,7 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
-    version: hasBuild ? `1.0.${build}` : config.version,
+    version: hasBuild ? `1.1.${build}` : config.version,
     android: {
       ...config.android,
       ...(hasBuild ? { versionCode: build } : {}),

@@ -251,7 +251,7 @@ const makeStyles = (colors: Palette) =>
     meetFoot: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
     // 12 = the redesign's radius.control for buttons; switch to the token once it lands in theme.ts.
     button: {
-      minHeight: target.min, minWidth: 112, paddingHorizontal: space.lg, borderRadius: 12,
+      minHeight: target.min, minWidth: 112, paddingHorizontal: space.lg, borderRadius: radius.control,
       backgroundColor: colors.faint, alignItems: 'center', justifyContent: 'center',
     },
   });

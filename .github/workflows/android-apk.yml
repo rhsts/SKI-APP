@@ -154,7 +154,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Ski Tracker 1.0.${{ github.run_number }}
+          name: Ski Tracker 1.1.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: ${{ needs.build.outputs.file }}
@@ -163,6 +163,8 @@ jobs:
             Updates install over the previous version and keep your data.
             If Android says "App not installed", your phone has an older build signed with the old key: back up your days first (You → Back up all days), uninstall Ski Tracker, install this one, then You → Restore from a backup.
             ✔️ Checked on an Android emulator: the app starts and keeps running.
+
+            **New in 1.1:** Friends is a live map of who's on the mountain, every screen shares one design, recording and friends sync are more reliable, and release builds are signed with our own key. Full list: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/CHANGELOG.md).
 
             ${{ needs.build.outputs.maps }}
 
