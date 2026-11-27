@@ -106,8 +106,31 @@ and everything else still works.
    `GOOGLE_MAPS_API_KEY`, paste the key → **Add secret**.
 6. **Actions → Build Android APK → Run workflow**, then install the new release.
 
-The build is signed with the standard React Native debug key: fine for installing on your own phones, but the
-Play Store would need a real signing key.
+### Release signing key (required)
+
+Release APKs are signed with your own key. Never use the standard React Native debug key: it is public, so
+anyone could sign a fake "update" with it and Android would install it over the real app, with all its data and
+location permission. The workflow refuses to build without the key, and refuses an APK signed with the debug key.
+
+1. Make the key once, on any computer with Java (for example Android Studio's): type a strong password twice
+   when asked.
+   ```bash
+   keytool -genkeypair -v -keystore ski-release.jks -alias ski -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Ski Tracker"
+   ```
+2. Turn it into text for GitHub: `base64 -w0 ski-release.jks > ski-release.txt` (on a Mac: `base64 -i ski-release.jks -o ski-release.txt`).
+3. In GitHub: repo **Settings → Secrets and variables → Actions → New repository secret**, four times:
+   - `ANDROID_KEYSTORE_BASE64`: the contents of `ski-release.txt`
+   - `ANDROID_KEYSTORE_PASSWORD`: the password you typed
+   - `ANDROID_KEY_ALIAS`: `ski`
+   - `ANDROID_KEY_PASSWORD`: the same password (keytool uses one password for both)
+4. Keep `ski-release.jks` and its password somewhere safe (a password manager), and delete `ski-release.txt`.
+   If you lose the key, no later APK can update the installed app.
+
+**Switching from the debug key, once:** the first APK signed with the new key can't install over an older one.
+Everyone first saves their days with **You → Back up all days** (and keeps the file somewhere off the phone),
+uninstalls Ski Tracker, installs the new APK, and then uses **You → Restore from a backup**. Days already in
+the online backup of an account come back by logging in again. After that,
+updates install over the previous version as before.
 
 ## Try it on your phone (Android, no build needed)
 

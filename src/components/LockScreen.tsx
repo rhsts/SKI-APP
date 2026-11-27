@@ -10,7 +10,7 @@ import { dialog } from '../dialog';
 import { api, checkServer, FriendsError } from '../friends/api';
 import { createAccount, logIn, restoreDays } from '../friends/account';
 import { resetFriendsCache, syncFriends } from '../friends/sync';
-import { normalizeServerUrl, parseInvite } from '../lib/groups';
+import { INSECURE_SERVER_MESSAGE, isInsecureServerUrl, normalizeServerUrl, parseInvite } from '../lib/groups';
 import { getSettings, updateSettings, useSettings } from '../settings';
 import { font, useStyles, useTheme, type Palette } from '../theme';
 
@@ -50,6 +50,10 @@ function ServerStep({ code, setCode }: { code: string | null; setCode: (c: strin
     const url = normalizeServerUrl(server);
     if (!url) {
       dialog('Check the server address', 'It looks like https://skipi.tail1a2b.ts.net');
+      return;
+    }
+    if (isInsecureServerUrl(url)) {
+      dialog('Use https for this address', INSECURE_SERVER_MESSAGE);
       return;
     }
     setBusy(true);

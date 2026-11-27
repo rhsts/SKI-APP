@@ -11,9 +11,12 @@ services:
     environment:
       # Put SERVER_PASSWORD=... in the .env file next to this one (see SETUP-PI.md).
       - SERVER_PASSWORD=${SERVER_PASSWORD:-}
+      # Optional: the username that runs the server (otherwise the first account to register).
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
 
   tunnel:
-    image: cloudflare/cloudflared:latest
+    # A fixed version, so a new release is only used once you choose to update this line.
+    image: cloudflare/cloudflared:2026.11.2
     profiles: ["tunnel"]
     restart: unless-stopped
     command: tunnel --no-autoupdate run

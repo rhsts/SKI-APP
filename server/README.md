@@ -12,8 +12,10 @@ rankings. A Raspberry Pi 4 handles this easily: it's built for a handful to a fe
   for it when connecting). Wrong guesses are answered slowly.
 - **Accounts.** Each phone makes up a random device id + secret, and logs in to an account (username +
   password, scrypt-hashed). Several phones can be the same person. The first account is the **admin**, who can
-  list and remove people. 8 wrong passwords lock a username for 15 minutes. Group codes are 6 characters, and
-  only members can see a group.
+  list and remove people; set `ADMIN_USERNAME=yourname` in `.env` to make only that account the admin instead.
+  8 wrong passwords lock a username for 15 minutes. Group codes are 6 characters, and only members can see a
+  group. 10 wrong group codes from one address or phone (or 200 from everyone together) block joining with a
+  code for 15 minutes, so codes can't be found by guessing.
 
 **New to this? Follow [SETUP-PI.md](SETUP-PI.md):** a step-by-step manual from an empty SD card to a working
 server, reachable from the mountain for free with Tailscale Funnel.

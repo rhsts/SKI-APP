@@ -12,7 +12,7 @@ import { AccountCard } from '../../components/AccountCard';
 import { checkServer } from '../../friends/api';
 import { leaveLive } from '../../friends/live';
 import { resetFriendsCache, syncFriends } from '../../friends/sync';
-import { normalizeServerUrl } from '../../lib/groups';
+import { INSECURE_SERVER_MESSAGE, isInsecureServerUrl, normalizeServerUrl } from '../../lib/groups';
 import { refreshGeofences, requestReminderPermissions } from '../../tracking/geofence';
 import { useTracker } from '../../tracking/tracker';
 import { Row as LinkRow, Rows } from '../../components/Row';
@@ -34,6 +34,10 @@ export default function ProfileScreen() {
     const url = normalizeServerUrl(server);
     if (!url) {
       dialog('That’s not a web address', 'For example https://ski.example.com');
+      return;
+    }
+    if (isInsecureServerUrl(url)) {
+      dialog('Use https for this address', INSECURE_SERVER_MESSAGE);
       return;
     }
     setBusy('server');
