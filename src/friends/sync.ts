@@ -2,7 +2,7 @@ import { matchSession } from '../challenges/service';
 import { getDb, getSegment, kvGet, kvSet, listAttempts, listSessions, saveSegment } from '../db';
 import { dayUpload, localDate, type Group, type GroupChallenge } from '../lib/groups';
 import { getSettings, updateSettings } from '../settings';
-import { api, friendsEnabled } from './api';
+import { api, FriendsError, friendsEnabled } from './api';
 
 /**
  * Keeps your phone and the friends server in step:
@@ -115,6 +115,21 @@ export async function flushPendingDeletes(): Promise<number> {
   return keep.length;
 }
 
+/**
+ * One upload. False when the server refused this one item (400: it doesn't accept that day or
+ * time), so the rest still go up: without this, one such item stopped every sync from then on,
+ * group challenges and the online backup included. Anything else (no signal, rate limit) throws.
+ */
+async function sent(upload: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await upload();
+    return true;
+  } catch (e) {
+    if (e instanceof FriendsError && e.status === 400) return false;
+    throw e;
+  }
+}
+
 async function uploadDays() {
   const { shareDemoDays } = getSettings();
   const since = Date.now() - DAYS_BACK;
@@ -132,7 +147,7 @@ async function uploadDays() {
     const body = dayUpload(s.startedAt, s.stats);
     const sig = JSON.stringify(body);
     if ((await kvGet(key)) === sig) continue;
-    await api.putDay(s.id, body);
+    if (!(await sent(() => api.putDay(s.id, body)))) continue;
     await kvSet(key, sig);
   }
 }
@@ -179,7 +194,7 @@ async function uploadAttempts(challenges: CachedChallenge[]) {
     const key = `friends:att:${a.id}`;
     const sig = String(a.time);
     if ((await kvGet(key)) === sig) continue;
-    await api.putAttempt(a.id, { segmentId: a.segmentId, date, time: a.time, at: a.at, ghost: a.ghost });
+    if (!(await sent(() => api.putAttempt(a.id, { segmentId: a.segmentId, date, time: a.time, at: a.at, ghost: a.ghost })))) continue;
     await kvSet(key, sig);
   }
 }
