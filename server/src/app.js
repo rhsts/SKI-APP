@@ -194,6 +194,8 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
     addGroup: q('INSERT INTO groups (id, name, code, created_by, created_at) VALUES (?, ?, ?, ?, ?)'),
     renameGroup: q('UPDATE groups SET name = ? WHERE id = ?'),
     deleteGroup: q('DELETE FROM groups WHERE id = ?'),
+    setGroupOwner: q('UPDATE groups SET created_by = ? WHERE id = ?'),
+    firstMember: q('SELECT player_id AS id FROM members WHERE group_id = ? ORDER BY joined_at LIMIT 1'),
     isMember: q('SELECT 1 AS ok FROM members WHERE group_id = ? AND player_id = ?'),
     addMember: q('INSERT OR IGNORE INTO members (group_id, player_id, joined_at) VALUES (?, ?, ?)'),
     removeMember: q('DELETE FROM members WHERE group_id = ? AND player_id = ?'),
@@ -591,6 +593,8 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
         stmt.removeMember.run(g.id, me.id);
         stmt.deletePinBy.run(g.id, me.id); // nobody left who could clear it
         if (stmt.memberCount.get(g.id).n === 0) stmt.deleteGroup.run(g.id);
+        // The owner left: whoever has been in the group longest takes over (removing challenges).
+        else if (g.createdBy === me.id) stmt.setGroupOwner.run(stmt.firstMember.get(g.id).id, g.id);
       });
       return { ok: true };
     }],

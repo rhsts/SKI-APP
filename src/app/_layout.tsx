@@ -47,7 +47,8 @@ export default function RootLayout() {
       checkServer(getSettings().serverUrl, getSettings().serverPassword).catch(() => undefined);
       syncFriends().catch(() => undefined);
       // Piste names for days still missing them, one by one while any screen is open.
-      lookupStalePistes(await listSessions()).catch(() => undefined);
+      // Not awaited: after an update listSessions() first refreshes every old day's stats.
+      listSessions().then((all) => lookupStalePistes(all)).catch(() => undefined);
       registerPistesTask().catch(() => undefined);
     })()
       .catch((e) => console.warn('Startup failed', e))

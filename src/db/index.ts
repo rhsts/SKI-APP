@@ -332,6 +332,15 @@ export async function getSession(id: string): Promise<SessionRow | null> {
   return r ? toSession(r) : null;
 }
 
+/**
+ * Whether a day exists and when it ended, without waiting for old days' stats to be refreshed
+ * (after an update that can take a minute with a long history): for the check at launch.
+ */
+export async function getSessionEnd(id: string): Promise<{ endedAt: number | null } | null> {
+  const r = await getDb().getFirstAsync<{ ended_at: number | null }>('SELECT ended_at FROM sessions WHERE id = ?', id);
+  return r ? { endedAt: r.ended_at } : null;
+}
+
 /** Finished days, newest first. */
 export async function listSessions(): Promise<SessionRow[]> {
   await ensureStatsFresh();
