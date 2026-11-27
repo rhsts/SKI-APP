@@ -4,7 +4,7 @@ import { fmtAir, fmtAlt, fmtDist, fmtDuration, fmtSpeed, fmtTimeOfDay } from '..
 import type { MotionSummary } from '../lib/motion';
 import { difficultyColor, difficultyLabel, type PisteMatch } from '../lib/pistes';
 import type { Activity, Units } from '../lib/types';
-import { font, useTheme, useStyles, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 
 interface Props {
   activity: Activity;
@@ -106,7 +106,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   const styles = useStyles(makeStyles);
   return (
     <View>
-      <Text style={[s.label, { fontSize: 11 }]}>{label}</Text>
+      <Text style={[s.label, { fontSize: size.label }]}>{label}</Text>
       <Text style={styles.metric}>{value}</Text>
     </View>
   );
@@ -127,11 +127,11 @@ export function BreakRow({ activity }: { activity: Activity }) {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     card: { flexDirection: 'row', gap: 12, alignItems: 'center', borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
-    icon: { width: 40, height: 40, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    icon: { width: 40, height: 40, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 },
     // Wraps to a second line on narrow screens / big fonts instead of spilling past the card.
     metrics: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 12, rowGap: 8 },
-    metric: { fontSize: 13, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
+    metric: { fontSize: size.caption, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     pisteRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     dot: { width: 10, height: 10, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
     breakRow: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingHorizontal: 16, paddingVertical: 2 },

@@ -10,7 +10,7 @@ import { fmtAlt, fmtDist, fmtRaceTime } from '../lib/format';
 import { leaderboard, pathInfo } from '../lib/segments';
 import { decodeChallenge, type ChallengePayload } from '../lib/share';
 import { useSettings } from '../settings';
-import { font, useTheme, useStyles, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 import { refreshRacers } from '../tracking/tracker';
 
 /**
@@ -117,8 +117,8 @@ const makeStyles = (colors: Palette) =>
     center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
     hero: { alignItems: 'center', gap: 8, paddingVertical: 20 },
     lbRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    accept: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-    acceptText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
-    secondary: { borderWidth: 1, borderColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12 },
+    accept: { backgroundColor: colors.accent, borderRadius: radius.control, paddingVertical: 16, alignItems: 'center' },
+    acceptText: { color: colors.onAccent, fontSize: size.body, fontFamily: font.medium },
+    secondary: { borderWidth: 1, borderColor: colors.accent, borderRadius: radius.control, paddingHorizontal: 20, paddingVertical: 12 },
     secondaryText: { color: colors.accent, fontFamily: font.medium },
   });

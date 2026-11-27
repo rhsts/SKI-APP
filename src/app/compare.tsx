@@ -7,7 +7,7 @@ import { fmtAlt, fmtDate, fmtDelta, fmtDist, fmtDuration, fmtRaceTime, fmtSpeed 
 import { computeStats } from '../lib/stats';
 import type { Units } from '../lib/types';
 import { useSettings } from '../settings';
-import { font, useStyles, useTheme, type Palette } from '../theme';
+import { font, size, useStyles, useTheme, type Palette } from '../theme';
 
 interface Loaded {
   a: SessionRow;
@@ -114,10 +114,10 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     headRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    vs: { fontSize: 15, fontFamily: font.medium, color: colors.muted },
+    vs: { fontSize: size.body, fontFamily: font.medium, color: colors.muted },
     row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 8 },
     rowBorder: { borderTopWidth: 1, borderTopColor: colors.faint },
-    rowLabel: { flex: 1.2, textAlign: 'center', fontSize: 13, fontFamily: font.medium, color: colors.muted },
-    val: { flex: 1, fontSize: 15, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
+    rowLabel: { flex: 1.2, textAlign: 'center', fontSize: size.caption, fontFamily: font.medium, color: colors.muted },
+    val: { flex: 1, fontSize: size.body, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     win: { color: colors.good, fontFamily: font.medium },
   });

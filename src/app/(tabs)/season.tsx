@@ -18,7 +18,7 @@ import { fmtAir, fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed, speedValue } f
 import type { Units } from '../../lib/types';
 import { ALL_TIME, seasonKeys, seasonOf, summariseSeason, type DaySummary, type SeasonRecord } from '../../lib/season';
 import { updateSettings, useSettings } from '../../settings';
-import { font, useTheme, useStyles, type Palette } from '../../theme';
+import { font, radius, size, space, target, useTheme, useStyles, type Palette } from '../../theme';
 import { useTabBarSpace } from '../../components/TabBar';
 
 export default function SeasonScreen() {
@@ -94,7 +94,7 @@ export default function SeasonScreen() {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={[styles.content, { paddingBottom: tabSpace }]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
         {keys.map((k) => (
           <Pressable key={k} onPress={() => setPicked(k)} style={[styles.pill, k === key && styles.pillOn]}>
             <Text style={[styles.pillText, k === key && { color: colors.onAccent }]}>{k === ALL_TIME ? 'All time' : `Season ${k}`}</Text>
@@ -102,17 +102,23 @@ export default function SeasonScreen() {
         ))}
       </ScrollView>
 
-      <View style={[s.card, styles.hero]}>
-        <Text style={s.label}>Vertical</Text>
-        <Text style={styles.big}>{fmtAlt(season.verticalDown, units)}</Text>
-        <Text style={s.muted}>
+      {/* The season's one big number, in the same light treatment as top speed on Record. */}
+      <View style={styles.hero}>
+        <Text style={s.label}>Vertical skied</Text>
+        <View style={styles.heroRow}>
+          <Text style={[s.display, styles.heroValue]} numberOfLines={1} adjustsFontSizeToFit>{fmtAlt(season.verticalDown, units, false)}</Text>
+          <Text style={styles.heroUnit}>{units === 'metric' ? 'm' : 'ft'}</Text>
+        </View>
+        <Text style={s.body}>
           {season.days} {season.days === 1 ? 'day' : 'days'}
-          {allTime && season.seasons.size ? ` · ${season.seasons.size} ${season.seasons.size === 1 ? 'season' : 'seasons'}` : ''}
-          {season.places.length ? ` · ${season.places.slice(0, 3).join(', ')}${season.places.length > 3 ? '…' : ''}` : ''}
+          {allTime && season.seasons.size ? ` over ${season.seasons.size} ${season.seasons.size === 1 ? 'season' : 'seasons'}` : ''}
         </Text>
+        {season.places.length ? (
+          <Text style={s.muted} numberOfLines={2}>{season.places.slice(0, 3).join(', ')}{season.places.length > 3 ? ' and more' : ''}</Text>
+        ) : null}
         {Object.keys(season.sports).length > 1 || (Object.keys(season.sports)[0] ?? 'ski') !== 'ski' ? (
           <Text style={s.muted}>
-            {SPORTS.filter((sp) => season.sports[sp.id]).map((sp) => `${sp.label} ${season.sports[sp.id]}`).join(' · ')}
+            {SPORTS.filter((sp) => season.sports[sp.id]).map((sp) => `${sp.label} ${season.sports[sp.id]}`).join(', ')}
           </Text>
         ) : null}
       </View>
@@ -131,14 +137,14 @@ export default function SeasonScreen() {
 
       {streaks ? (
         <View style={[s.card, styles.streak]}>
-          <Ionicons name={streaks.days >= 2 ? 'flame-outline' : 'calendar-outline'} size={28} color={colors.accent} />
+          <Ionicons name={streaks.days >= 2 ? 'flame-outline' : 'calendar-outline'} size={28} color={colors.muted} />
           <View style={{ flex: 1 }}>
             <Text style={s.h2}>
               {streaks.days >= 2 ? `${streaks.days} days in a row` : streaks.weeks >= 2 ? `${streaks.weeks} weeks in a row` : 'No streak yet'}
             </Text>
             {streaks.bestDays > 0 ? (
               <Text style={s.muted}>
-                Best: {streaks.bestDays} {streaks.bestDays === 1 ? 'day' : 'days'} · {streaks.bestWeeks} {streaks.bestWeeks === 1 ? 'week' : 'weeks'}
+                Best: {streaks.bestDays} {streaks.bestDays === 1 ? 'day' : 'days'}, {streaks.bestWeeks} {streaks.bestWeeks === 1 ? 'week' : 'weeks'}
               </Text>
             ) : null}
           </View>
@@ -152,9 +158,9 @@ export default function SeasonScreen() {
       {weekly.map((w) => <WeeklyRow key={w.kind} w={w} units={units} />)}
 
       <DifficultyBar shares={shares} units={units} title={allTime ? 'Pistes, all time' : 'Pistes this season'} />
-      {waiting ? <Text style={[s.muted, { fontSize: 12 }]}>Looking up pistes for {waiting} {waiting === 1 ? 'day' : 'days'}…</Text> : null}
+      {waiting ? <Text style={s.muted}>Looking up pistes for {waiting} {waiting === 1 ? 'day' : 'days'}…</Text> : null}
 
-      <Text style={[s.h2, { marginTop: 8 }]}>Goals</Text>
+      <Text style={[s.h2, styles.section]}>Goals</Text>
       {progress.map((g) => (
         <GoalRow
           key={g.key}
@@ -183,7 +189,7 @@ export default function SeasonScreen() {
         } : undefined}
       />
 
-      <Text style={[s.h2, { marginTop: 8 }]}>{allTime ? 'All-time records' : 'Personal records'}</Text>
+      <Text style={[s.h2, styles.section]}>{allTime ? 'All-time records' : 'Personal records'}</Text>
       <RecordRow icon="speedometer" label="Fastest speed" rec={r.topSpeed} fmt={(v) => fmtSpeed(v, units)} />
       <RecordRow icon="resize" label="Longest run" rec={r.longestRun} fmt={(v) => fmtDist(v, units)} />
       <RecordRow icon="trending-down" label="Most vertical in a day" rec={r.mostVertical} fmt={(v) => fmtAlt(v, units)} />
@@ -226,9 +232,9 @@ function GoalRow({ g, units, editing, onToggle, onChange }: {
   const styles = useStyles(makeStyles);
   const t = GOAL_TEXT[g.key];
   return (
-    <Pressable onPress={onToggle} style={[s.card, { gap: 8 }]} accessibilityHint="Tap to change the goal">
+    <Pressable onPress={onToggle} style={[s.card, styles.goal]} accessibilityHint="Tap to change the goal">
       <View style={styles.goalHead}>
-        <Ionicons name={g.done ? 'checkmark-circle' : t.icon} size={20} color={g.done ? colors.good : colors.accent} />
+        <Ionicons name={g.done ? 'checkmark-circle' : t.icon} size={20} color={g.done ? colors.good : colors.muted} />
         <Text style={[s.body, { flex: 1, fontFamily: font.medium }]}>{t.title} {t.period}</Text>
         <Text style={s.body}>
           <Text style={{ fontFamily: font.medium }}>{fmtGoal(g.key, g.value, units)}</Text>
@@ -241,11 +247,11 @@ function GoalRow({ g, units, editing, onToggle, onChange }: {
       {editing ? (
         <View style={styles.stepper}>
           <Pressable onPress={() => onChange(stepGoal(g.key, g.target, -1, units))} style={styles.stepBtn} accessibilityLabel="Lower goal">
-            <Ionicons name="remove" size={22} color={colors.accent} />
+            <Ionicons name="remove" size={22} color={colors.text} />
           </Pressable>
-          <Text style={[s.h2, { minWidth: 110, textAlign: 'center' }]}>{fmtGoal(g.key, g.target, units)}</Text>
+          <Text style={[s.h2, styles.stepValue]}>{fmtGoal(g.key, g.target, units)}</Text>
           <Pressable onPress={() => onChange(stepGoal(g.key, g.target, 1, units))} style={styles.stepBtn} accessibilityLabel="Raise goal">
-            <Ionicons name="add" size={22} color={colors.accent} />
+            <Ionicons name="add" size={22} color={colors.text} />
           </Pressable>
         </View>
       ) : null}
@@ -273,9 +279,9 @@ function WeeklyRow({ w, units }: { w: WeeklyChallenge; units: Units }) {
   const styles = useStyles(makeStyles);
   const t = weeklyText(w, units);
   return (
-    <View style={[s.card, { gap: 8 }]}>
+    <View style={[s.card, styles.goal]}>
       <View style={styles.goalHead}>
-        <Ionicons name={w.done ? 'checkmark-circle' : w.icon} size={20} color={w.done ? colors.good : colors.accent} />
+        <Ionicons name={w.done ? 'checkmark-circle' : w.icon} size={20} color={w.done ? colors.good : colors.muted} />
         <Text style={[s.body, { flex: 1, fontFamily: font.medium }]}>{t.title}</Text>
         <Text style={s.body}>
           <Text style={{ fontFamily: font.medium }}>{t.value}</Text>
@@ -283,7 +289,7 @@ function WeeklyRow({ w, units }: { w: WeeklyChallenge; units: Units }) {
         </Text>
       </View>
       <View style={styles.barTrack}>
-        <View style={[styles.barFill, { width: `${Math.round(w.progress * 100)}%`, backgroundColor: w.done ? colors.good : colors.warn }]} />
+        <View style={[styles.barFill, { width: `${Math.round(w.progress * 100)}%`, backgroundColor: w.done ? colors.good : colors.accent }]} />
       </View>
     </View>
   );
@@ -302,7 +308,7 @@ function BadgeTile({ b, onPress }: { b: Badge; onPress: () => void }) {
     >
       <Ionicons name={got ? b.icon : 'lock-closed-outline'} size={28} color={got ? colors.accent : colors.muted} />
       <Text style={styles.badgeTitle} numberOfLines={1}>{b.title}</Text>
-      <Text style={[s.muted, { fontSize: 11, textAlign: 'center' }]} numberOfLines={2}>
+      <Text style={[s.muted, styles.badgeSub]} numberOfLines={2}>
         {got ? fmtDate(b.earnedAt!).slice(4) : b.description}
       </Text>
     </Tap>
@@ -320,10 +326,10 @@ function RecordRow({ icon, label, rec, fmt }: {
       onPress={() => rec && router.push(`/day/${rec.dayId}`)}
       style={[s.card, styles.record]}
     >
-      <View style={styles.medal}><Ionicons name={icon} size={20} color={colors.warn} /></View>
+      <View style={styles.medal}><Ionicons name={icon} size={20} color={colors.muted} /></View>
       <View style={{ flex: 1 }}>
         <Text style={s.label}>{label}</Text>
-        <Text style={styles.recValue}>{rec ? fmt(rec.value) : '–'}</Text>
+        <Text style={[s.figure, styles.recValue]}>{rec ? fmt(rec.value) : '–'}</Text>
       </View>
       {rec ? <Text style={s.muted}>{fmtDate(rec.date)}</Text> : null}
     </Tap>
@@ -332,23 +338,29 @@ function RecordRow({ icon, label, rec, fmt }: {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    content: { padding: 16, gap: 12, paddingBottom: 32 },
-    pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
+    content: { padding: space.lg, gap: space.md, paddingBottom: space.xxl },
+    pill: { paddingHorizontal: space.lg, paddingVertical: space.sm, borderRadius: radius.pill, backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    pillText: { fontFamily: font.medium, color: colors.text },
-    hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-    big: { fontSize: 44, fontFamily: font.medium, color: colors.text },
-    streak: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    goalHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    barTrack: { height: 8, borderRadius: 4, backgroundColor: colors.faint, overflow: 'hidden' },
-    barFill: { height: 8, borderRadius: 4 },
-    stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
-    stepBtn: { width: 48, height: 48, borderRadius: 16, borderWidth: 2, borderColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-    badgeHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 },
-    badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    badge: { width: '31%', alignItems: 'center', gap: 2, paddingVertical: 12, paddingHorizontal: 8 },
-    badgeTitle: { fontSize: 13, fontFamily: font.medium, color: colors.text, textAlign: 'center' },
-    record: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    medal: { width: 40, height: 40, borderRadius: 16, backgroundColor: colors.warnSoft, alignItems: 'center', justifyContent: 'center' },
-    recValue: { fontSize: 20, fontFamily: font.medium, color: colors.text },
+    pillText: { fontFamily: font.medium, fontSize: size.caption, color: colors.text },
+    hero: { gap: space.xs, paddingTop: space.lg, paddingBottom: space.xl },
+    heroRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+    heroValue: { flexShrink: 1 },
+    heroUnit: { fontFamily: font.regular, fontSize: size.figure, color: colors.muted },
+    section: { marginTop: space.xl },
+    streak: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+    goal: { gap: space.sm },
+    goalHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+    barTrack: { height: space.xs, borderRadius: 2, backgroundColor: colors.faint, overflow: 'hidden' },
+    barFill: { height: space.xs, borderRadius: 2 },
+    stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.md },
+    stepBtn: { width: target.min + space.xs, height: target.min + space.xs, borderRadius: radius.control, backgroundColor: colors.faint, alignItems: 'center', justifyContent: 'center' },
+    stepValue: { minWidth: 110, textAlign: 'center', fontVariant: ['tabular-nums'] },
+    badgeHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: space.xl },
+    badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+    badge: { width: '31%', alignItems: 'center', gap: 2, paddingVertical: space.md, paddingHorizontal: space.sm },
+    badgeTitle: { fontSize: size.caption, fontFamily: font.medium, color: colors.text, textAlign: 'center' },
+    badgeSub: { fontSize: size.label, lineHeight: 14, textAlign: 'center' },
+    record: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+    medal: { width: 40, height: 40, borderRadius: radius.control, backgroundColor: colors.liftSoft, alignItems: 'center', justifyContent: 'center' },
+    recValue: { fontSize: size.control, lineHeight: 26 },
   });

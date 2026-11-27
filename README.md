@@ -1,6 +1,6 @@
 # Ski Tracker
 
-A ski-day tracker for Android and iOS built with Expo / React Native. Start recording at the lift, put
+A ski-day tracker for Android built with Expo / React Native. Start recording at the lift, put
 the phone in your pocket, and the app logs your day:
 
 - **Top speed**, average ski speed, and current speed while you ride

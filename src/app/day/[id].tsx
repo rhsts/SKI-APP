@@ -29,7 +29,7 @@ import type { Activity, TrackPoint, Units } from '../../lib/types';
 import type { MotionSummary } from '../../lib/motion';
 import type { PisteMatch } from '../../lib/pistes';
 import { useSettings } from '../../settings';
-import { font, useTheme, useStyles, type Palette } from '../../theme';
+import { font, radius, size, space, target, useTheme, useStyles, type Palette } from '../../theme';
 
 /** One ski day: the day's numbers and every run. Tap a run to see it on the map. */
 export default function DayScreen() {
@@ -101,7 +101,7 @@ export default function DayScreen() {
     [day, motion],
   );
 
-  if (!session || !day) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
+  if (!session || !day) return <ActivityIndicator style={{ marginTop: space.xxxl }} color={colors.accent} />;
 
   const { stats } = day;
   const suggestedRunNo = suggestion ? stats.activities.slice(0, suggestion.activityIndex + 1).filter((a) => a.kind === 'run').length : 0;
@@ -164,12 +164,12 @@ export default function DayScreen() {
         options={{
           title: fmtDate(session.startedAt),
           headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: 16 }}>
+            <View style={{ flexDirection: 'row', gap: space.lg }}>
               <Pressable onPress={() => router.push({ pathname: '/day/share', params: { id: session.id } })} hitSlop={10} accessibilityLabel="Share as image">
-                <Ionicons name="share-social-outline" size={22} color={colors.accent} />
+                <Ionicons name="share-social-outline" size={22} color={colors.text} />
               </Pressable>
               <Pressable onPress={menu} hitSlop={10} accessibilityLabel="More">
-                <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.accent} />
+                <Ionicons name="ellipsis-horizontal-circle-outline" size={24} color={colors.text} />
               </Pressable>
             </View>
           ),
@@ -188,12 +188,21 @@ export default function DayScreen() {
         </Pressable>
       )}
       <Text style={s.muted}>
-        {sportInfo(session.sport).label} · {fmtTimeOfDay(session.startedAt)} – {fmtTimeOfDay(session.endedAt ?? session.startedAt)} · {fmtDuration(stats.duration)}
+        {sportInfo(session.sport).label}, {fmtTimeOfDay(session.startedAt)} to {fmtTimeOfDay(session.endedAt ?? session.startedAt)} ({fmtDuration(stats.duration)})
       </Text>
+
+      {/* The day's one big number, in the same light treatment as Record and Season. */}
+      <View style={styles.hero} accessible accessibilityLabel={`Vertical: ${fmtAlt(stats.verticalDown, units)}`}>
+        <Text style={s.label}>Vertical skied</Text>
+        <View style={styles.heroRow}>
+          <Text style={[s.display, styles.heroValue]} numberOfLines={1} adjustsFontSizeToFit>{fmtAlt(stats.verticalDown, units, false)}</Text>
+          <Text style={styles.heroUnit}>{units === 'metric' ? 'm' : 'ft'}</Text>
+        </View>
+      </View>
 
       <StatGrid>
         <StatTile label="Top speed" value={fmtSpeed(stats.topSpeed, units)} sub={stats.topSpeedTime ? `at ${fmtTimeOfDay(stats.topSpeedTime)}` : undefined} />
-        <StatTile label="Vertical ↓" value={fmtAlt(stats.verticalDown, units)} sub={`↑ ${fmtAlt(stats.verticalUp, units)}`} />
+        <StatTile label="Ridden up" value={fmtAlt(stats.verticalUp, units)} />
         <StatTile label="Peak altitude" value={fmtAlt(stats.maxAlt, units)} sub={`Lowest ${fmtAlt(stats.minAlt, units)}`} />
         <StatTile label="Runs" value={String(stats.runCount)} sub={`Longest ${fmtDist(stats.longestRun, units)}`} />
         <StatTile label="Distance skied" value={fmtDist(stats.skiDistance, units)} sub={`Total ${fmtDist(stats.distance, units)}`} />
@@ -207,7 +216,7 @@ export default function DayScreen() {
         <StatTile
           label="Jumps"
           value={String(motionDay.jumps)}
-          sub={motionDay.jumps ? `Best ${fmtAir(motionDay.bestAir)} · total ${fmtAir(motionDay.totalAir)}` : undefined}
+          sub={motionDay.jumps ? `Best ${fmtAir(motionDay.bestAir)}, total ${fmtAir(motionDay.totalAir)}` : undefined}
         />
         <StatTile label="Falls" value={String(motionDay.falls)} sub={stats.runCount ? `${stats.runCount - new Set(motion.filter((e) => e.kind === 'fall').map((e) => runOfEvent(e.t)).filter((i) => i != null)).size} without a fall` : undefined} />
       </StatGrid>
@@ -217,7 +226,7 @@ export default function DayScreen() {
         <Text style={s.muted}>{lookupFailed ? 'Piste names unavailable. Reopen this day to retry.' : 'Looking up the pistes…'}</Text>
       ) : null}
 
-      <Text style={[s.h2, { marginTop: 8 }]}>Runs</Text>
+      <Text style={[s.h2, styles.section]}>Runs</Text>
       {stats.runCount === 0 ? <Text style={s.muted}>No runs detected.</Text> : null}
       <RunList
         timeline={timeline}
@@ -229,13 +238,13 @@ export default function DayScreen() {
       />
 
       {motion.length ? (
-        <View style={[s.card, { gap: 4 }]}>
+        <View style={[s.card, { gap: space.xs }]}>
           <Text style={s.label}>Jumps and falls</Text>
           {motion.map((e) => {
             const r = runOfEvent(e.t);
             return (
               <Pressable key={`${e.kind}-${e.t}`} onPress={() => showEvent(e.t)} onLongPress={() => removeEvent(e)} style={styles.timedRow}>
-                <Ionicons name={e.kind === 'jump' ? 'arrow-up-outline' : 'alert-circle-outline'} size={18} color={colors.accent} />
+                <Ionicons name={e.kind === 'jump' ? 'arrow-up-outline' : 'alert-circle-outline'} size={18} color={colors.muted} />
                 <Text style={[s.body, { flex: 1, fontFamily: font.medium }]}>
                   {e.kind === 'jump' ? `${fmtAir(e.value)} airtime` : 'Fall'}
                   <Text style={s.muted}>
@@ -246,7 +255,7 @@ export default function DayScreen() {
               </Pressable>
             );
           })}
-          <Text style={[s.muted, { fontSize: 12 }]}>Hold one to remove it.</Text>
+          <Text style={s.muted}>Hold one to remove it.</Text>
         </View>
       ) : null}
 
@@ -277,11 +286,11 @@ export default function DayScreen() {
 
       {suggestion ? (
         <View style={[s.card, styles.suggest]}>
-          <Ionicons name="flag-outline" size={24} color={colors.accent} />
-          <View style={{ flex: 1, gap: 8 }}>
+          <Ionicons name="flag-outline" size={24} color={colors.muted} />
+          <View style={{ flex: 1, gap: space.sm }}>
             <Text style={s.h2}>You skied this line {suggestion.times} times</Text>
             <Text style={s.muted}>Fastest: Run {suggestedRunNo}. Make it a challenge to race friends.</Text>
-            <View style={{ flexDirection: 'row', gap: 16, marginTop: 2 }}>
+            <View style={{ flexDirection: 'row', gap: space.lg, marginTop: 2 }}>
               <Pressable onPress={() => router.push({ pathname: '/segment/new', params: { session: session.id, run: String(suggestion.activityIndex) } })}>
                 <Text style={styles.link}>Make challenge</Text>
               </Pressable>
@@ -299,7 +308,7 @@ export default function DayScreen() {
       ) : null}
 
       {timed.length ? (
-        <View style={[s.card, { gap: 8 }]}>
+        <View style={[s.card, { gap: space.sm }]}>
           <Text style={s.label}>Challenge times</Text>
           {timed.map(({ attempt, segment }) => (
             <Pressable key={attempt.id} onPress={() => router.push(`/segment/${segment.id}`)} style={styles.timedRow}>
@@ -362,11 +371,16 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    content: { padding: 16, gap: 12, paddingBottom: 40 },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    input: { flex: 1, fontSize: 20, fontFamily: font.medium, color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: 4 },
-    play: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-    suggest: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
-    timedRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    content: { padding: space.lg, gap: space.md, paddingBottom: space.xxxl },
+    titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+    input: { flex: 1, fontSize: size.control, fontFamily: font.medium, color: colors.text, borderBottomWidth: 2, borderBottomColor: colors.accent, paddingVertical: space.xs },
+    hero: { gap: space.xs, paddingVertical: space.md },
+    heroRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
+    heroValue: { flexShrink: 1 },
+    heroUnit: { fontFamily: font.regular, fontSize: size.figure, color: colors.muted },
+    section: { marginTop: space.xl },
+    play: { width: target.min, height: target.min, borderRadius: radius.control, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+    suggest: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: size.body },
+    timedRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: target.min },
   });

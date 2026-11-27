@@ -16,7 +16,7 @@ import {
 import type { Segment } from '../../lib/segments';
 import { useSettings } from '../../settings';
 import { Avatar } from '../../components/Avatar';
-import { font, useStyles, useTheme, type Palette } from '../../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../../theme';
 
 const METRICS: { key: BoardMetric; label: string }[] = [
   { key: 'vertical', label: 'Vertical' },
@@ -308,7 +308,7 @@ function ChallengeCard({ c, rows, groupId, ownerId, today, onRemoved, compact, o
           </View>
         ))
       )}
-      {canRemove && !compact ? <Text style={[s.muted, { fontSize: 11 }]}>Press and hold to remove.</Text> : null}
+      {canRemove && !compact ? <Text style={[s.muted, { fontSize: size.label }]}>Press and hold to remove.</Text> : null}
     </Pressable>
   );
 }
@@ -383,18 +383,18 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     codeCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    code: { fontSize: 24, fontFamily: font.medium, letterSpacing: 4, color: colors.text },
-    pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
+    code: { fontSize: size.figure, fontFamily: font.medium, letterSpacing: 4, color: colors.text },
+    pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint },
     pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
     pillText: { fontFamily: font.medium, color: colors.text },
-    segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 12, padding: 4 },
-    segBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+    segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: radius.control, padding: 4 },
+    segBtn: { flex: 1, paddingVertical: 8, borderRadius: radius.control, alignItems: 'center' },
     segOn: { backgroundColor: colors.accent },
     segText: { fontFamily: font.medium, color: colors.text },
-    rankRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8 },
+    rankRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: radius.control },
     meRow: { backgroundColor: colors.accentSoft },
-    rank: { width: 30, fontSize: 17, fontFamily: font.medium, color: colors.text, textAlign: 'center' },
-    value: { fontSize: 15, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
+    rank: { width: 30, fontSize: size.body, fontFamily: font.medium, color: colors.text, textAlign: 'center' },
+    value: { fontSize: size.body, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 12, justifyContent: 'space-between' },
-    link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
+    link: { color: colors.accent, fontFamily: font.medium, fontSize: size.body },
   });

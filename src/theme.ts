@@ -29,8 +29,6 @@ export interface Palette {
   ink: string;
   onInk: string;
   onInkMuted: string;
-  /** Floating chrome (tab bar) on top of a blur. */
-  glass: string;
 }
 
 // "Alpine dawn": warm snow white and warm graphite, with glacier ice as the only brand colour.
@@ -55,7 +53,6 @@ export const LIGHT: Palette = {
   ink: '#1A1917',
   onInk: '#F7F5F1',
   onInkMuted: '#A8A39A',
-  glass: 'rgba(253,252,250,0.72)',
 };
 
 export const DARK: Palette = {
@@ -79,7 +76,6 @@ export const DARK: Palette = {
   ink: '#23211F',
   onInk: '#EFEBE4',
   onInkMuted: '#A8A39A',
-  glass: 'rgba(25,24,22,0.72)',
 };
 
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -93,8 +89,8 @@ export const size = { label: 11, caption: 13, body: 16, control: 20, figure: 25,
 /** The only gaps. Related things sit 4–8 apart, groups 24 apart. */
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
 
-/** One radius for controls, cards and sheets; floating chrome is a pill. */
-export const radius = { card: 24, pill: 999 } as const;
+/** Cards and sheets are 24; buttons, inputs, rows and chips are 12; floating chrome and filter pills are pills. Nothing else. */
+export const radius = { card: 24, control: 12, pill: 999 } as const;
 
 /** Touch targets: the minimum everywhere, and the glove-sized Record controls. */
 export const target = { min: 44, control: 72, start: 144 } as const;
@@ -132,11 +128,14 @@ function makeBase(colors: Palette) {
     // Hierarchy comes from weight and colour more than from size.
     h1: { fontFamily: font.medium, fontSize: size.figure, lineHeight: 32, letterSpacing: -0.5, color: colors.text },
     h2: { fontFamily: font.medium, fontSize: size.body, lineHeight: 24, color: colors.text },
-    label: { fontFamily: font.medium, fontSize: size.label, lineHeight: 16, color: colors.muted, textTransform: 'uppercase', letterSpacing: 1.1 },
+    /** A quiet sentence-case caption above a figure or a group. */
+    label: { fontFamily: font.medium, fontSize: size.caption, lineHeight: 18, color: colors.muted },
     body: { fontFamily: font.regular, fontSize: size.body, lineHeight: 24, color: colors.text },
     muted: { fontFamily: font.regular, fontSize: size.caption, lineHeight: 18, color: colors.muted },
     /** A number: 4,984 or 78.4. Its unit goes beside it in `muted`. */
     figure: { fontFamily: font.regular, fontSize: size.figure, lineHeight: 32, letterSpacing: -0.5, color: colors.text, fontVariant: ['tabular-nums'] },
+    /** The one big number on a screen: very light and tight, its unit small and muted beside it. */
+    display: { fontFamily: font.light, fontSize: size.heroFit, lineHeight: 104, letterSpacing: -2, color: colors.text, fontVariant: ['tabular-nums'] },
     /** Text on buttons. */
     control: { fontFamily: font.medium, fontSize: size.body, lineHeight: 24, color: colors.text },
     hairline: { height: StyleSheet.hairlineWidth, backgroundColor: colors.faint },

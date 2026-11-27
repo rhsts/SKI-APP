@@ -11,7 +11,7 @@ import { getPoints, getSession, type SessionRow } from '../../db';
 import { cleanTrack, computeStats, smoothedSpeeds } from '../../lib/stats';
 import type { TrackPoint } from '../../lib/types';
 import { useSettings } from '../../settings';
-import { font, useStyles, useTheme, type Palette } from '../../theme';
+import { font, radius, size, space, target, useStyles, useTheme, type Palette } from '../../theme';
 
 /** Preview of the day poster, with a button to share it as an image. */
 export default function ShareDayScreen() {
@@ -48,19 +48,22 @@ export default function ShareDayScreen() {
     }
   };
 
-  if (!session || !day) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
+  if (!session || !day) return <ActivityIndicator style={{ marginTop: space.xxxl }} color={colors.accent} />;
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={styles.content}>
-      <DayShareCard
-        ref={card}
-        points={day.pts}
-        speeds={day.speeds}
-        stats={day.stats}
-        place={session.place}
-        startedAt={session.startedAt}
-        units={units}
-      />
+      {/* A hairline frames the card on screen; it is not part of the image. */}
+      <View style={styles.frame}>
+        <DayShareCard
+          ref={card}
+          points={day.pts}
+          speeds={day.speeds}
+          stats={day.stats}
+          place={session.place}
+          startedAt={session.startedAt}
+          units={units}
+        />
+      </View>
       <Tap onPress={share} disabled={busy} style={styles.button}>
         {busy ? <ActivityIndicator color={colors.onAccent} /> : (
           <>
@@ -75,7 +78,11 @@ export default function ShareDayScreen() {
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    content: { padding: 16, gap: 16, alignItems: 'center', paddingBottom: 40 },
-    button: { alignSelf: 'stretch', flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16 },
-    buttonText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
+    content: { padding: space.lg, gap: space.lg, alignItems: 'center', paddingBottom: space.xxxl },
+    frame: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.faint },
+    button: {
+      alignSelf: 'stretch', flexDirection: 'row', gap: space.md, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: colors.accent, borderRadius: radius.control, minHeight: target.control,
+    },
+    buttonText: { color: colors.onAccent, fontSize: size.body, fontFamily: font.medium },
   });

@@ -6,7 +6,7 @@ import { simplify } from '../lib/geo';
 import type { TrailMap } from '../lib/trailmap';
 import type { Activity, TrackPoint } from '../lib/types';
 import { TrailOverlay } from './TrailOverlay';
-import { useTheme, useStyles, type Palette, speedColor } from '../theme';
+import { radius, speedColor, useStyles, useTheme, type Palette } from '../theme';
 import { mapsAvailable } from '../lib/mapsAvailable';
 import { MapPlaceholder } from './MapPlaceholder';
 import { ViewMarker } from './ViewMarker';
@@ -149,7 +149,7 @@ export const RouteMap = memo(function RouteMap({ points, speeds, activities, cur
 
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    wrap: { height: 280, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.faint },
-    photoPin: { width: 28, height: 28, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.accent },
-    dot: { width: 18, height: 18, borderRadius: 8, backgroundColor: colors.accent, borderWidth: 3, borderColor: '#fff' },
+    wrap: { height: 280, borderRadius: radius.control, overflow: 'hidden', backgroundColor: colors.faint },
+    photoPin: { width: 28, height: 28, borderRadius: radius.control, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.accent },
+    dot: { width: 18, height: 18, borderRadius: radius.control, backgroundColor: colors.accent, borderWidth: 3, borderColor: '#fff' },
   });
