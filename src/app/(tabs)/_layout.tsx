@@ -21,7 +21,7 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Record', headerShown: false }} />
       <Tabs.Screen name="days" options={{ title: 'Days' }} />
-      <Tabs.Screen name="leaderboard" options={{ title: 'Friends' }} />
+      <Tabs.Screen name="leaderboard" options={{ title: 'Friends', headerShown: false }} />
       <Tabs.Screen name="profile" options={{ title: 'You' }} />
       <Tabs.Screen name="challenges" options={{ title: 'Challenges' }} />
       <Tabs.Screen name="season" options={{ title: 'Season' }} />

@@ -89,6 +89,7 @@ export default function RootLayout() {
         <Stack.Screen name="c" options={{ title: 'Challenge invite' }} />
         <Stack.Screen name="group/new" options={{ title: 'Friend group' }} />
         <Stack.Screen name="group/[id]" options={{ title: 'Group' }} />
+        <Stack.Screen name="boards" options={{ title: 'Leaderboards' }} />
         <Stack.Screen name="player/[id]" options={{ title: 'Profile' }} />
         <Stack.Screen name="admin" options={{ title: 'Manage people' }} />
       </Stack>

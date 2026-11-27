@@ -75,12 +75,12 @@ export function LiveMap({ points, trail, center, follow = true, friends = [], pi
         ))}
         {pins.map((p) => (
           <ViewMarker key={`${p.groupId}:${p.createdAt}`} coordinate={{ latitude: p.lat, longitude: p.lon }} anchor={{ x: 0.5, y: 1 }} zIndex={4}>
-            <Ionicons name="flag" size={32} color={colors.danger} />
+            <Ionicons name="flag" size={32} color={colors.text} />
           </ViewMarker>
         ))}
         {draft ? (
           <ViewMarker key={`draft:${draft.lat},${draft.lon}`} coordinate={{ latitude: draft.lat, longitude: draft.lon }} anchor={{ x: 0.5, y: 1 }} zIndex={5}>
-            <Ionicons name="flag-outline" size={32} color={colors.danger} />
+            <Ionicons name="flag-outline" size={32} color={colors.text} />
           </ViewMarker>
         ) : null}
       </MapView>
