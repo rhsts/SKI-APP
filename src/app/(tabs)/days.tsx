@@ -1,26 +1,55 @@
+import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { Tap } from '../../components/Tap';
-import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTabBarSpace } from '../../components/TabBar';
 import { listSessions, type SessionRow } from '../../db';
-import { fmtAlt, fmtDate, fmtDuration, fmtSpeed } from '../../lib/format';
+import { fmtAlt, fmtDuration, fmtSpeed } from '../../lib/format';
+import { difficultyColor, type Difficulty } from '../../lib/pistes';
 import { sportInfo } from '../../lib/sport';
 import { useSettings } from '../../settings';
-import { font, size, useTheme, useStyles, type Palette } from '../../theme';
-import { useTabBarSpace } from '../../components/TabBar';
 import { addDemoDay } from '../../tracking/demo';
+import { font, radius, size, space, target, useStyles, useTheme, type Palette } from '../../theme';
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Days grouped by month, newest first (the list already comes newest first). */
+function byMonth(days: SessionRow[]): { title: string; data: SessionRow[] }[] {
+  const out: { title: string; data: SessionRow[] }[] = [];
+  for (const d of days) {
+    const at = new Date(d.startedAt);
+    const title = `${MONTHS[at.getMonth()]} ${at.getFullYear()}`;
+    if (out[out.length - 1]?.title !== title) out.push({ title, data: [] });
+    out[out.length - 1].data.push(d);
+  }
+  return out;
+}
+
+/** Runs per difficulty, hardest last, from the pistes each run was matched to. */
+function pisteMix(pistes: SessionRow['pistes']): { d: Difficulty; n: number }[] {
+  if (!pistes) return [];
+  const order: Difficulty[] = ['novice', 'easy', 'intermediate', 'advanced', 'expert', 'freeride'];
+  const count = new Map<Difficulty, number>();
+  for (const p of Object.values(pistes)) {
+    if (!order.includes(p.difficulty)) continue;
+    count.set(p.difficulty, (count.get(p.difficulty) ?? 0) + 1);
+  }
+  return order.filter((d) => count.has(d)).map((d) => ({ d, n: count.get(d)! }));
+}
 
 export default function DaysScreen() {
-  const { colors, s } = useTheme();
+  const { colors, s, dark } = useTheme();
   const styles = useStyles(makeStyles);
   const { units } = useSettings();
   const tabSpace = useTabBarSpace();
+  const navigation = useNavigation();
   const [days, setDays] = useState<SessionRow[] | null>(null);
   const [adding, setAdding] = useState(false);
   // Compare mode: pick two days.
   const [picking, setPicking] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
+  const sections = useMemo(() => byMonth(days ?? []), [days]);
 
   const toggle = (id: string) => {
     const next = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id].slice(-2);
@@ -37,37 +66,52 @@ export default function DaysScreen() {
   }, []);
   useFocusEffect(load);
 
-  if (!days) return <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} />;
+  // Compare lives in the header, out of the way of the days themselves.
+  const canCompare = (days?.length ?? 0) >= 2;
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: canCompare
+        ? () => (
+            <Pressable
+              onPress={() => { setPicking((p) => !p); setPicked([]); }}
+              style={styles.headerAction}
+              hitSlop={space.sm}
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerActionText}>{picking ? 'Cancel' : 'Compare'}</Text>
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [navigation, canCompare, picking, styles]);
+
+  if (!days) return <ActivityIndicator style={{ marginTop: space.xxxl }} color={colors.accent} />;
+
+  const altUnit = units === 'metric' ? 'm' : 'ft';
 
   return (
-    <FlatList
+    <SectionList
       style={s.screen}
       contentContainerStyle={[styles.list, { paddingBottom: tabSpace }]}
-      data={days}
+      sections={sections}
       keyExtractor={(d) => d.id}
+      stickySectionHeadersEnabled={false}
       ListHeaderComponent={
-        days.length >= 2 ? (
-          <Pressable
-            onPress={() => { setPicking(!picking); setPicked([]); }}
-            style={[styles.compare, picking && { backgroundColor: colors.accent }]}
-          >
-            <Ionicons name="git-compare-outline" size={18} color={picking ? colors.onAccent : colors.accent} />
-            <Text style={[styles.compareText, picking && { color: colors.onAccent }]}>
-              {picking ? `Pick ${2 - picked.length} day${picked.length ? '' : 's'} to compare · Cancel` : 'Compare two days'}
-            </Text>
-          </Pressable>
+        picking ? (
+          <Text style={[s.body, styles.hint]}>Pick {2 - picked.length} {picked.length ? 'more day' : 'days'} to compare.</Text>
         ) : undefined
       }
+      renderSectionHeader={({ section }) => <Text style={[s.label, styles.month]}>{section.title}</Text>}
       ListEmptyComponent={
-        <View style={[s.card, styles.empty]}>
-          <Ionicons name="snow-outline" size={40} color={colors.accent} />
-          <Text style={s.h2}>No ski days yet</Text>
-          <Text style={[s.muted, { textAlign: 'center' }]}>
-            Record one, or add a demo day.
+        <View style={styles.empty}>
+          <Text style={s.h1}>No ski days yet</Text>
+          <Text style={[s.body, { color: colors.muted }]}>
+            Start recording on the Record tab, or add a demo day to see how a day looks.
           </Text>
           <Pressable
             style={styles.demo}
             disabled={adding}
+            accessibilityRole="button"
             onPress={async () => {
               setAdding(true);
               try {
@@ -82,31 +126,46 @@ export default function DaysScreen() {
           </Pressable>
         </View>
       }
-      renderItem={({ item }) => {
+      renderItem={({ item, index }) => {
         const st = item.stats;
+        const at = new Date(item.startedAt);
+        const on = picked.includes(item.id);
+        const mix = pisteMix(item.pistes);
+        const total = mix.reduce((n, m) => n + m.n, 0);
+        const extra = [item.sport !== 'ski' ? sportInfo(item.sport).label : null, item.isDemo ? 'Demo' : null].filter(Boolean).join(', ');
         return (
           <Tap
-            style={[s.card, styles.row, picked.includes(item.id) && styles.picked]}
+            style={[styles.row, index === 0 && styles.first]}
             onPress={() => (picking ? toggle(item.id) : router.push(`/day/${item.id}`))}
+            accessibilityState={picking ? { selected: on } : undefined}
           >
-            {picking ? (
-              <Ionicons name={picked.includes(item.id) ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={colors.accent} />
-            ) : null}
-            <View style={{ flex: 1, gap: 2 }}>
+            {/* The date as a calendar stub: weekday over day of month. */}
+            <View style={[styles.date, on && styles.dateOn]}>
+              <Text style={[styles.weekday, on && { color: colors.onAccent }]}>{WEEKDAYS[at.getDay()]}</Text>
+              <Text style={[styles.dayNum, on && { color: colors.onAccent }]}>{at.getDate()}</Text>
+            </View>
+            <View style={styles.middle}>
               <Text style={s.h2} numberOfLines={1}>{item.place ?? 'Ski day'}</Text>
-              <Text style={s.muted}>
-                {fmtDate(item.startedAt)}{item.sport !== 'ski' ? ` · ${sportInfo(item.sport).label}` : ''}{item.isDemo ? ' · Demo' : ''}
-              </Text>
               {st ? (
-                <View style={styles.metrics}>
-                  <Metric icon="speedometer-outline" text={fmtSpeed(st.topSpeed, units)} />
-                  <Metric icon="trending-down" text={fmtAlt(st.verticalDown, units)} />
-                  <Metric icon="repeat" text={`${st.runCount} runs`} />
-                  <Metric icon="time-outline" text={fmtDuration(st.skiTime)} />
+                <Text style={[s.muted, styles.tabular]} numberOfLines={1}>
+                  {st.runCount} {st.runCount === 1 ? 'run' : 'runs'}, {fmtSpeed(st.topSpeed, units)} top, {fmtDuration(st.skiTime)}
+                </Text>
+              ) : null}
+              {extra ? <Text style={s.muted}>{extra}</Text> : null}
+              {total ? (
+                <View style={styles.mix} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  {mix.map((m) => (
+                    <View key={m.d} style={{ flex: m.n, backgroundColor: difficultyColor(m.d, dark) }} />
+                  ))}
                 </View>
               ) : null}
             </View>
-            {picking ? null : <Ionicons name="chevron-forward" size={20} color={colors.muted} />}
+            {st ? (
+              <View style={styles.right}>
+                <Text style={s.figure}>{fmtAlt(st.verticalDown, units, false)}</Text>
+                <Text style={s.muted}>{altUnit} down</Text>
+              </View>
+            ) : null}
           </Tap>
         );
       }}
@@ -114,31 +173,33 @@ export default function DaysScreen() {
   );
 }
 
-function Metric({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
-  const { colors } = useTheme();
-  const styles = useStyles(makeStyles);
-  return (
-    <View style={styles.metric}>
-      <Ionicons name={icon} size={14} color={colors.accent} />
-      <Text style={styles.metricText}>{text}</Text>
-    </View>
-  );
-}
-
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
-    list: { padding: 16, gap: 12 },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 2, borderColor: 'transparent' },
-    picked: { borderColor: colors.accent },
-    compare: {
-      flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 12, borderWidth: 1, borderColor: colors.accent, marginBottom: 2,
+    list: { paddingHorizontal: space.lg, paddingTop: space.sm },
+    hint: { paddingVertical: space.md },
+    month: { paddingTop: space.xl, paddingBottom: space.sm },
+    row: {
+      flexDirection: 'row', alignItems: 'center', gap: space.lg, paddingVertical: space.lg,
+      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.faint,
     },
-    compareText: { fontFamily: font.medium, fontSize: size.body, color: colors.accent },
-    metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 },
-    metric: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    metricText: { fontFamily: font.medium, fontSize: size.caption, color: colors.text, fontVariant: ['tabular-nums'] },
-    empty: { alignItems: 'center', gap: 12, paddingVertical: 32 },
-    demo: { backgroundColor: colors.accent, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8, minWidth: 160, alignItems: 'center' },
+    first: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.faint },
+    date: {
+      width: target.min + space.xs, height: target.min + space.md, borderRadius: radius.control,
+      backgroundColor: colors.liftSoft, alignItems: 'center', justifyContent: 'center',
+    },
+    dateOn: { backgroundColor: colors.accent },
+    weekday: { fontFamily: font.medium, fontSize: size.label, lineHeight: 14, color: colors.muted },
+    dayNum: { fontFamily: font.regular, fontSize: size.control, lineHeight: 26, color: colors.text, fontVariant: ['tabular-nums'] },
+    middle: { flex: 1, gap: 2 },
+    tabular: { fontVariant: ['tabular-nums'] },
+    mix: { flexDirection: 'row', height: 3, borderRadius: 2, overflow: 'hidden', gap: 2, marginTop: space.sm, maxWidth: 160 },
+    right: { alignItems: 'flex-end' },
+    headerAction: { paddingHorizontal: space.lg, minHeight: target.min, justifyContent: 'center' },
+    headerActionText: { fontFamily: font.medium, fontSize: size.body, color: colors.accent },
+    empty: { gap: space.md, paddingTop: space.xxxl },
+    demo: {
+      alignSelf: 'flex-start', backgroundColor: colors.accent, borderRadius: radius.control, paddingHorizontal: space.xl,
+      minHeight: target.min + space.xs, justifyContent: 'center', marginTop: space.sm, minWidth: 160, alignItems: 'center',
+    },
     demoText: { fontFamily: font.medium, fontSize: size.body, color: colors.onAccent },
   });

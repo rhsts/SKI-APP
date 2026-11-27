@@ -11,7 +11,7 @@ import { deleteSegment, getSegment, listAttempts } from '../../db';
 import { fmtAlt, fmtDate, fmtDelta, fmtDist, fmtRaceTime } from '../../lib/format';
 import { leaderboard, pathInfo, type Attempt, type Segment } from '../../lib/segments';
 import { useSettings } from '../../settings';
-import { font, useTheme, useStyles, type Palette } from '../../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../../theme';
 import { refreshRacers } from '../../tracking/tracker';
 
 export default function SegmentScreen() {
@@ -95,7 +95,7 @@ export default function SegmentScreen() {
         {myBest ? (
           <>
             <Text style={s.label}>Your best</Text>
-            <Text style={styles.big}>{fmtRaceTime(myBest.time)}</Text>
+            <Text style={styles.big} numberOfLines={1} adjustsFontSizeToFit>{fmtRaceTime(myBest.time)}</Text>
             <Text style={s.muted}>
               {myBest.rank === 1
                 ? board.length > 1 ? `Fastest of ${board.length}.` : 'Send it to a friend.'
@@ -105,7 +105,7 @@ export default function SegmentScreen() {
         ) : (
           <>
             <Text style={s.label}>Time to beat</Text>
-            <Text style={styles.big}>{leader ? fmtRaceTime(leader.time) : '–'}</Text>
+            <Text style={styles.big} numberOfLines={1} adjustsFontSizeToFit>{leader ? fmtRaceTime(leader.time) : '–'}</Text>
             <Text style={[s.muted, { textAlign: 'center' }]}>
               {leader ? `Set by ${leader.playerName}. ` : ''}Start recording and ski it: you’re timed automatically, with a
               live ghost to race against.
@@ -158,7 +158,7 @@ export default function SegmentScreen() {
           style={styles.attempt}
         >
           <Text style={s.body}>{fmtDate(a.at)}</Text>
-          <Text style={[styles.lbTime, { fontSize: 15 }]}>
+          <Text style={[styles.lbTime, { fontSize: size.body }]}>
             {a.id === myBest?.id ? 'Best · ' : ''}{fmtRaceTime(a.time)}
           </Text>
         </Pressable>
@@ -171,16 +171,16 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
     hero: { alignItems: 'center', gap: 4, paddingVertical: 20 },
-    big: { fontSize: 44, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
+    big: { fontSize: size.heroFit, lineHeight: 104, letterSpacing: -2, fontFamily: font.light, color: colors.text, fontVariant: ['tabular-nums'] },
     group: {
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 12, borderWidth: 1, borderColor: colors.accent,
+      borderRadius: radius.control, borderWidth: 1, borderColor: colors.accent,
     },
-    groupText: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },
-    invite: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16 },
-    inviteText: { color: colors.onAccent, fontSize: 17, fontFamily: font.medium },
+    groupText: { color: colors.accent, fontFamily: font.medium, fontSize: size.body },
+    invite: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent, borderRadius: radius.control, paddingVertical: 16 },
+    inviteText: { color: colors.onAccent, fontSize: size.body, fontFamily: font.medium },
     lbRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: 'transparent', paddingVertical: 12 },
-    rank: { fontSize: 20, width: 36, textAlign: 'center', fontFamily: font.medium, color: colors.muted },
-    lbTime: { fontSize: 17, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
+    rank: { fontSize: size.control, width: 36, textAlign: 'center', fontFamily: font.medium, color: colors.muted },
+    lbTime: { fontSize: size.body, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     attempt: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.faint },
   });

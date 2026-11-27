@@ -3,6 +3,7 @@
 //
 //   GOOGLE_MAPS_API_KEY  Google Maps key for Android maps (GitHub secret)
 //   BUILD_NUMBER         increases with every build so new APKs install over old ones
+//   ANDROID_KEYSTORE_*   the release signing key (see plugins/with-release-signing.js)
 module.exports = ({ config }) => {
   const mapsKey = process.env.GOOGLE_MAPS_API_KEY || '';
   const build = Number.parseInt(process.env.BUILD_NUMBER || '', 10);
@@ -10,7 +11,7 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
-    version: hasBuild ? `1.0.${build}` : config.version,
+    version: hasBuild ? `1.1.${build}` : config.version,
     android: {
       ...config.android,
       ...(hasBuild ? { versionCode: build } : {}),
@@ -18,6 +19,8 @@ module.exports = ({ config }) => {
     },
     plugins: [
       ...(config.plugins ?? []),
+      // Release APKs are signed with our own key (from GitHub secrets), not the public debug key.
+      './plugins/with-release-signing',
       [
         'expo-build-properties',
         {

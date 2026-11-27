@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fmtDate, fmtDelta, fmtRaceTime } from '../lib/format';
 import { compareSplits, pointAlong, progressAt, SECTION_NAMES } from '../lib/ghost';
 import { ghostTimeAt, GHOST_SAMPLES, leaderboard, type Attempt, type Segment } from '../lib/segments';
-import { font, useStyles, useTheme, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 import { SegmentMap } from './SegmentMap';
 
 interface Props {
@@ -164,11 +164,11 @@ export function RaceReplay({ segment, attempts, playerId }: Props) {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     playRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    play: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-    chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: colors.faint },
-    chipText: { fontFamily: font.medium, color: colors.text, fontSize: 13 },
+    play: { width: 44, height: 44, borderRadius: radius.control, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+    chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.faint },
+    chipText: { fontFamily: font.medium, color: colors.text, fontSize: size.caption },
     splits: { gap: 2 },
-    splitRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8 },
+    splitRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 4, borderRadius: radius.control },
     splitName: { flex: 1.2 },
     splitVal: { flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] },
   });

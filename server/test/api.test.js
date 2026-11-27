@@ -173,3 +173,15 @@ test('an upload that is too big gets an answer, not a dropped connection', async
   // The server still works afterwards.
   assert.equal((await call(anna, 'GET', '/v1/me')).status, 200);
 });
+
+test('when the group owner leaves, the longest-standing member takes over', async () => {
+  const [o, m1, m2] = ['p-own', 'p-m1', 'p-m2'].map(player);
+  const g = (await call(o, 'POST', '/v1/groups', { name: 'Hand over' })).json;
+  await call(m1, 'POST', '/v1/groups/join', { code: g.code });
+  await call(m2, 'POST', '/v1/groups/join', { code: g.code });
+  const c = (await call(m2, 'POST', `/v1/groups/${g.id}/challenges`, { date: '2025-02-01', segment: { id: 's-own', name: 'X', path: PATH } })).json;
+  assert.equal((await call(o, 'DELETE', `/v1/groups/${g.id}/members/me`)).status, 200);
+  assert.equal((await call(m1, 'GET', `/v1/groups/${g.id}`)).json.createdBy, 'p-m1');
+  // The new owner can tidy up the group's challenges.
+  assert.equal((await call(m1, 'DELETE', `/v1/groups/${g.id}/challenges/${c.id}`)).status, 200);
+});

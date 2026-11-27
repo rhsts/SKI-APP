@@ -3,6 +3,8 @@ name: Build Android APK
 # Builds an installable APK, checks on an Android emulator that it starts without
 # crashing, and only then attaches it to a GitHub Release.
 # Optional repository secret GOOGLE_MAPS_API_KEY enables maps.
+# Required repository secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and
+# ANDROID_KEY_PASSWORD sign the APK with our own key (README → "Release signing key").
 # Only runs when started by hand: GitHub → Actions → Build Android APK → Run workflow.
 on:
   workflow_dispatch:
@@ -56,10 +58,31 @@ jobs:
           echo "--- shrinking settings ---"
           grep -n -i "minify\|shrinkResources" android/gradle.properties android/app/build.gradle || true
 
+      # Never ship an APK signed with the public debug key: anyone could sign a fake "update" with it.
+      - name: Unpack the release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "::error::The release signing key is missing. Add the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets (README → Release signing key)."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
       - name: Build release APK
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         # arm64 for phones, x86_64 so the emulator check can run the same APK.
-        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,x86_64 --no-daemon
+        run: |
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,x86_64 --no-daemon
+          rm -f "$ANDROID_KEYSTORE_FILE"
 
       - name: Collect APK
         id: apk
@@ -72,6 +95,11 @@ jobs:
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
           SHA1=$("$APKSIGNER" verify --print-certs "$OUT" | sed -n 's/.*certificate SHA-1 digest: //p' | head -1 | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
           echo "Signing SHA-1: $SHA1"
+          # The public React Native / Android debug key: refuse to release anything signed with it.
+          if [ -z "$SHA1" ] || [ "$SHA1" = "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25" ]; then
+            echo "::error::The APK is signed with the public debug key, not the release key."
+            exit 1
+          fi
           echo "sha1=$SHA1" >> "$GITHUB_OUTPUT"
           if [ -n "$GOOGLE_MAPS_API_KEY" ]; then echo "maps=✅ Maps enabled" >> "$GITHUB_OUTPUT"; else echo "maps=⚠️ Built without a Google Maps key: maps show a placeholder. Add the GOOGLE_MAPS_API_KEY secret and run the workflow again." >> "$GITHUB_OUTPUT"; fi
 
@@ -126,14 +154,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Ski Tracker 1.0.${{ github.run_number }}
+          name: Ski Tracker 1.1.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: ${{ needs.build.outputs.file }}
           body: |
             **Install on Android:** tap `${{ needs.build.outputs.file }}` below → allow your browser to "install unknown apps" → Install.
             Updates install over the previous version and keep your data.
+            If Android says "App not installed", your phone has an older build signed with the old key: back up your days first (You → Back up all days), uninstall Ski Tracker, install this one, then You → Restore from a backup.
             ✔️ Checked on an Android emulator: the app starts and keeps running.
+
+            **New in 1.1:** Friends is a live map of who's on the mountain, every screen shares one design, recording and friends sync are more reliable, and release builds are signed with our own key. Full list: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/CHANGELOG.md).
 
             ${{ needs.build.outputs.maps }}
 

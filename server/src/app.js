@@ -25,6 +25,8 @@ const LOGIN_FAILS = 8; // wrong passwords per username…
 const LOGIN_WINDOW_MS = 15 * 60 * 1000; // …within this window lock it for the rest of the window
 const SERVER_PW_FAILS_PER_IP = 10; // wrong server passwords per client IP per window…
 const SERVER_PW_FAILS_TOTAL = 100; // …and from everyone together (so faking IPs doesn't help)
+const JOIN_FAILS = 10; // wrong group codes per client IP, and per player, per window…
+const JOIN_FAILS_TOTAL = 200; // …and from everyone together, so codes can't be guessed until one fits
 const DAY_MS = 24 * 3600 * 1000;
 const LIVE_FRESH_MS = 10 * 60 * 1000; // a position older than this is no longer "where they are"
 const PIN_AFTER_MEET_MS = 2 * 3600 * 1000; // a pin with a time stays this long after it
@@ -120,12 +122,18 @@ function validPath(path) {
 /**
  * `password`: the server password (SERVER_PASSWORD). When set, every request
  * except /v1/health must send it in the "X-Server-Password" header.
+ * `adminUsername` (ADMIN_USERNAME): when set, only that account is made admin
+ * automatically, instead of whoever registers first.
  */
-export function createApi(db, { password = '', clock = Date.now } = {}) {
+export function createApi(db, { password = '', adminUsername = '', clock = Date.now } = {}) {
+  adminUsername = String(adminUsername).trim().toLowerCase();
   const passwordHash = password ? createHash('sha256').update(password).digest() : null;
   const tooMany = 'Too many wrong passwords. Try again in 15 minutes.';
   const ipFails = failLimit(SERVER_PW_FAILS_PER_IP, LOGIN_WINDOW_MS, clock, tooMany);
   const allFails = failLimit(SERVER_PW_FAILS_TOTAL, LOGIN_WINDOW_MS, clock, tooMany);
+  const tooManyCodes = 'Too many wrong group codes. Try again in 15 minutes.';
+  const joinFails = failLimit(JOIN_FAILS, LOGIN_WINDOW_MS, clock, tooManyCodes); // keys: 'ip:…' and 'player:…'
+  const allJoinFails = failLimit(JOIN_FAILS_TOTAL, LOGIN_WINDOW_MS, clock, tooManyCodes);
   function checkPassword(given, ip, known) {
     if (!passwordHash) return;
     // Phones already set up on this server aren't locked out by someone else's guessing.
@@ -194,6 +202,8 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
     addGroup: q('INSERT INTO groups (id, name, code, created_by, created_at) VALUES (?, ?, ?, ?, ?)'),
     renameGroup: q('UPDATE groups SET name = ? WHERE id = ?'),
     deleteGroup: q('DELETE FROM groups WHERE id = ?'),
+    setGroupOwner: q('UPDATE groups SET created_by = ? WHERE id = ?'),
+    firstMember: q('SELECT player_id AS id FROM members WHERE group_id = ? ORDER BY joined_at LIMIT 1'),
     isMember: q('SELECT 1 AS ok FROM members WHERE group_id = ? AND player_id = ?'),
     addMember: q('INSERT OR IGNORE INTO members (group_id, player_id, joined_at) VALUES (?, ?, ?)'),
     removeMember: q('DELETE FROM members WHERE group_id = ? AND player_id = ?'),
@@ -246,6 +256,9 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
     deletePin: q('DELETE FROM pins WHERE group_id = ?'),
     deletePinBy: q('DELETE FROM pins WHERE group_id = ? AND created_by = ?'),
   };
+
+  // ADMIN_USERNAME also covers an account that already exists.
+  if (adminUsername) db.prepare('UPDATE players SET is_admin = 1 WHERE username = ?').run(adminUsername);
 
   // Where each skier was last, while they record: player id -> { lat, lon, at }. In memory on
   // purpose: it is only worth something for a few minutes, and nobody's whereabouts get stored.
@@ -406,8 +419,8 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
       const pw = validPassword(body?.password);
       if (stmt.byUsername.get(username)) throw new HttpError(409, 'That username is taken');
       const name = str(body?.name, 30) || me.name;
-      // The first account on a server runs it.
-      const admin = stmt.anyAdmin.get() ? 0 : 1;
+      // ADMIN_USERNAME picks who runs the server; without it, the first account does.
+      const admin = adminUsername ? Number(username === adminUsername) : stmt.anyAdmin.get() ? 0 : 1;
       stmt.register.run(username, hashPassword(pw), name, admin, me.id);
       return meInfo(me);
     }],
@@ -559,10 +572,19 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
       });
     }],
 
-    ['POST', /^\/v1\/groups\/join$/, (me, _p, body) => {
+    ['POST', /^\/v1\/groups\/join$/, (me, _p, body, _q, ip) => {
+      // A group shows where its members are right now, so its code must not be guessable by trying.
+      joinFails.check(`ip:${ip}`);
+      joinFails.check(`player:${me.id}`);
+      allJoinFails.check('');
       const code = str(body?.code, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
       const g = code ? stmt.groupByCode.get(code) : null;
-      if (!g) throw new HttpError(404, 'No group with that code');
+      if (!g) {
+        joinFails.fail(`ip:${ip}`);
+        joinFails.fail(`player:${me.id}`);
+        allJoinFails.fail('');
+        throw new HttpError(404, 'No group with that code', 'join');
+      }
       join(g, me);
       return { ...g, members: stmt.memberCount.get(g.id).n };
     }],
@@ -591,6 +613,8 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
         stmt.removeMember.run(g.id, me.id);
         stmt.deletePinBy.run(g.id, me.id); // nobody left who could clear it
         if (stmt.memberCount.get(g.id).n === 0) stmt.deleteGroup.run(g.id);
+        // The owner left: whoever has been in the group longest takes over (removing challenges).
+        else if (g.createdBy === me.id) stmt.setGroupOwner.run(stmt.firstMember.get(g.id).id, g.id);
       });
       return { ok: true };
     }],
@@ -737,10 +761,11 @@ export function createApi(db, { password = '', clock = Date.now } = {}) {
       } catch {
         throw new HttpError(400, 'Invalid address'); // e.g. /v1/groups/%zz
       }
+      const clientIp = String(headers['cf-connecting-ip'] || ip);
       const cred = credentials(headers.authorization);
-      checkPassword(headers['x-server-password'], String(headers['cf-connecting-ip'] || ip), !!cred?.known);
+      checkPassword(headers['x-server-password'], clientIp, !!cred?.known);
       const me = auth(cred);
-      return [200, fn(me, params, body, u.searchParams)];
+      return [200, fn(me, params, body, u.searchParams, clientIp)];
     }
     throw new HttpError(404, 'Not found');
   }
@@ -784,7 +809,7 @@ export function listener(api, log = () => undefined) {
       } catch (e) {
         status = e instanceof HttpError ? e.status : 500;
         out = { error: e instanceof HttpError ? e.message : 'Server error', ...(e?.code ? { code: e.code } : {}) };
-        if (e?.code === 'password' || e?.code === 'login') delay = WRONG_PASSWORD_DELAY_MS;
+        if (e?.code === 'password' || e?.code === 'login' || e?.code === 'join') delay = WRONG_PASSWORD_DELAY_MS;
         if (!(e instanceof HttpError)) log(e);
       }
       const send = () => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(out));

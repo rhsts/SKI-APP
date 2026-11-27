@@ -7,7 +7,7 @@ import type { LatLon } from '../lib/geo';
 import type { LiveMember } from '../lib/groups';
 import type { TrailMap } from '../lib/trailmap';
 import type { TrackPoint } from '../lib/types';
-import { radius, useStyles, useTheme, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 import { TrailOverlay } from './TrailOverlay';
 import { mapsAvailable } from '../lib/mapsAvailable';
 import { MapPlaceholder } from './MapPlaceholder';
@@ -75,12 +75,12 @@ export function LiveMap({ points, trail, center, follow = true, friends = [], pi
         ))}
         {pins.map((p) => (
           <ViewMarker key={`${p.groupId}:${p.createdAt}`} coordinate={{ latitude: p.lat, longitude: p.lon }} anchor={{ x: 0.5, y: 1 }} zIndex={4}>
-            <Ionicons name="flag" size={32} color={colors.danger} />
+            <Ionicons name="flag" size={32} color={colors.text} />
           </ViewMarker>
         ))}
         {draft ? (
           <ViewMarker key={`draft:${draft.lat},${draft.lon}`} coordinate={{ latitude: draft.lat, longitude: draft.lon }} anchor={{ x: 0.5, y: 1 }} zIndex={5}>
-            <Ionicons name="flag-outline" size={32} color={colors.danger} />
+            <Ionicons name="flag-outline" size={32} color={colors.text} />
           </ViewMarker>
         ) : null}
       </MapView>
@@ -95,5 +95,5 @@ const makeStyles = (colors: Palette) =>
       width: 28, height: 28, borderRadius: 14, backgroundColor: colors.accent, borderWidth: 2, borderColor: colors.onAccent,
       alignItems: 'center', justifyContent: 'center',
     },
-    initial: { color: colors.onAccent, fontSize: 13, fontWeight: '600' },
+    initial: { color: colors.onAccent, fontFamily: font.medium, fontSize: size.caption },
   });

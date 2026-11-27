@@ -6,13 +6,13 @@ import { createBackup, importTracks, restoreBackup } from '../../days/files';
 import { deleteAllData, deleteDemoData, deleteTrailMaps } from '../../db';
 import type { Units } from '../../lib/types';
 import { updateSettings, useSettings } from '../../settings';
-import { font, useTheme, useStyles, type Palette } from '../../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../../theme';
 import { addDemoDay } from '../../tracking/demo';
 import { AccountCard } from '../../components/AccountCard';
 import { checkServer } from '../../friends/api';
 import { leaveLive } from '../../friends/live';
 import { resetFriendsCache, syncFriends } from '../../friends/sync';
-import { normalizeServerUrl } from '../../lib/groups';
+import { INSECURE_SERVER_MESSAGE, isInsecureServerUrl, normalizeServerUrl } from '../../lib/groups';
 import { refreshGeofences, requestReminderPermissions } from '../../tracking/geofence';
 import { useTracker } from '../../tracking/tracker';
 import { Row as LinkRow, Rows } from '../../components/Row';
@@ -34,6 +34,10 @@ export default function ProfileScreen() {
     const url = normalizeServerUrl(server);
     if (!url) {
       dialog('That’s not a web address', 'For example https://ski.example.com');
+      return;
+    }
+    if (isInsecureServerUrl(url)) {
+      dialog('Use https for this address', INSECURE_SERVER_MESSAGE);
       return;
     }
     setBusy('server');
@@ -353,9 +357,9 @@ const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 32 },
     section: { gap: 12 },
-    input: { fontSize: 17, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
-    segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: 12, padding: 4 },
-    segBtn: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+    input: { fontSize: size.body, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.faint, paddingVertical: 8 },
+    segment: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: radius.control, padding: 4 },
+    segBtn: { flex: 1, paddingVertical: 12, borderRadius: radius.control, alignItems: 'center' },
     segOn: { backgroundColor: colors.accent },
     segText: { fontFamily: font.medium, color: colors.text },
     switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

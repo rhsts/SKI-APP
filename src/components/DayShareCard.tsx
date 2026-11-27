@@ -1,10 +1,10 @@
 import { useMemo, type ComponentRef, type Ref } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { ClipPath, Defs, G, LinearGradient, Polyline, Rect, Stop } from 'react-native-svg';
+import Svg, { Polyline } from 'react-native-svg';
 import { fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed } from '../lib/format';
 import { localProjector } from '../lib/geo';
 import type { Activity, DayStats, TrackPoint, Units } from '../lib/types';
-import { font, speedColor } from '../theme';
+import { font, LIGHT, size, space, speedColor } from '../theme';
 
 interface Props {
   points: TrackPoint[]; // cleaned
@@ -20,12 +20,11 @@ interface Props {
 export const CARD_W = 360;
 export const CARD_H = 450; // 4:5, the shape Instagram and WhatsApp status like
 
-const MAP_H = 220;
-const MAP_Y = 64;
-const PAD = 22;
+const MAP_H = 136;
+const PAD = space.xl;
 
 /**
- * A poster of your day to share as an image. Fixed dark design (independent of
+ * A poster of your day to share as an image. Fixed snow-white design (independent of
  * the app theme) so it looks the same wherever it's posted. The route is drawn
  * in SVG instead of using the map, which can't be captured reliably on Android.
  */
@@ -34,58 +33,60 @@ export function DayShareCard({ points, speeds, stats, place, startedAt, units, r
 
   return (
     <View ref={ref} collapsable={false} style={styles.card}>
-      <Svg width={CARD_W} height={CARD_H} style={StyleSheet.absoluteFill}>
-        <Defs>
-          <LinearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#0B2545" />
-            <Stop offset="1" stopColor="#081421" />
-          </LinearGradient>
-          <ClipPath id="map">
-            <Rect x={PAD} y={MAP_Y} width={CARD_W - 2 * PAD} height={MAP_H} />
-          </ClipPath>
-        </Defs>
-        <Rect x={0} y={0} width={CARD_W} height={CARD_H} fill="url(#bg)" />
-        {/* A G, not a nested Svg: Android's react-native-svg ignores x/y on nested Svg. */}
-        <G clipPath="url(#map)">
-          <G transform={`translate(${PAD}, ${MAP_Y})`}>
-            {lines.map((l, i) => (
-              <Polyline
-                key={i}
-                points={l.points}
-                fill="none"
-                stroke={l.color}
-                strokeWidth={l.lift ? 1.5 : 3.5}
-                strokeDasharray={l.lift ? '5,4' : undefined}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={l.lift ? 0.6 : 1}
-              />
-            ))}
-          </G>
-        </G>
-      </Svg>
+      <View style={styles.head}>
+        <Text allowFontScaling={false} style={styles.title} numberOfLines={1}>{place ?? 'Ski day'}</Text>
+        <Text allowFontScaling={false} style={styles.caption}>{fmtDate(startedAt)}</Text>
+      </View>
 
-      <Text allowFontScaling={false} style={styles.brand}>SKI TRACKER</Text>
-      <Text allowFontScaling={false} style={styles.title} numberOfLines={1}>{place ?? 'Ski day'}</Text>
-      <Text allowFontScaling={false} style={styles.date}>{fmtDate(startedAt)}</Text>
+      {/* Fast is deep glacier, slow is pale ice: the same ramp as the app's maps, on snow white. */}
+      <View style={styles.map}>
+        <Svg width={CARD_W - 2 * PAD} height={MAP_H}>
+          {lines.map((l, i) => (
+            <Polyline
+              key={i}
+              points={l.points}
+              fill="none"
+              stroke={l.color}
+              strokeWidth={l.lift ? 1.5 : 3.5}
+              strokeDasharray={l.lift ? '5,4' : undefined}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+        </Svg>
+      </View>
+
+      <View style={styles.hero}>
+        <Text allowFontScaling={false} style={styles.caption}>Vertical</Text>
+        <View style={styles.heroRow}>
+          <Text allowFontScaling={false} style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit>
+            {fmtAlt(stats.verticalDown, units, false)}
+          </Text>
+          <Text allowFontScaling={false} style={styles.unit}>{units === 'metric' ? 'm' : 'ft'}</Text>
+        </View>
+      </View>
 
       <View style={styles.grid}>
-        <Big label="Top speed" value={fmtSpeed(stats.topSpeed, units)} />
-        <Big label="Vertical" value={fmtAlt(stats.verticalDown, units)} />
-        <Big label="Runs" value={String(stats.runCount)} />
-        <Big label="Ski time" value={fmtDuration(stats.skiTime)} />
-        <Big label="Distance" value={fmtDist(stats.skiDistance, units)} />
-        <Big label="Peak" value={fmtAlt(stats.maxAlt, units)} />
+        <Small label="Top speed" value={fmtSpeed(stats.topSpeed, units)} />
+        <Small label="Runs" value={String(stats.runCount)} />
+        <Small label="Ski time" value={fmtDuration(stats.skiTime)} />
+      </View>
+      <View style={styles.grid}>
+        <Small label="Distance" value={fmtDist(stats.skiDistance, units)} />
+        <Small label="Peak" value={fmtAlt(stats.maxAlt, units)} />
+        <View style={styles.cell}>
+          <Text allowFontScaling={false} style={[styles.caption, styles.brand]}>Ski Tracker</Text>
+        </View>
       </View>
     </View>
   );
 }
 
-function Big({ label, value }: { label: string; value: string }) {
+function Small({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.cell}>
+      <Text allowFontScaling={false} style={styles.caption}>{label}</Text>
       <Text allowFontScaling={false} style={styles.value} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-      <Text allowFontScaling={false} style={styles.label}>{label}</Text>
     </View>
   );
 }
@@ -121,7 +122,7 @@ function buildLines(points: TrackPoint[], speeds: number[], activities: Activity
   const lines: Line[] = [];
   const step = Math.max(1, Math.floor(points.length / 1500));
   for (const a of activities) {
-    if (a.kind === 'lift') lines.push({ points: pts(a.startIndex, a.endIndex, step * 3), color: '#9FB3C8', lift: true });
+    if (a.kind === 'lift') lines.push({ points: pts(a.startIndex, a.endIndex, step * 3), color: LIGHT.lift, lift: true });
     if (a.kind !== 'run') continue;
     const chunk = Math.max(step * 2, 6);
     for (let i = a.startIndex; i < a.endIndex; i += chunk) {
@@ -136,12 +137,17 @@ function buildLines(points: TrackPoint[], speeds: number[], activities: Activity
 
 const styles = StyleSheet.create({
   // No borderRadius: this view is captured to PNG and rounded corners would come out transparent.
-  card: { width: CARD_W, height: CARD_H, overflow: 'hidden', backgroundColor: '#081421' },
-  brand: { position: 'absolute', top: 18, left: PAD, color: '#7FB3E6', fontSize: 11, fontFamily: font.medium, letterSpacing: 1.5 },
-  title: { position: 'absolute', top: 32, left: PAD, right: PAD, color: '#FFFFFF', fontSize: 20, fontFamily: font.medium },
-  date: { position: 'absolute', top: 17, right: PAD, color: '#9FB3C8', fontSize: 12, fontFamily: font.medium },
-  grid: { position: 'absolute', left: PAD, right: PAD, bottom: PAD, flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
-  cell: { width: '33.33%' },
-  value: { color: '#FFFFFF', fontSize: 20, fontFamily: font.medium, fontVariant: ['tabular-nums'] },
-  label: { color: '#9FB3C8', fontSize: 11, fontFamily: font.medium, textTransform: 'uppercase', letterSpacing: 0.8 },
+  card: { width: CARD_W, height: CARD_H, overflow: 'hidden', backgroundColor: LIGHT.bg, padding: PAD, gap: space.lg },
+  head: { gap: 2 },
+  title: { color: LIGHT.text, fontSize: size.figure, lineHeight: 32, letterSpacing: -0.5, fontFamily: font.medium },
+  caption: { color: LIGHT.muted, fontSize: size.caption, lineHeight: 18, fontFamily: font.medium },
+  map: { borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: LIGHT.faint },
+  hero: { marginTop: -space.xs },
+  heroRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.xs },
+  heroValue: { color: LIGHT.text, fontSize: 56, lineHeight: 62, letterSpacing: -1.5, fontFamily: font.light, fontVariant: ['tabular-nums'], flexShrink: 1 },
+  unit: { color: LIGHT.muted, fontSize: size.control, fontFamily: font.regular },
+  grid: { flexDirection: 'row', marginTop: -space.sm },
+  cell: { width: '33.33%', gap: 2 },
+  value: { color: LIGHT.text, fontSize: size.control, lineHeight: 26, fontFamily: font.regular, fontVariant: ['tabular-nums'] },
+  brand: { textAlign: 'right', marginTop: 'auto' },
 });

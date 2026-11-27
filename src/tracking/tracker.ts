@@ -4,7 +4,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 import {
-  createSession, deleteMotionEvent, deleteSession, deleteUnfinishedSessions, finishSession, getPoints, getSession, insertMotionEvents, insertPoints, kvGet, kvSet,
+  createSession, deleteMotionEvent, deleteSession, deleteUnfinishedSessions, finishSession, getPoints, getSessionEnd, insertMotionEvents, insertPoints, kvGet, kvSet,
   listAttempts, listMotionEvents, listSegments, listTrailMaps, upsertAttempts,
 } from '../db';
 import { EMPTY_MOTION, summariseMotion, type MotionEvent, type MotionSummary } from '../lib/motion';
@@ -28,7 +28,7 @@ import { lookupPistes } from '../mountain/pistes';
 import { refreshGeofences } from './geofence';
 import { showLockScreen, startTrackingService, stopTrackingService } from './lockscreen';
 import { lookupPlace } from './place';
-import { LOCATION_TASK, locationTaskOptions, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
+import { LOCATION_TASK, locationTaskOptions, plausibleFixes, readActive, resetGpsState, toTrackPoint, type ActiveSession } from './task';
 
 /**
  * Recording state shared by every screen. GPS fixes go GPS → SQLite (via the
@@ -136,6 +136,7 @@ export function useTracker(): TrackerState {
 const BACKGROUND_STATS_MS = 15000;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let lastStatsAt = 0;
+let lastStatsCost = 0;
 let polling = false;
 
 async function poll() {
@@ -166,9 +167,12 @@ async function pollOnce() {
   const now = Date.now();
   const every = AppState.currentState === 'background' ? BACKGROUND_STATS_MS : points.length > 6000 ? 3000 : 1000;
   let stats = state.stats;
-  if (!stats || now - lastStatsAt >= every) {
+  // On a long day one pass can take seconds on a phone, on the same thread as the screen: wait at
+  // least 4 times as long as the last pass took, so the stats never use more than a fifth of it.
+  if (!stats || now - lastStatsAt >= Math.max(every, lastStatsCost * 4)) {
     stats = computeStats(points);
-    lastStatsAt = now;
+    lastStatsAt = Date.now();
+    lastStatsCost = lastStatsAt - now;
   }
   const tail = cleanTrack(points.slice(-8));
   const spd = tail.length ? smoothedSpeeds(tail) : [0];
@@ -416,8 +420,10 @@ async function startSource(a: ActiveSession): Promise<void> {
     // Expo Go on iOS, or "Allow all the time" refused: track while the app is open
     // and keep the screen awake so the phone doesn't stop GPS.
     watchSub = await Location.watchPositionAsync(options, (loc) => {
+      const [p] = plausibleFixes([toTrackPoint(loc)], a.startedAt);
+      if (!p) return;
       readPressure()
-        .then((pres) => insertPoints(a.sessionId, [{ ...toTrackPoint(loc), pres }]))
+        .then((pres) => insertPoints(a.sessionId, [{ ...p, pres }]))
         .catch((e) => set({ error: String(e) }));
     });
     await activateKeepAwakeAsync('ski-tracking');
@@ -688,7 +694,7 @@ export async function recoverActiveDay(): Promise<void> {
   // Leftovers of a start that was interrupted.
   await deleteUnfinishedSessions(a?.sessionId ?? null).catch(() => undefined);
   // Killed while finishing: the day was already saved (or deleted as too short).
-  const s = a ? await getSession(a.sessionId) : null;
+  const s = a ? await getSessionEnd(a.sessionId) : null;
   if (!a || !s || s.endedAt != null) {
     if (a) await saveActive(null);
     // Nothing is being recorded: a notification left behind would say otherwise.
@@ -710,6 +716,8 @@ export async function recoverActiveDay(): Promise<void> {
     await loadMotion(a.sessionId);
     await refreshRacers();
     startPolling();
+    // Killed and reopened: the sensors this screen ran were gone with it.
+    await startBarometer();
     if (getSettings().motion) await startMotionSensor(a);
     await syncLockScreen();
     return;

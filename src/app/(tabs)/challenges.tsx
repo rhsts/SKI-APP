@@ -13,7 +13,7 @@ import { useSettings } from '../../settings';
 import { cachedChallenges, cachedGroups, syncFriends, type CachedChallenge } from '../../friends/sync';
 import type { Group } from '../../lib/groups';
 import { localDate } from '../../lib/groups';
-import { font, useTheme, useStyles, type Palette } from '../../theme';
+import { font, radius, useTheme, useStyles, type Palette } from '../../theme';
 import { useTabBarSpace } from '../../components/TabBar';
 
 interface Row {
@@ -187,7 +187,7 @@ const makeStyles = (colors: Palette) =>
     list: { padding: 16, gap: 12 },
     paste: {
       flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12,
-      borderRadius: 12, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
+      borderRadius: radius.control, borderWidth: 1, borderColor: colors.accent, borderStyle: 'dashed', marginBottom: 4,
     },
     groupsHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
     link: { color: colors.accent, fontFamily: font.medium, fontSize: 15 },

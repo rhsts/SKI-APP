@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import type { BottomTabBarProps } from 'expo-router/tabs';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chromeShadow, font, size, space, target, useStyles, useTheme, type Palette } from '../theme';
 import { useTracker } from '../tracking/tracker';
@@ -24,7 +23,7 @@ export function useTabBarSpace(): number {
   return gapBelow(useSafeAreaInsets().bottom) + HEIGHT + space.xl;
 }
 
-/** A floating glass pill over the content: four thin icons with small labels. */
+/** A floating pill over the content: four thin icons with small labels. */
 export function TabBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
@@ -35,9 +34,8 @@ export function TabBar({ state, emitter, navigateToTab, insets }: BottomTabBarPr
     <View style={[styles.wrap, { bottom: gapBelow(insets.bottom) }]} pointerEvents="box-none">
       <View style={[styles.lift, { boxShadow: chromeShadow(dark) }]}>
         <View style={styles.bar} accessibilityRole="tablist">
-          {/* Real blur on iOS. Android without a blur target would only be see-through, so it gets a solid surface. */}
-          {Platform.OS === 'ios' ? <BlurView intensity={40} tint={dark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} /> : null}
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'ios' ? colors.glass : colors.card }]} />
+          {/* A solid surface: Android without a blur target would only be see-through. */}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
           {TABS.map((tab) => {
             const route = state.routes.find((r) => r.name === tab.name);
             if (!route) return null;

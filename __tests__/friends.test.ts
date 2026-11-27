@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import http from 'node:http';
 import path from 'node:path';
 import {
-  cleanCode, dayUpload, parseInvite, localDate, normalizeServerUrl, rankBoard, rankChallenge, type BoardRow,
+  cleanCode, dayUpload, isInsecureServerUrl, parseInvite, localDate, normalizeServerUrl, rankBoard, rankChallenge, type BoardRow,
 } from '../src/lib/groups';
 import { simulateDay } from '../src/lib/sim';
 import { packDay, unpackDay, fromBase64, toBase64 } from '../src/lib/trackpack';
@@ -87,6 +87,18 @@ describe('group leaderboards', () => {
     expect(normalizeServerUrl('not a url')).toBeNull();
     expect(normalizeServerUrl('')).toBeNull();
     expect(cleanCode(' ab c-12 3 ')).toBe('ABC123');
+  });
+
+  it('allows plain http only for home network addresses', () => {
+    for (const ok of ['http://192.168.1.20:8787', 'http://10.0.0.5', 'http://172.20.1.1:8787', 'http://127.0.0.1:8787',
+      'http://localhost:8787', 'http://skipi.local:8787', 'http://100.101.102.103:8787', 'http://[fd12:3456::1]:8787',
+      'https://ski.example.com', 'https://8.8.8.8']) {
+      expect(isInsecureServerUrl(ok)).toBe(false);
+    }
+    for (const bad of ['http://ski.example.com', 'http://8.8.8.8:8787', 'http://172.32.0.1', 'http://100.128.0.1',
+      'http://[2001:db8::1]:8787', 'http://192.168.1.20.example.com']) {
+      expect(isInsecureServerUrl(bad)).toBe(true);
+    }
   });
 });
 

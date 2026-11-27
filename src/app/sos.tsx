@@ -10,7 +10,7 @@ import { emergencyNumbers, formatCoords } from '../lib/emergency';
 import { mapFor, nearestFeature } from '../lib/trailmap';
 import { fmtAlt, fmtTimeOfDay } from '../lib/format';
 import { useSettings } from '../settings';
-import { font, useStyles, useTheme, type Palette } from '../theme';
+import { font, radius, size, useStyles, useTheme, type Palette } from '../theme';
 import { useTracker } from '../tracking/tracker';
 
 /**
@@ -64,7 +64,7 @@ export default function SosScreen() {
       {numbers.map((n, k) => (
         <Tap key={n} onPress={() => call(n)} style={[styles.call, k > 0 && styles.callAlt]}>
           <Ionicons name="call" size={k === 0 ? 28 : 20} color={k === 0 ? '#fff' : colors.danger} />
-          <Text style={[styles.callText, k > 0 && { color: colors.danger, fontSize: 17 }]}>Call {n}</Text>
+          <Text style={[styles.callText, k > 0 && { color: colors.danger, fontSize: size.body }]}>Call {n}</Text>
         </Tap>
       ))}
       <Text style={[s.muted, { textAlign: 'center' }]}>
@@ -135,11 +135,11 @@ export default function SosScreen() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     content: { padding: 16, gap: 12, paddingBottom: 40 },
-    call: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: 16, minHeight: 76 },
+    call: { flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.danger, borderRadius: radius.control, minHeight: 76 },
     callAlt: { backgroundColor: 'transparent', borderWidth: 2, borderColor: colors.danger, minHeight: 52 },
-    callText: { color: '#fff', fontSize: 24, fontFamily: font.medium },
-    coords: { fontSize: 20, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
+    callText: { color: '#fff', fontSize: size.figure, fontFamily: font.medium },
+    coords: { fontSize: size.control, fontFamily: font.medium, color: colors.text, fontVariant: ['tabular-nums'] },
     row: { flexDirection: 'row', gap: 12, marginTop: 4 },
-    btn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.accent },
+    btn: { flex: 1, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: radius.control, borderWidth: 1, borderColor: colors.accent },
     btnText: { color: colors.accent, fontFamily: font.medium },
   });

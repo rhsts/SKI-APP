@@ -44,6 +44,21 @@ export function toTrackPoint(l: Location.LocationObject): TrackPoint {
   };
 }
 
+/** A fix this long before Start is a cached one (the hotel, the car park): not part of the day. */
+const STALE_BEFORE_START_MS = 60_000;
+/** A fix stamped this far ahead of the phone's clock has a broken time. */
+const MAX_FUTURE_MS = 5 * 60_000;
+
+/**
+ * Drops fixes whose time can't belong to this day. Android can hand over its last known
+ * position (often hours old and far away) as the first fix, and some GPS chips report broken
+ * times. Kept, a stale fix stretches the day's duration and distance, and a fix from the
+ * future stops the Record screen from showing any newer fix for the rest of the day.
+ */
+export function plausibleFixes<P extends { t: number }>(pts: P[], startedAt: number, now = Date.now()): P[] {
+  return pts.filter((p) => Number.isFinite(p.t) && p.t >= startedAt - STALE_BEFORE_START_MS && p.t <= now + MAX_FUTURE_MS);
+}
+
 /**
  * Options for background location updates in a given battery mode.
  * `ownService`: Android only. expo-location runs its own foreground service, with a fixed
@@ -104,8 +119,10 @@ if (!TaskManager.isTaskDefined(LOCATION_TASK)) {
     if (error || !data?.locations?.length) return;
     const active = await readActive();
     if (!active || active.paused || active.source !== 'gps') return;
+    const pts = plausibleFixes(data.locations.map(toTrackPoint), active.startedAt);
+    if (!pts.length) return;
     const pres = await readPressure();
-    const pts = data.locations.map((l) => ({ ...toTrackPoint(l), pres }));
+    for (const p of pts) p.pres = pres;
     await insertPoints(active.sessionId, pts);
     const last = pts[pts.length - 1];
     prefetchTrailMap(last.lat, last.lon, last.t).catch(() => undefined); // no await: never hold up recording

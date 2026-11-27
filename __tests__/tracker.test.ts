@@ -22,7 +22,7 @@ jest.mock('../src/db', () => ({
   deleteSession: jest.fn(async (id: string) => { mockSessions.delete(id); }),
   deleteUnfinishedSessions: jest.fn(async () => undefined),
   finishSession: (...a: [string, number, unknown, string | null]) => mockFinish(...a),
-  getSession: jest.fn(async (id: string) => (mockSessions.has(id) ? { id, ...mockSessions.get(id) } : null)),
+  getSessionEnd: jest.fn(async (id: string) => (mockSessions.has(id) ? { endedAt: mockSessions.get(id)!.endedAt } : null)),
   getPoints: jest.fn(async (_id: string, after = -1) => mockPoints.filter((p) => p.t > after)),
   insertPoints: jest.fn(async () => undefined),
   insertMotionEvents: jest.fn(async () => undefined),
@@ -39,6 +39,7 @@ jest.mock('../src/tracking/task', () => ({
   locationTaskOptions: () => ({}),
   resetGpsState: jest.fn(async () => undefined),
   toTrackPoint: (l: unknown) => l,
+  plausibleFixes: (p: unknown[]) => p,
   readActive: jest.fn(async () => { const raw = mockKv.get('active'); return raw ? JSON.parse(raw) : null; }),
 }));
 jest.mock('../src/tracking/lockscreen', () => ({

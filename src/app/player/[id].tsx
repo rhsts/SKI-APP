@@ -12,7 +12,7 @@ import { fmtAlt, fmtDate, fmtDist, fmtDuration, fmtSpeed } from '../../lib/forma
 import { badgeInfo } from '../../lib/goals';
 import { dateToMs } from '../../lib/groups';
 import { useSettings } from '../../settings';
-import { font, useStyles, useTheme, type Palette } from '../../theme';
+import { font, size, useStyles, useTheme, type Palette } from '../../theme';
 
 /** A skier's profile, as their friends see it: picture, season totals, recent days and badges. */
 export default function PlayerScreen() {
@@ -108,5 +108,5 @@ const makeStyles = (colors: Palette) =>
     dayRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     badge: { width: '31%', alignItems: 'center', gap: 2, paddingVertical: 12, paddingHorizontal: 8 },
-    badgeTitle: { fontSize: 12, fontFamily: font.medium, color: colors.text, textAlign: 'center' },
+    badgeTitle: { fontSize: size.caption, fontFamily: font.medium, color: colors.text, textAlign: 'center' },
   });
