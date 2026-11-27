@@ -177,6 +177,32 @@ export function normalizeServerUrl(input: string): string | null {
   return `${m[1].toLowerCase()}://${m[2].toLowerCase()}${m[3] ?? ''}${m[4] ?? ''}`;
 }
 
+/** Addresses that only exist on a home network (or on your own Tailscale network). */
+export function isHomeNetworkHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === 'localhost' || /\.(local|lan|home|internal|home\.arpa)$/.test(h)) return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31)
+      || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127); // 100.64/10: Tailscale
+  }
+  // IPv6: loopback, unique local (fc00::/7) and link-local (fe80::/10).
+  return h === '::1' || /^f[cd][0-9a-f]{2}:/.test(h) || /^fe[89ab][0-9a-f]:/.test(h);
+}
+
+/**
+ * Plain http sends the server password and this phone's login unencrypted, which is only
+ * acceptable inside a home network. Anything reachable over the internet must use https.
+ */
+export function isInsecureServerUrl(url: string): boolean {
+  const m = /^http:\/\/(\[[^\]]+\]|[^/:]+)/i.exec(url);
+  return !!m && !isHomeNetworkHost(m[1]);
+}
+
+export const INSECURE_SERVER_MESSAGE =
+  'Plain http only works for a server on your home network. Over the internet, use the https:// address (for example your Cloudflare Tunnel or Tailscale address).';
+
 /** Group codes are 6 letters/digits; people type them in any case and with spaces. */
 export function cleanCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);

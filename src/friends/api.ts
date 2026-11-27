@@ -1,7 +1,7 @@
 import type {
   BoardRow, ChallengeRow, DayUpload, Group, GroupChallenge, GroupDetail, GroupLive, Pin,
 } from '../lib/groups';
-import { segmentUpload } from '../lib/groups';
+import { INSECURE_SERVER_MESSAGE, isInsecureServerUrl, segmentUpload } from '../lib/groups';
 import type { Segment } from '../lib/segments';
 import { displayName, getSettings, updateSettings } from '../settings';
 
@@ -32,6 +32,8 @@ async function call<T>(
   timeoutMs = TIMEOUT_MS,
 ): Promise<T> {
   if (!base) throw new FriendsError('Set up your friends server under You first.');
+  // Also covers addresses saved before this check existed: never send the login over plain http to the internet.
+  if (isInsecureServerUrl(base)) throw new FriendsError(INSECURE_SERVER_MESSAGE);
   const { deviceId, deviceSecret } = getSettings();
   const ctrl = new AbortController();
   // The timer covers reading the answer too: a download that stalls halfway must not hang for ever.
