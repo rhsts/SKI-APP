@@ -12,8 +12,8 @@ import { useTabBarSpace } from '../../components/TabBar';
 import { Tap } from '../../components/Tap';
 import { listTrailMaps } from '../../db';
 import { refreshLive, useLive } from '../../friends/live';
-import { cachedGroups } from '../../friends/sync';
-import { friendLine, friendsHeadline, sortFriends } from '../../lib/friendsMap';
+import { cachedFriends, cachedGroups, refreshFriends } from '../../friends/sync';
+import { friendLine, friendList, friendsHeadline, type Friend } from '../../lib/friendsMap';
 import type { LatLon } from '../../lib/geo';
 import type { Group } from '../../lib/groups';
 import { mapFor, nearestFeature, type TrailMap } from '../../lib/trailmap';
@@ -24,9 +24,12 @@ import { useTracker } from '../../tracking/tracker';
 /** How often the open tab asks where everyone is. While you record, the tracker asks too; calls share one request. */
 const REFRESH_MS = 20_000;
 
+type Mode = 'list' | 'map';
+
 /**
- * Friends: a map of everyone in your groups who is skiing right now, the meet-up pin,
- * and a short list underneath. The map stays put while the list scrolls. Leaderboards, groups and challenges are one tap away.
+ * Friends: opens on a list of everyone in your groups, with whoever is skiing right now on top.
+ * The map (live positions and the meet-up pin) is one tap away, or tap someone who's out to see them on it.
+ * Leaderboards, groups and challenges sit at the bottom.
  */
 export default function FriendsScreen() {
   const { colors, dark, s } = useTheme();
@@ -43,6 +46,10 @@ export default function FriendsScreen() {
   const [trail, setTrail] = useState<TrailMap | null>(null);
   const [draft, setDraft] = useState<LatLon | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [all, setAll] = useState<Friend[]>([]);
+  const [view, setView] = useState<Mode>('list');
+  /** The friend tapped in the list: the map opens on them. */
+  const [start, setStart] = useState<LatLon | null>(null);
   const recording = tracker.status !== 'idle';
 
   // Where you are: today's last fix while recording, else the phone's last known position (never prompts).
@@ -52,7 +59,11 @@ export default function FriendsScreen() {
   useFocusEffect(useCallback(() => {
     if (!serverUrl) return;
     let on = true;
-    cachedGroups().then((g) => on && setGroups(g)).catch(() => on && setGroups([]));
+    cachedFriends().then((f) => on && setAll(f)).catch(() => undefined);
+    cachedGroups()
+      .then((g) => { if (on) setGroups(g); return refreshFriends(g); })
+      .then((f) => on && setAll(f))
+      .catch(() => on && setGroups((g) => g ?? []));
     refreshLive().catch(() => undefined);
     const t = setInterval(() => refreshLive().catch(() => undefined), REFRESH_MS);
     return () => { on = false; clearInterval(t); };
@@ -77,17 +88,29 @@ export default function FriendsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spotKey]);
 
-  const friends = useMemo(() => sortFriends(live.friends, me), [live.friends, me]);
+  const { out, rest } = useMemo(() => friendList(all, live.friends, me), [all, live.friends, me]);
+  const friends = useMemo(() => out.map((f) => f.live), [out]);
   const mapHeight = Math.round(height * 0.5);
 
   const meetLabel = (p: LatLon) => {
     const f = trail ? nearestFeature(trail, p, 300) : null;
     return f ? (f.kind === 'lift' ? `Top of ${f.name}` : f.name) : 'Meet here';
   };
-  const showFriend = (p: LatLon) => mapRef.current?.focus(p);
+  const showFriend = (p: LatLon) => {
+    if (view === 'map') return mapRef.current?.focus(p);
+    setStart(p);
+    setView('map');
+  };
+  const switchTo = (v: Mode) => {
+    setStart(null);
+    setView(v);
+  };
   const refresh = () => {
     setRefreshing(true);
-    Promise.all([refreshLive(), cachedGroups().then(setGroups)]).catch(() => undefined).finally(() => setRefreshing(false));
+    Promise.all([
+      refreshLive(),
+      cachedGroups().then((g) => { setGroups(g); return refreshFriends(g); }).then(setAll),
+    ]).catch(() => undefined).finally(() => setRefreshing(false));
   };
 
   const more = (
@@ -122,8 +145,115 @@ export default function FriendsScreen() {
       ? 'Friends in your groups can see you.'
       : 'Friends see you while you record.';
 
+  const friendRow = (f: Friend, isOut: boolean, line: string) => (
+    <Tap
+      key={f.playerId}
+      style={styles.friend}
+      onPress={() => {
+        const l = isOut ? live.friends.find((x) => x.playerId === f.playerId) : null;
+        if (l) showFriend(l);
+        else router.push(`/player/${f.playerId}`);
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`${f.name}, ${line}. ${isOut ? 'Show on map' : 'Open profile'}`}
+    >
+      <Avatar playerId={f.playerId} name={f.name} size={40} hasAvatar={f.hasAvatar} />
+      <View style={styles.grow}>
+        <Text style={s.h2} numberOfLines={1}>{f.name}</Text>
+        <Text style={s.muted} numberOfLines={1}>{line}</Text>
+      </View>
+      {isOut ? (
+        <Pressable
+          onPress={() => router.push(`/player/${f.playerId}`)}
+          hitSlop={8}
+          style={styles.profile}
+          accessibilityRole="button"
+          accessibilityLabel={`${f.name}’s profile`}
+        >
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </Pressable>
+      ) : (
+        <View style={styles.profile}><Ionicons name="chevron-forward" size={20} color={colors.muted} /></View>
+      )}
+    </Tap>
+  );
+
+  const outRows = out.map((f) => friendRow(f, true, friendLine(f.live, me, units)));
+
+  const toggle = (
+    <View style={[styles.header, { paddingTop: insets.top + space.sm }]}>
+      <Text style={[s.h1, styles.grow]}>Friends</Text>
+      <View style={styles.pills} accessibilityRole="tablist">
+        {(['list', 'map'] as const).map((v) => (
+          <Pressable
+            key={v}
+            onPress={() => switchTo(v)}
+            style={[styles.pill, v === view && styles.pillOn]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: v === view }}
+          >
+            <Ionicons name={v === 'list' ? 'list-outline' : 'map-outline'} size={18} color={v === view ? colors.onAccent : colors.muted} />
+            <Text style={[styles.pillText, v === view && { color: colors.onAccent }]}>{v === 'list' ? 'List' : 'Map'}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
+  const statusLine = (
+    <View style={styles.status}>
+      <Ionicons name={shareLive && recording ? 'radio' : 'eye-off-outline'} size={18} color={shareLive && recording ? colors.accent : colors.muted} />
+      <Text style={[s.muted, styles.grow]}>{status}</Text>
+    </View>
+  );
+
+  const joinCard = (
+    <View style={[s.card, styles.join]}>
+      <Text style={s.h2}>Add your friends</Text>
+      <Text style={s.muted}>Make a group or join one with a code. Everyone in it shows up here, and on the map while they ski.</Text>
+      <Pressable onPress={() => router.push('/group/new')} style={styles.cta} accessibilityRole="button">
+        <Text style={styles.ctaText}>Make or join a group</Text>
+      </Pressable>
+    </View>
+  );
+
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />;
+
+  if (view === 'list') {
+    return (
+      <View style={s.screen}>
+        {toggle}
+        <ScrollView style={styles.grow} contentContainerStyle={[styles.body, { paddingBottom: tabSpace }]} refreshControl={refreshControl}>
+          {statusLine}
+          {noGroups ? joinCard : (
+            <>
+              <View style={styles.section}>
+                <Text style={s.label}>On the mountain</Text>
+                {out.length ? outRows : <Text style={s.muted}>Nobody is skiing right now. When friends start recording, they show here and on the map.</Text>}
+              </View>
+              {live.pins.length ? (
+                <View style={styles.section}>
+                  <Text style={s.label}>Meet up</Text>
+                  {live.pins.map((p) => <PinNote key={p.groupId} pin={p} me={me} units={units} />)}
+                </View>
+              ) : null}
+              {rest.length ? (
+                <View style={styles.section}>
+                  <Text style={s.label}>{out.length ? 'Everyone else' : `All friends (${rest.length})`}</Text>
+                  {rest.map((f) => friendRow(f, false, f.groups.join(', ')))}
+                </View>
+              ) : null}
+            </>
+          )}
+          {more}
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={s.screen}>
+      {toggle}
       <View>
         <FriendsMap
           ref={mapRef}
@@ -133,9 +263,10 @@ export default function FriendsScreen() {
           me={me}
           trail={trail}
           draft={draft}
+          start={start}
           onLongPress={noGroups ? undefined : setDraft}
         />
-        <View style={[styles.chip, { top: insets.top + space.sm, boxShadow: chromeShadow(dark) }]} pointerEvents="none">
+        <View style={[styles.chip, { top: space.sm, boxShadow: chromeShadow(dark) }]} pointerEvents="none">
           <View style={[styles.dot, { backgroundColor: friends.length ? colors.accent : colors.muted }]} />
           <Text style={s.control} numberOfLines={1}>{friendsHeadline(friends.length)}</Text>
         </View>
@@ -150,51 +281,13 @@ export default function FriendsScreen() {
       </View>
 
       {/* The map stays put and the list scrolls under it, so dragging the map never scrolls the page. */}
-      <ScrollView
-        style={styles.grow}
-        contentContainerStyle={[styles.body, { paddingBottom: tabSpace }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
-      >
-        <View style={styles.status}>
-          <Ionicons name={shareLive && recording ? 'radio' : 'eye-off-outline'} size={18} color={shareLive && recording ? colors.accent : colors.muted} />
-          <Text style={[s.muted, styles.grow]}>{status}</Text>
-        </View>
+      <ScrollView style={styles.grow} contentContainerStyle={[styles.body, { paddingBottom: tabSpace }]} refreshControl={refreshControl}>
+        {statusLine}
 
-        {noGroups ? (
-          <View style={[s.card, styles.join]}>
-            <Text style={s.h2}>Add your friends</Text>
-            <Text style={s.muted}>Make a group or join one with a code. Everyone in it shows on this map while they ski.</Text>
-            <Pressable onPress={() => router.push('/group/new')} style={styles.cta} accessibilityRole="button">
-              <Text style={styles.ctaText}>Make or join a group</Text>
-            </Pressable>
-          </View>
-        ) : (
+        {noGroups ? joinCard : (
           <View style={styles.section}>
             <Text style={s.label}>On the mountain</Text>
-            {friends.length ? friends.map((f) => (
-              <Tap
-                key={f.playerId}
-                style={styles.friend}
-                onPress={() => showFriend(f)}
-                accessibilityRole="button"
-                accessibilityLabel={`${f.name}, ${friendLine(f, me, units)}. Show on map`}
-              >
-                <Avatar playerId={f.playerId} name={f.name} size={40} />
-                <View style={styles.grow}>
-                  <Text style={s.h2} numberOfLines={1}>{f.name}</Text>
-                  <Text style={s.muted} numberOfLines={1}>{friendLine(f, me, units)}</Text>
-                </View>
-                <Pressable
-                  onPress={() => router.push(`/player/${f.playerId}`)}
-                  hitSlop={8}
-                  style={styles.profile}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${f.name}’s profile`}
-                >
-                  <Ionicons name="chevron-forward" size={20} color={colors.muted} />
-                </Pressable>
-              </Tap>
-            )) : (
+            {out.length ? outRows : (
               <Text style={s.muted}>Nobody from your groups is skiing right now. When they start recording, they appear here and on the map.</Text>
             )}
           </View>
@@ -230,6 +323,14 @@ export default function FriendsScreen() {
 const makeStyles = (colors: Palette) =>
   StyleSheet.create({
     grow: { flex: 1 },
+    header: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.sm },
+    pills: { flexDirection: 'row', gap: space.xs },
+    pill: {
+      flexDirection: 'row', alignItems: 'center', gap: space.xs, minHeight: target.min, paddingHorizontal: space.md,
+      borderRadius: radius.pill, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.faint,
+    },
+    pillOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+    pillText: { fontFamily: font.medium, color: colors.text },
     body: { padding: space.lg, gap: space.xl },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md, padding: space.xxl },
     cta: { alignSelf: 'center', marginTop: space.sm, paddingHorizontal: space.xl, paddingVertical: space.md, borderRadius: radius.pill, backgroundColor: colors.accent },

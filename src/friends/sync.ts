@@ -1,6 +1,7 @@
 import { matchSession } from '../challenges/service';
 import { getDb, getSegment, kvGet, kvSet, listAttempts, listSessions, saveSegment } from '../db';
-import { dayUpload, localDate, type Group, type GroupChallenge } from '../lib/groups';
+import { mergeMembers, type Friend } from '../lib/friendsMap';
+import { dayUpload, localDate, type Group, type GroupChallenge, type GroupDetail } from '../lib/groups';
 import { getSettings, updateSettings } from '../settings';
 import { api, FriendsError, friendsEnabled } from './api';
 
@@ -37,6 +38,28 @@ export async function cachedGroups(): Promise<Group[]> {
   } catch {
     return [];
   }
+}
+
+/** Everyone in your groups as last fetched, so the Friends list shows offline too. */
+export async function cachedFriends(): Promise<Friend[]> {
+  try {
+    return JSON.parse((await kvGet('friends:members')) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch every group's members and remember them. A group that fails keeps nobody out: it's just skipped. */
+export async function refreshFriends(groups: Group[]): Promise<Friend[]> {
+  const details = await Promise.all(groups.map((g) => api.group(g.id).catch(() => null)));
+  if (groups.length && details.every((d) => d == null)) return cachedFriends(); // offline: keep the last list
+  return saveFriends(details.filter((d) => d != null));
+}
+
+async function saveFriends(details: GroupDetail[]): Promise<Friend[]> {
+  const friends = mergeMembers(details, getSettings().playerId);
+  await kvSet('friends:members', JSON.stringify(friends));
+  return friends;
 }
 
 export async function cachedChallenges(): Promise<CachedChallenge[]> {
@@ -155,8 +178,10 @@ async function uploadDays() {
 async function pullChallenges(groups: Group[]): Promise<CachedChallenge[]> {
   const out: CachedChallenge[] = [];
   const fresh: GroupChallenge[] = [];
+  const details: GroupDetail[] = [];
   for (const g of groups) {
     const detail = await api.group(g.id);
+    details.push(detail);
     for (const c of detail.challenges) {
       out.push({ groupId: g.id, groupName: g.name, challengeId: c.id, segmentId: c.segmentId, date: c.date, name: c.segment.name });
       if (!(await getSegment(c.segmentId))) {
@@ -166,6 +191,7 @@ async function pullChallenges(groups: Group[]): Promise<CachedChallenge[]> {
     }
   }
   await kvSet('friends:challenges', JSON.stringify(out));
+  await saveFriends(details);
   if (fresh.length) {
     // Someone set a challenge on a stretch you already skied that day: time those days now.
     const sessions = await listSessions();
@@ -203,6 +229,7 @@ async function uploadAttempts(challenges: CachedChallenge[]) {
 export async function resetFriendsCache() {
   await kvSet('friends:groups', null);
   await kvSet('friends:challenges', null);
+  await kvSet('friends:members', null);
   await getDb().runAsync(
     "DELETE FROM kv WHERE key LIKE 'friends:day:%' OR key LIKE 'friends:att:%' OR key LIKE 'backup:%' OR key = 'profile:badges'",
   );
