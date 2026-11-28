@@ -176,7 +176,7 @@ export default function RecordScreen() {
             style={styles.sos}
             hitSlop={space.sm}
             accessibilityRole="button"
-            accessibilityLabel="Emergency: call for help and show my coordinates"
+            accessibilityLabel="Emergency: show my coordinates and the emergency number"
           >
             <Ionicons name="medkit-outline" size={20} color={colors.danger} />
             <Text style={styles.sosText}>SOS</Text>
