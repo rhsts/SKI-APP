@@ -25,7 +25,6 @@ jobs:
       BUILD_NUMBER: ${{ github.run_number }}
       EXPO_NO_TELEMETRY: '1'
     outputs:
-      file: ${{ steps.apk.outputs.file }}
       sha1: ${{ steps.apk.outputs.sha1 }}
       maps: ${{ steps.apk.outputs.maps }}
     steps:
@@ -87,10 +86,12 @@ jobs:
       - name: Collect APK
         id: apk
         run: |
+          # The file name is not passed on as a job output: GitHub drops any output that contains a
+          # secret's value, and the key alias "ski" is part of "ski-tracker-…". Later jobs rebuild the
+          # name from the run number instead.
           OUT=ski-tracker-${BUILD_NUMBER}.apk
           cp android/app/build/outputs/apk/release/app-release.apk "$OUT"
           ls -lh "$OUT"
-          echo "file=$OUT" >> "$GITHUB_OUTPUT"
           # Fingerprint of the key the APK is actually signed with (for restricting the Maps key).
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
           SHA1=$("$APKSIGNER" verify --print-certs "$OUT" | sed -n 's/.*certificate SHA-1 digest: //p' | head -1 | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
@@ -106,7 +107,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: apk
-          path: ${{ steps.apk.outputs.file }}
+          path: ski-tracker-${{ github.run_number }}.apk
           retention-days: 14
 
   smoke-test:
@@ -134,7 +135,7 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: ./scripts/smoke-test.sh ${{ needs.build.outputs.file }}
+          script: ./scripts/smoke-test.sh ski-tracker-${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -157,9 +158,9 @@ jobs:
           name: Ski Tracker 1.1.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
-          files: ${{ needs.build.outputs.file }}
+          files: ski-tracker-${{ github.run_number }}.apk
           body: |
-            **Install on Android:** tap `${{ needs.build.outputs.file }}` below → allow your browser to "install unknown apps" → Install.
+            **Install on Android:** tap `ski-tracker-${{ github.run_number }}.apk` below → allow your browser to "install unknown apps" → Install.
             Updates install over the previous version and keep your data.
             If Android says "App not installed", your phone has an older build signed with the old key: back up your days first (You → Back up all days), uninstall Ski Tracker, install this one, then You → Restore from a backup.
             ✔️ Checked on an Android emulator: the app starts and keeps running.
