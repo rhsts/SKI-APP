@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Changed
+- **Friends opens on a list of all your friends.** Everyone in your groups, with whoever is skiing right
+  now on top (closest first). Tap someone who's out to see them on the map, or anyone else for their
+  profile. A List / Map switch at the top opens the live map and meet-up pin.
 - **SOS no longer has call buttons.** The screen shows the emergency number to dial yourself, your
   coordinates, the nearest piste or lift, and Copy and Send location.
 

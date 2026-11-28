@@ -1,6 +1,6 @@
 import { fmtDist } from './format';
 import { distance, type LatLon } from './geo';
-import type { LiveMember } from './groups';
+import type { GroupDetail, LiveMember } from './groups';
 import type { Units } from './types';
 
 /** The Friends tab's map: what to say about each friend, and where to point the camera. */
@@ -22,6 +22,45 @@ export function friendLine(f: LiveMember, me: LatLon | null, units: Units, now =
 export function sortFriends(friends: LiveMember[], me: LatLon | null): LiveMember[] {
   return [...friends].sort((a, b) =>
     (me ? distance(me, a) - distance(me, b) : b.at - a.at) || a.name.localeCompare(b.name));
+}
+
+/** Someone in at least one of your groups. */
+export interface Friend {
+  playerId: string;
+  name: string;
+  hasAvatar: boolean;
+  /** Names of the groups you share, A to Z. */
+  groups: string[];
+}
+
+/** Everyone in your groups once, without you, A to Z. */
+export function mergeMembers(details: Pick<GroupDetail, 'name' | 'members'>[], myId: string): Friend[] {
+  const byId = new Map<string, Friend>();
+  for (const g of details) {
+    for (const m of g.members) {
+      if (m.playerId === myId) continue;
+      const f = byId.get(m.playerId) ?? { playerId: m.playerId, name: m.name, hasAvatar: m.hasAvatar !== false, groups: [] };
+      if (!f.groups.includes(g.name)) f.groups.push(g.name);
+      byId.set(m.playerId, f);
+    }
+  }
+  return [...byId.values()]
+    .map((f) => ({ ...f, groups: [...f.groups].sort((a, b) => a.localeCompare(b)) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The Friends list: who is out now (closest first) and everyone else (A to Z).
+ * Someone seen live but not yet in the member list (it hasn't loaded) still shows as out.
+ */
+export function friendList(all: Friend[], live: LiveMember[], me: LatLon | null): { out: (Friend & { live: LiveMember })[]; rest: Friend[] } {
+  const byId = new Map(all.map((f) => [f.playerId, f]));
+  const out = sortFriends(live, me).map((l) => ({
+    ...(byId.get(l.playerId) ?? { playerId: l.playerId, name: l.name, hasAvatar: true, groups: [] }),
+    live: l,
+  }));
+  const seen = new Set(live.map((l) => l.playerId));
+  return { out, rest: all.filter((f) => !seen.has(f.playerId)) };
 }
 
 /** "3 friends on the mountain" */

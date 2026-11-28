@@ -30,6 +30,8 @@ interface Props {
   me: LatLon | null;
   trail: TrailMap | null;
   draft?: LatLon | null;
+  /** Open on this spot instead of framing everyone, e.g. the friend tapped in the list. */
+  start?: LatLon | null;
   /** Long-press: drop a meet-up pin there. */
   onLongPress?: (p: LatLon) => void;
 }
@@ -37,7 +39,7 @@ interface Props {
 const EDGE = { top: 96, right: 48, bottom: 48, left: 48 };
 
 /** The Friends tab's map: everyone in your groups who is skiing now, with their picture and name. */
-export function FriendsMap({ ref, height, friends, pins, me, trail, draft, onLongPress }: Props) {
+export function FriendsMap({ ref, height, friends, pins, me, trail, draft, start, onLongPress }: Props) {
   const mapRef = useRef<MapView>(null);
   const spots = useMemo<LatLon[]>(
     () => [...(me ? [me] : []), ...friends, ...pins],
@@ -50,17 +52,15 @@ export function FriendsMap({ ref, height, friends, pins, me, trail, draft, onLon
       mapRef.current?.animateToRegion(regionFor(spots), 500);
     }
   };
-  useImperativeHandle(ref, () => ({
-    focus: (p) => mapRef.current?.animateCamera({ center: { latitude: p.lat, longitude: p.lon }, zoom: 15 }, { duration: 500 }),
-    showAll,
-  }));
+  const focus = (p: LatLon) => mapRef.current?.animateCamera({ center: { latitude: p.lat, longitude: p.lon }, zoom: 15 }, { duration: 500 });
+  useImperativeHandle(ref, () => ({ focus, showAll }));
 
   // Frame everyone once, when the first position arrives (yours or a friend's): after that the map is yours to move.
   const framed = useRef(false);
   useEffect(() => {
     if (framed.current || !spots.length) return;
     framed.current = true;
-    const t = setTimeout(showAll, 300); // after the map has laid out
+    const t = setTimeout(() => (start ? focus(start) : showAll()), 300); // after the map has laid out
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots.length]);
@@ -73,7 +73,7 @@ export function FriendsMap({ ref, height, friends, pins, me, trail, draft, onLon
         style={StyleSheet.absoluteFill}
         provider={PROVIDER_GOOGLE}
         mapType="terrain"
-        initialRegion={regionFor(spots)}
+        initialRegion={regionFor(start ? [start] : spots)}
         showsUserLocation
         showsMyLocationButton={false}
         toolbarEnabled={false}
